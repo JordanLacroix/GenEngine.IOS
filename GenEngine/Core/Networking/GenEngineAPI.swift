@@ -7,10 +7,19 @@ protocol GenEngineAPI: Sendable {
     func login(userName: String, password: String) async throws -> AccessToken
     func listPublishedStories() async throws -> [PublishedScenarioView]
     func importScenario(rawJSON: Data) async throws -> ScenarioView
+    func validate(scenarioId: UUID) async throws -> ValidationReport
+    func analyze(scenarioId: UUID) async throws -> NarrativeStructureReport
+    func preview(scenarioId: UUID, request: ScenarioPreviewRequest) async throws -> ScenarioPreview
     func publish(scenarioId: UUID, expectedRevision: Int) async throws -> ScenarioVersionView
     func startSession(scenarioVersionId: UUID, seed: UInt64) async throws -> SessionView
+    func session(sessionId: UUID) async throws -> SessionView
     func currentStep(sessionId: UUID) async throws -> CurrentStep
+    func sessionTree(sessionId: UUID) async throws -> NarrativeTree
     func submitChoice(sessionId: UUID, commandId: UUID, expectedRevision: Int, choiceId: String) async throws -> InputResult
+    func continueInteraction(sessionId: UUID, commandId: UUID, expectedRevision: Int) async throws -> InputResult
+    func submitAnswer(sessionId: UUID, commandId: UUID, expectedRevision: Int, answerId: String) async throws -> InputResult
+    func submitText(sessionId: UUID, commandId: UUID, expectedRevision: Int, text: String) async throws -> InputResult
+    func confirmTextAnalysis(sessionId: UUID, commandId: UUID, expectedRevision: Int, confirmed: Bool) async throws -> InputResult
     func pause(sessionId: UUID, expectedRevision: Int) async throws -> SessionView
     func resume(sessionId: UUID, expectedRevision: Int) async throws -> SessionView
 }
@@ -74,6 +83,18 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await perform(method: "POST", base: endpoints.authoring, path: "/scenarios/import", body: rawJSON, authenticated: true)
     }
 
+    func validate(scenarioId: UUID) async throws -> ValidationReport {
+        try await postWithoutBody(base: endpoints.authoring, path: scenarioPath(scenarioId) + "/validate")
+    }
+
+    func analyze(scenarioId: UUID) async throws -> NarrativeStructureReport {
+        try await postWithoutBody(base: endpoints.authoring, path: scenarioPath(scenarioId) + "/analyze")
+    }
+
+    func preview(scenarioId: UUID, request: ScenarioPreviewRequest) async throws -> ScenarioPreview {
+        try await send(method: "POST", base: endpoints.authoring, path: scenarioPath(scenarioId) + "/preview", body: request)
+    }
+
     func publish(scenarioId: UUID, expectedRevision: Int) async throws -> ScenarioVersionView {
         try await send(method: "POST", base: endpoints.authoring, path: "/scenarios/\(scenarioId.uuidString.lowercased())/publish", body: PublishRequest(expectedRevision: expectedRevision))
     }
@@ -82,20 +103,44 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await send(method: "POST", base: endpoints.play, path: "/sessions", body: StartSessionRequest(scenarioVersionId: scenarioVersionId, seed: seed))
     }
 
+    func session(sessionId: UUID) async throws -> SessionView {
+        try await perform(method: "GET", base: endpoints.play, path: sessionPath(sessionId), body: nil, authenticated: true)
+    }
+
     func currentStep(sessionId: UUID) async throws -> CurrentStep {
-        try await perform(method: "GET", base: endpoints.play, path: "/sessions/\(sessionId.uuidString.lowercased())/current-step", body: nil, authenticated: true)
+        try await perform(method: "GET", base: endpoints.play, path: sessionPath(sessionId) + "/current-step", body: nil, authenticated: true)
+    }
+
+    func sessionTree(sessionId: UUID) async throws -> NarrativeTree {
+        try await perform(method: "GET", base: endpoints.play, path: sessionPath(sessionId) + "/tree", body: nil, authenticated: true)
     }
 
     func submitChoice(sessionId: UUID, commandId: UUID, expectedRevision: Int, choiceId: String) async throws -> InputResult {
-        try await send(method: "POST", base: endpoints.play, path: "/sessions/\(sessionId.uuidString.lowercased())/inputs", body: SubmitChoiceRequest(commandId: commandId, expectedRevision: expectedRevision, choiceId: choiceId))
+        try await send(method: "POST", base: endpoints.play, path: sessionPath(sessionId) + "/inputs", body: SubmitChoiceRequest(commandId: commandId, expectedRevision: expectedRevision, choiceId: choiceId))
+    }
+
+    func continueInteraction(sessionId: UUID, commandId: UUID, expectedRevision: Int) async throws -> InputResult {
+        try await send(method: "POST", base: endpoints.play, path: sessionPath(sessionId) + "/continue", body: ContinueInteractionRequest(commandId: commandId, expectedRevision: expectedRevision))
+    }
+
+    func submitAnswer(sessionId: UUID, commandId: UUID, expectedRevision: Int, answerId: String) async throws -> InputResult {
+        try await send(method: "POST", base: endpoints.play, path: sessionPath(sessionId) + "/answers", body: SubmitAnswerRequest(commandId: commandId, expectedRevision: expectedRevision, answerId: answerId))
+    }
+
+    func submitText(sessionId: UUID, commandId: UUID, expectedRevision: Int, text: String) async throws -> InputResult {
+        try await send(method: "POST", base: endpoints.play, path: sessionPath(sessionId) + "/text-inputs", body: SubmitTextRequest(commandId: commandId, expectedRevision: expectedRevision, text: text))
+    }
+
+    func confirmTextAnalysis(sessionId: UUID, commandId: UUID, expectedRevision: Int, confirmed: Bool) async throws -> InputResult {
+        try await send(method: "POST", base: endpoints.play, path: sessionPath(sessionId) + "/text-inputs/confirm", body: ConfirmTextAnalysisRequest(commandId: commandId, expectedRevision: expectedRevision, confirmed: confirmed))
     }
 
     func pause(sessionId: UUID, expectedRevision: Int) async throws -> SessionView {
-        try await send(method: "POST", base: endpoints.play, path: "/sessions/\(sessionId.uuidString.lowercased())/pause", body: RevisionRequest(expectedRevision: expectedRevision))
+        try await send(method: "POST", base: endpoints.play, path: sessionPath(sessionId) + "/pause", body: RevisionRequest(expectedRevision: expectedRevision))
     }
 
     func resume(sessionId: UUID, expectedRevision: Int) async throws -> SessionView {
-        try await send(method: "POST", base: endpoints.play, path: "/sessions/\(sessionId.uuidString.lowercased())/resume", body: RevisionRequest(expectedRevision: expectedRevision))
+        try await send(method: "POST", base: endpoints.play, path: sessionPath(sessionId) + "/resume", body: RevisionRequest(expectedRevision: expectedRevision))
     }
 
     private func send<Body: Encodable & Sendable, Response: Decodable>(method: String, base: String, path: String, body: Body, authenticated: Bool = true) async throws -> Response {
@@ -106,6 +151,10 @@ actor LiveGenEngineAPI: GenEngineAPI {
     private func sendVoid<Body: Encodable & Sendable>(method: String, base: String, path: String, body: Body, authenticated: Bool) async throws {
         let data = try JSONEncoder().encode(body)
         _ = try await request(method: method, base: base, path: path, body: data, authenticated: authenticated)
+    }
+
+    private func postWithoutBody<Response: Decodable>(base: String, path: String) async throws -> Response {
+        try await perform(method: "POST", base: base, path: path, body: nil, authenticated: true)
     }
 
     private func perform<Response: Decodable>(method: String, base: String, path: String, body: Data?, authenticated: Bool) async throws -> Response {
@@ -165,4 +214,7 @@ actor LiveGenEngineAPI: GenEngineAPI {
         let kept = value.index(value.index(after: dot), offsetBy: 3)
         return String(value[..<kept]) + String(value[cursor...])
     }
+
+    private func sessionPath(_ id: UUID) -> String { "/sessions/\(id.uuidString.lowercased())" }
+    private func scenarioPath(_ id: UUID) -> String { "/scenarios/\(id.uuidString.lowercased())" }
 }
