@@ -1,25 +1,52 @@
-# GenEngine for iOS and iPadOS
+<div align="center">
 
-Native SwiftUI client for playing interactive stories powered by GenEngine. The repository is an adaptable product foundation: it includes a polished offline demo, authenticated backend access, and Debug-only authoring tools.
+# GenEngine iOS
 
-## Product slice
+**Client SwiftUI natif pour jouer, découvrir et tester les récits interactifs GenEngine sur iPhone et iPad.**
 
-- Premium narrative home and library.
-- Immersive choice-based player with motion and accessibility support.
-- Offline demo so the product remains reviewable without a backend.
-- Identity, Authoring, and complete Play API integration.
-- Typed narration, choices, quizzes, free text with confirmation, pause/resume, and an explainable session tree.
-- Local session references for server-authoritative resume (no narrative state is duplicated on device).
-- Developer controls isolated from release builds.
-- Universal layout for iPhone and iPad.
+[![iOS](https://github.com/JordanLacroix/GenEngine.IOS/actions/workflows/ios.yml/badge.svg)](https://github.com/JordanLacroix/GenEngine.IOS/actions/workflows/ios.yml)
+[![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](https://www.swift.org/)
+[![Status](https://img.shields.io/badge/statut-client%20connecté-2EA44F)](#état-du-projet)
+[![License](https://img.shields.io/badge/licence-non%20définie-lightgrey)](#licence)
 
-## Requirements
+[Vision](#vision) · [Démarrage rapide](#démarrage-rapide) · [Architecture](#architecture) · [Roadmap](#roadmap) · [Documentation](#documentation) · [Contribuer](#contribuer)
 
-- Xcode 26 or later.
-- Swift 6.
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen) 2.44 or later.
+</div>
 
-## Generate and run
+---
+
+## Vision
+
+GenEngine iOS fournit une expérience narrative native, accessible et adaptée à l’iPhone comme à l’iPad. Le serveur reste l’autorité sur les scénarios, les sessions et les transitions ; le client présente les états reçus et transmet les intentions de l’utilisateur.
+
+Le dépôt conserve deux parcours explicitement séparés :
+
+- un mode connecté couvrant Identity, le catalogue Authoring et le parcours Play complet ;
+- une démonstration hors ligne stable, destinée à la revue produit et aux tests d’interface.
+
+## État du projet
+
+| Capacité | État |
+|---|---|
+| Accueil et bibliothèque éditoriale | ✅ Disponible |
+| Démonstration hors ligne | ✅ Disponible |
+| Authentification et stockage Keychain | ✅ Connecté |
+| Catalogue public Authoring | ✅ Connecté |
+| Choix, quiz et texte libre confirmé | ✅ Connecté à Play |
+| Pause, reprise et arbre explicable | ✅ Connecté à Play |
+| Outils Authoring | ✅ Disponibles en Debug uniquement |
+| Support universel iPhone/iPad | ✅ Configuré |
+| Configuration, organisations, assistant et économie | 📋 En attente des contrats backend |
+
+## Démarrage rapide
+
+### Prérequis
+
+- Xcode 26 ou version ultérieure ;
+- Swift 6 ;
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) 2.44 ou version ultérieure.
+
+### Générer et lancer
 
 ```bash
 brew install xcodegen
@@ -27,58 +54,90 @@ xcodegen generate
 open GenEngine.xcodeproj
 ```
 
-The Xcode project is generated and intentionally ignored. `project.yml` is the source of truth.
+Le projet Xcode généré est volontairement ignoré. [`project.yml`](project.yml) est la source de vérité.
 
-Choose **Explore the demo** on the welcome screen to navigate the complete product slice without a running backend.
+Sélectionnez **Explorer la démo** pour parcourir l’application sans backend.
 
-## Connect to GenEngine locally
+### Connecter le backend local
 
-Start the backend from the GenEngine repository:
+Depuis le dépôt backend :
 
 ```bash
-docker compose -f compose.yaml up --build -d --wait
+docker compose up --build --detach --wait
 ```
 
-In a Debug build, open **Developer** and configure the three service URLs. Simulator defaults use `localhost`; a physical device needs reachable HTTPS endpoints. App Transport Security is not disabled globally.
+Dans une compilation Debug, ouvrez **Developer** et configurez les trois services. Le simulateur utilise `localhost` ; un appareil physique exige des endpoints HTTPS joignables. App Transport Security n’est pas désactivé globalement.
 
-The public Authoring catalog is loaded on Home and Library, including in demo mode. From the Developer screen, the bundled `forest-choice.json` fixture is imported, validated, structurally analyzed, previewed, then published; a successful publication refreshes the catalog. Tokens are stored in Keychain; endpoint preferences and opaque session references are stored in `UserDefaults`. Session state and transitions remain authoritative in Play.
+| Service | URL locale |
+|---|---|
+| Authoring | `http://localhost:5201` |
+| Play | `http://localhost:5202` |
+| Identity | `http://localhost:5203` |
+
+Les jetons sont conservés dans Keychain. Les préférences d’endpoints et références opaques de sessions sont stockées dans `UserDefaults`. L’état narratif reste exclusivement autoritatif dans Play.
 
 ## Architecture
 
 ```text
 GenEngine/
-├── App/                 App entry point, navigation and product state
+├── App/                 # Entrée, navigation et état produit
 ├── Core/
-│   ├── Configuration/   Environments and endpoint persistence
-│   ├── DesignSystem/    Tokens and reusable components
-│   ├── Models/          API and presentation models
-│   ├── Networking/      Typed API client
-│   └── Security/        Keychain-backed credentials
+│   ├── Configuration/   # Environnements et endpoints
+│   ├── DesignSystem/    # Tokens et composants partagés
+│   ├── Models/          # Modèles API et présentation
+│   ├── Networking/      # Client HTTP typé
+│   └── Security/        # Credentials protégés par Keychain
 └── Features/
     ├── Authentication/
-    ├── Developer/       Debug builds only
+    ├── Developer/       # Debug uniquement
     ├── Home/
     ├── Library/
     └── Player/
 ```
 
-Views depend on `AppState`; remote I/O is isolated behind `GenEngineAPI`. Fixtures live in `DemoStory` and never alter production responses.
+Les vues dépendent de `AppState` et les I/O distantes passent par `GenEngineAPI`. Les fixtures vivent dans `DemoStory` et ne remplacent jamais silencieusement une réponse distante en erreur.
 
-## Quality
+Les frontières et compromis sont détaillés dans [`specs/architecture.md`](specs/architecture.md).
+
+## Qualité
 
 ```bash
+xcodegen generate
 xcodebuild build -project GenEngine.xcodeproj -scheme GenEngine \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
-
 xcodebuild test -project GenEngine.xcodeproj -scheme GenEngine \
   -destination 'platform=iOS Simulator,OS=latest,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO
 ```
 
-Swift Testing covers deterministic demo navigation and API enum compatibility. GitHub Actions regenerates the project before every build.
+Swift Testing couvre la navigation déterministe de la démonstration et la compatibilité des enums API. GitHub Actions régénère le projet avant chaque build.
 
-## Security notes
+## Roadmap
 
-- No credentials or personal LAN address are committed.
-- Release builds contain no Developer tab or authoring import UI.
-- Cleartext traffic is not globally allowed. Use HTTPS for devices and deployed environments.
-- The mobile app currently talks to the three GenEngine services directly. A single public edge endpoint is recommended before production distribution.
+Le client a livré sa fondation visuelle puis la connexion au parcours narratif actuel. Les prochaines tranches suivront les contrats publiés du backend, sans anticiper les règles de configuration, d’autorisation ou d’organisation. Voir [`specs/roadmap.md`](specs/roadmap.md).
+
+## Documentation
+
+- [Index des spécifications](specs/README.md)
+- [Passage de relais](specs/handoff.md)
+- [Invariants](specs/invariants.md)
+- [Architecture](specs/architecture.md)
+- [Roadmap](specs/roadmap.md)
+- [Guide de contribution](CONTRIBUTING.md)
+- [Politique de sécurité](SECURITY.md)
+
+## Sécurité
+
+Ne publiez aucune vulnérabilité exploitable dans une issue. Consultez [`SECURITY.md`](SECURITY.md) pour le canal de signalement privé et le périmètre pris en charge.
+
+## Contribuer
+
+Les contributions suivent des branches courtes, des commits conventionnels, une PR focalisée et les contrôles CI requis. Consultez [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Dépôts associés
+
+- [GenEngine backend](https://github.com/JordanLacroix/GenEngine)
+- [GenEngine Web](https://github.com/JordanLacroix/GenEngine.Web)
+
+## Licence
+
+Aucune licence n’est actuellement définie. Le dépôt est public, mais cela n’accorde pas automatiquement un droit de réutilisation, modification ou redistribution.
