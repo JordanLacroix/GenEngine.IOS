@@ -12,21 +12,19 @@ struct HomeView: View {
                     HeroStoryCard(story: DemoStory.summary) { Task { await state.open(DemoStory.summary) } }
                     VStack(alignment: .leading, spacing: 14) {
                         Text("À découvrir").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
-                        ScrollView(.horizontal) {
-                            HStack(spacing: 16) {
-                                ForEach(state.stories.dropFirst()) { story in
-                                    CompactStoryCard(story: story) { Task { await state.open(story) } }
-                                }
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 16)], spacing: 16) {
+                            ForEach(state.stories.dropFirst()) { story in
+                                CompactStoryCard(story: story) { Task { await state.open(story) } }
                             }
                         }
-                        .scrollIndicators(.hidden)
                     }
                 }
-                .frame(maxWidth: 980, alignment: .leading)
                 .padding(.horizontal, 22)
                 .padding(.top, 18)
                 .padding(.bottom, 110)
-                .frame(maxWidth: .infinity)
+                .containerRelativeFrame(.horizontal) { availableWidth, _ in
+                    min(availableWidth, 1_024)
+                }
             }
         }
         .navigationTitle("Accueil")
@@ -82,7 +80,7 @@ struct CompactStoryCard: View {
                 Text(story.duration).font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             }
             .padding(20)
-            .frame(width: 220, height: 230, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 210, alignment: .leading)
             .background(GenEngineTheme.midnight.opacity(0.78), in: RoundedRectangle(cornerRadius: 24))
             .overlay { RoundedRectangle(cornerRadius: 24).stroke(GenEngineTheme.accent(story.accent).opacity(0.26)) }
         }
