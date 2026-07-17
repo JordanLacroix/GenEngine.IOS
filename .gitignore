@@ -1,0 +1,14 @@
+# Xcode / builds
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcresult
+
+# XcodeGen generates the project from project.yml.
+GenEngine.xcodeproj/
+GenEngineTester.xcodeproj/
+
+# Local configuration and macOS
+*.local.xcconfig
+.DS_Store
