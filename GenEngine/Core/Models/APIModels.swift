@@ -5,6 +5,16 @@ struct AccessToken: Decodable, Sendable { let token: String; let expiresAt: Date
 struct ScenarioView: Decodable, Sendable { let id: UUID; let title: String; let revision: Int; let draftJson: String }
 struct PublishRequest: Encodable, Sendable { let expectedRevision: Int }
 struct ScenarioVersionView: Decodable, Sendable { let id: UUID; let scenarioId: UUID; let number: Int; let snapshotHash: String; let publishedAt: Date }
+struct PublishedScenarioView: Decodable, Sendable {
+    let scenarioId: UUID
+    let versionId: UUID
+    let versionNumber: Int
+    let title: String
+    let description: String
+    let estimatedMinutes: Int
+    let publishedAt: Date
+    let snapshotHash: String
+}
 
 enum SessionStatus: Equatable, Sendable {
     case awaitingInput, paused, completed, abandoned

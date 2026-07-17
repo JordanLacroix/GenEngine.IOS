@@ -5,6 +5,7 @@ protocol GenEngineAPI: Sendable {
     func setToken(_ token: String?) async
     func register(userName: String, password: String) async throws -> AccessToken
     func login(userName: String, password: String) async throws -> AccessToken
+    func listPublishedStories() async throws -> [PublishedScenarioView]
     func importScenario(rawJSON: Data) async throws -> ScenarioView
     func publish(scenarioId: UUID, expectedRevision: Int) async throws -> ScenarioVersionView
     func startSession(scenarioVersionId: UUID, seed: UInt64) async throws -> SessionView
@@ -58,6 +59,15 @@ actor LiveGenEngineAPI: GenEngineAPI {
         let access: AccessToken = try await send(method: "POST", base: endpoints.identity, path: "/auth/login", body: CredentialsRequest(userName: userName, password: password), authenticated: false)
         token = access.token
         return access
+    }
+
+    func listPublishedStories() async throws -> [PublishedScenarioView] {
+        try await perform(
+            method: "GET",
+            base: endpoints.authoring,
+            path: "/catalog",
+            body: nil,
+            authenticated: false)
     }
 
     func importScenario(rawJSON: Data) async throws -> ScenarioView {
