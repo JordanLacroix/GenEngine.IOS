@@ -27,6 +27,7 @@ final class AppState {
     private(set) var currentStory: StorySummary?
     private(set) var session: SessionView?
     private(set) var step: CurrentStep?
+    private(set) var tree: NarrativeTree?
     private(set) var isDemoSession = false
     private(set) var scenarioVersionID: UUID?
     private(set) var publishedTitle: String?
@@ -37,6 +38,7 @@ final class AppState {
     private(set) var isLoadingCatalog = false
     private var hasLoadedCatalog = false
     private(set) var developerLog: [String] = []
+    private(set) var savedSessions: [SavedSession] = SessionStore.load()
 
     var hasProductAccess: Bool { isAuthenticated || isDemoAccess }
     var stories: [StorySummary] {
@@ -145,6 +147,36 @@ final class AppState {
             let result = try await self.api.submitChoice(sessionId: session.id, commandId: UUID(), expectedRevision: session.revision, choiceId: choiceID)
             self.session = result.session
             self.step = result.currentStep
+            self.remember(result.session)
+            await self.refreshTree()
+        }
+    }
+
+    func continueInteraction() async {
+        guard let session, !isDemoSession else { return }
+        await performInput("Narration continuée") {
+            try await self.api.continueInteraction(sessionId: session.id, commandId: UUID(), expectedRevision: session.revision)
+        }
+    }
+
+    func submit(answerID: String) async {
+        guard let session, !isDemoSession else { return }
+        await performInput("Réponse envoyée") {
+            try await self.api.submitAnswer(sessionId: session.id, commandId: UUID(), expectedRevision: session.revision, answerId: answerID)
+        }
+    }
+
+    func submit(text: String) async {
+        guard let session, !isDemoSession else { return }
+        await performInput("Texte analysé") {
+            try await self.api.submitText(sessionId: session.id, commandId: UUID(), expectedRevision: session.revision, text: text)
+        }
+    }
+
+    func confirmTextAnalysis(_ confirmed: Bool) async {
+        guard let session, !isDemoSession else { return }
+        await performInput(confirmed ? "Analyse confirmée" : "Nouvelle saisie demandée") {
+            try await self.api.confirmTextAnalysis(sessionId: session.id, commandId: UUID(), expectedRevision: session.revision, confirmed: confirmed)
         }
     }
 
@@ -158,20 +190,55 @@ final class AppState {
             } else {
                 self.session = try await self.api.pause(sessionId: session.id, expectedRevision: session.revision)
             }
+            if let updated = self.session { self.remember(updated) }
         }
     }
+
+    func resume(_ saved: SavedSession) async {
+        await run("Reprise de l’histoire") {
+            let session = try await self.api.session(sessionId: saved.id)
+            let story = self.stories.first { item in
+                if case let .published(versionID) = item.availability { return versionID == session.scenarioVersionId }
+                return false
+            } ?? StorySummary(id: session.scenarioVersionId.uuidString.lowercased(), title: saved.title, eyebrow: "Session sauvegardée", synopsis: "Reprenez cette histoire depuis le moteur GenEngine.", duration: "Tour \(session.turn + 1)", symbol: "bookmark.fill", accent: .verdigris, availability: .published(session.scenarioVersionId))
+            self.currentStory = story
+            self.isDemoSession = false
+            self.session = session
+            self.step = try await self.api.currentStep(sessionId: session.id)
+            self.remember(session)
+            await self.refreshTree()
+        }
+    }
+
+    func loadTree() async { await refreshTree() }
 
     func endSession() {
         session = nil
         step = nil
         currentStory = nil
         isDemoSession = false
+        tree = nil
     }
 
     #if DEBUG
     func importAndPublish(_ data: Data, label: String) async {
         await run("Import \(label)") {
             let scenario = try await self.api.importScenario(rawJSON: data)
+            let validation = try await self.api.validate(scenarioId: scenario.id)
+            guard validation.isValid else {
+                let errors = validation.issues.filter(\.isError).map(\.code).joined(separator: ", ")
+                throw APIError.invalidScenario("Validation refusée : \(errors)")
+            }
+            let analysis = try await self.api.analyze(scenarioId: scenario.id)
+            self.developerLog.insert("Analysis: \(analysis.loops.count) loop(s), \(analysis.conditionalDeadEnds.count) conditional dead end(s)", at: 0)
+            if let document = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let initialNodeID = document["initialNodeId"] as? String {
+                do {
+                    let preview = try await self.api.preview(scenarioId: scenario.id, request: ScenarioPreviewRequest(nodeId: initialNodeID, turn: 0, variables: [:], characteristics: [:], inventory: [], evidence: [], relations: [:], rewards: [], visitedNodes: []))
+                    self.developerLog.insert("Preview: \(preview.currentStep.kind) at \(preview.currentStep.nodeId)", at: 0)
+                } catch {
+                    self.developerLog.insert("Preview unavailable for empty injected state: \(error.localizedDescription)", at: 0)
+                }
+            }
             let version = try await self.api.publish(scenarioId: scenario.id, expectedRevision: scenario.revision)
             self.scenarioVersionID = version.id
             self.publishedTitle = scenario.title
@@ -189,6 +256,8 @@ final class AppState {
             self.isDemoSession = false
             self.session = session
             self.step = try await self.api.currentStep(sessionId: session.id)
+            self.remember(session)
+            await self.refreshTree()
         }
     }
 
@@ -209,5 +278,45 @@ final class AppState {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             developerLog.insert("✗ \(label): \(error.localizedDescription)", at: 0)
         }
+    }
+
+    private func performInput(_ label: String, operation: @escaping @MainActor () async throws -> InputResult) async {
+        await run(label) {
+            let result = try await operation()
+            self.session = result.session
+            self.step = result.currentStep
+            self.remember(result.session)
+            await self.refreshTree()
+        }
+    }
+
+    private func refreshTree() async {
+        guard let session, !isDemoSession else { tree = nil; return }
+        do { tree = try await api.sessionTree(sessionId: session.id) }
+        catch is CancellationError { }
+        catch { developerLog.insert("✗ Arbre: \(error.localizedDescription)", at: 0) }
+    }
+
+    private func remember(_ session: SessionView) {
+        let title = currentStory?.title ?? savedSessions.first(where: { $0.id == session.id })?.title ?? "Histoire GenEngine"
+        let saved = SavedSession(id: session.id, scenarioVersionId: session.scenarioVersionId, title: title, status: session.status.label, revision: session.revision, turn: session.turn, updatedAt: .now)
+        savedSessions.removeAll { $0.id == session.id }
+        savedSessions.insert(saved, at: 0)
+        savedSessions = Array(savedSessions.prefix(20))
+        SessionStore.save(savedSessions)
+    }
+}
+
+private enum SessionStore {
+    private static let key = "genengine.saved-sessions.v1"
+
+    static func load() -> [SavedSession] {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+        return (try? JSONDecoder().decode([SavedSession].self, from: data)) ?? []
+    }
+
+    static func save(_ sessions: [SavedSession]) {
+        guard let data = try? JSONEncoder().encode(sessions) else { return }
+        UserDefaults.standard.set(data, forKey: key)
     }
 }

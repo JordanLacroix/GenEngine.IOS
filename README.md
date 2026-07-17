@@ -7,7 +7,9 @@ Native SwiftUI client for playing interactive stories powered by GenEngine. The 
 - Premium narrative home and library.
 - Immersive choice-based player with motion and accessibility support.
 - Offline demo so the product remains reviewable without a backend.
-- Identity, Authoring, and Play API integration.
+- Identity, Authoring, and complete Play API integration.
+- Typed narration, choices, quizzes, free text with confirmation, pause/resume, and an explainable session tree.
+- Local session references for server-authoritative resume (no narrative state is duplicated on device).
 - Developer controls isolated from release builds.
 - Universal layout for iPhone and iPad.
 
@@ -39,7 +41,7 @@ docker compose -f compose.yaml up --build -d --wait
 
 In a Debug build, open **Developer** and configure the three service URLs. Simulator defaults use `localhost`; a physical device needs reachable HTTPS endpoints. App Transport Security is not disabled globally.
 
-The public Authoring catalog is loaded on Home and Library, including in demo mode. The bundled `forest-choice.json` fixture can be imported and published from the Developer screen; a successful publication refreshes that catalog. Tokens are stored in Keychain; endpoint preferences are stored in `UserDefaults`.
+The public Authoring catalog is loaded on Home and Library, including in demo mode. From the Developer screen, the bundled `forest-choice.json` fixture is imported, validated, structurally analyzed, previewed, then published; a successful publication refreshes the catalog. Tokens are stored in Keychain; endpoint preferences and opaque session references are stored in `UserDefaults`. Session state and transitions remain authoritative in Play.
 
 ## Architecture
 

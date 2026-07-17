@@ -13,9 +13,31 @@ struct LibraryView: View {
         ZStack {
             StoryCanvas(accent: GenEngineTheme.verdigris)
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 18)], spacing: 18) {
-                    ForEach(filteredStories) { story in
-                        LibraryStoryCard(story: story) { Task { await state.open(story) } }
+                VStack(alignment: .leading, spacing: 24) {
+                    if state.isAuthenticated && !state.savedSessions.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            EyebrowText(text: "Reprendre le fil", color: GenEngineTheme.amber)
+                            ForEach(state.savedSessions) { saved in
+                                Button { Task { await state.resume(saved) } } label: {
+                                    HStack(spacing: 14) {
+                                        Image(systemName: saved.status == "Terminé" ? "checkmark.seal.fill" : "bookmark.fill").foregroundStyle(GenEngineTheme.amber)
+                                        VStack(alignment: .leading) {
+                                            Text(saved.title).font(.system(.headline, design: .serif)).foregroundStyle(GenEngineTheme.ivory)
+                                            Text("\(saved.status) · Tour \(saved.turn + 1)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "arrow.right").foregroundStyle(GenEngineTheme.amber)
+                                    }
+                                    .padding(16).glassPanel()
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 18)], spacing: 18) {
+                        ForEach(filteredStories) { story in
+                            LibraryStoryCard(story: story) { Task { await state.open(story) } }
+                        }
                     }
                 }
                 .padding(22)

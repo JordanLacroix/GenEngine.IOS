@@ -3,6 +3,8 @@ import SwiftUI
 struct PlayerView: View {
     @Environment(AppState.self) private var state
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var textInput = ""
+    @State private var showsTree = false
 
     var body: some View {
         ZStack {
@@ -33,6 +35,7 @@ struct PlayerView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showsTree) { SessionTreeView(tree: state.tree) }
     }
 
     private func playerHeader(session: SessionView) -> some View {
@@ -44,7 +47,13 @@ struct PlayerView: View {
                 Text("Choix \(session.turn + 1)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             }
             Spacer()
-            if !state.isDemoSession && (session.status == .paused || session.status == .awaitingInput) {
+            if !state.isDemoSession {
+                Button { showsTree = true; Task { await state.loadTree() } } label: {
+                    Image(systemName: "point.3.connected.trianglepath.dotted").frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Explorer l’arbre de l’histoire")
+            }
+            if !state.isDemoSession && [.paused, .awaitingInput, .awaitingExternalInput, .awaitingValidation].contains(session.status) {
                 Button { Task { await state.pauseOrResume() } } label: {
                     Image(systemName: session.status == .paused ? "play.fill" : "pause.fill").frame(width: 44, height: 44)
                 }
@@ -71,11 +80,50 @@ struct PlayerView: View {
                 Text("Histoire en pause").font(.headline).foregroundStyle(GenEngineTheme.ivory)
                 Button("Reprendre") { Task { await state.pauseOrResume() } }.buttonStyle(PrimaryActionStyle())
             }
+        } else if step.kind == .narration {
+            Button("Continuer") { Task { await state.continueInteraction() } }
+                .buttonStyle(PrimaryActionStyle())
+                .disabled(state.isBusy)
+                .frame(maxWidth: 660)
+        } else if step.kind == .freeText && step.status == .awaitingExternalInput {
+            VStack(spacing: 14) {
+                TextField("Votre réponse", text: $textInput, axis: .vertical)
+                    .lineLimit(3...7)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 660)
+                Button("Faire analyser ma réponse") {
+                    let value = textInput
+                    Task { await state.submit(text: value) }
+                }
+                .buttonStyle(PrimaryActionStyle())
+                .disabled(state.isBusy || textInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        } else if step.kind == .freeText && step.status == .awaitingValidation, let analysis = step.pendingTextAnalysis {
+            VStack(spacing: 16) {
+                Label(analysis.isAccepted ? "Réponse reconnue" : "Réponse partiellement reconnue", systemImage: analysis.isAccepted ? "checkmark.seal.fill" : "questionmark.diamond.fill")
+                    .font(.headline)
+                    .foregroundStyle(analysis.isAccepted ? GenEngineTheme.verdigris : GenEngineTheme.amber)
+                Text(analysis.explanation).foregroundStyle(GenEngineTheme.secondaryText).multilineTextAlignment(.center)
+                if !analysis.matchedTerms.isEmpty {
+                    Text("Termes reconnus : \(analysis.matchedTerms.joined(separator: ", "))").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+                }
+                HStack {
+                    Button("Modifier") { Task { await state.confirmTextAnalysis(false) } }
+                    Button("Confirmer") { Task { await state.confirmTextAnalysis(true); textInput = "" } }.buttonStyle(PrimaryActionStyle())
+                }
+                .disabled(state.isBusy)
+            }
+            .padding(20)
+            .frame(maxWidth: 660)
+            .glassPanel()
         } else {
             VStack(spacing: 14) {
                 ForEach(Array(step.choices.enumerated()), id: \.element.id) { index, choice in
                     Button {
-                        Task { await state.submit(choiceID: choice.id) }
+                        Task {
+                            if step.kind == .quiz { await state.submit(answerID: choice.id) }
+                            else { await state.submit(choiceID: choice.id) }
+                        }
                     } label: {
                         HStack(spacing: 16) {
                             ChoiceNumber(value: index + 1)
@@ -90,10 +138,55 @@ struct PlayerView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(state.isBusy)
-                    .accessibilityLabel("Choix \(index + 1), \(choice.text)")
+                    .accessibilityLabel("\(step.kind == .quiz ? "Réponse" : "Choix") \(index + 1), \(choice.text)")
                 }
             }
         }
+    }
+}
+
+private struct SessionTreeView: View {
+    let tree: NarrativeTree?
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let tree {
+                    List {
+                        Section("Scènes") {
+                            ForEach(tree.nodes) { node in
+                                HStack(alignment: .top) {
+                                    Image(systemName: symbol(for: node.state)).foregroundStyle(color(for: node.state))
+                                    VStack(alignment: .leading) {
+                                        Text(node.id).font(.caption.monospaced()).foregroundStyle(.secondary)
+                                        Text(node.text).lineLimit(2)
+                                    }
+                                }
+                            }
+                        }
+                        Section("Chemins et conditions") {
+                            ForEach(Array(tree.edges.enumerated()), id: \.offset) { _, edge in
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Label(edge.text, systemImage: edge.isAvailable ? "arrow.right.circle.fill" : "lock.circle")
+                                    Text("\(edge.sourceNodeId) → \(edge.targetNodeId)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                                    Text(edge.evaluation.explanation).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                } else { ProgressView("Chargement de l’arbre…") }
+            }
+            .navigationTitle("Exploration")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private func symbol(for state: String) -> String {
+        switch state.lowercased() { case "current": "location.fill"; case "visited": "checkmark.circle.fill"; case "locked": "lock.fill"; default: "circle.dotted" }
+    }
+
+    private func color(for state: String) -> Color {
+        switch state.lowercased() { case "current": GenEngineTheme.ember; case "visited": GenEngineTheme.verdigris; case "locked": .secondary; default: GenEngineTheme.amber }
     }
 }
 

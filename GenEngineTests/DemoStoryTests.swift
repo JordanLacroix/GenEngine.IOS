@@ -21,6 +21,25 @@ struct DemoStoryTests {
         #expect(decoded == expected)
     }
 
+    @Test(arguments: [
+        ("\"AwaitingExternalInput\"", SessionStatus.awaitingExternalInput),
+        ("\"AwaitingValidation\"", SessionStatus.awaitingValidation),
+        ("4", SessionStatus.awaitingExternalInput),
+        ("5", SessionStatus.awaitingValidation)
+    ])
+    func sessionStatusAcceptsTypedInteractionStates(json: String, expected: SessionStatus) throws {
+        let decoded = try JSONDecoder().decode(SessionStatus.self, from: Data(json.utf8))
+        #expect(decoded == expected)
+    }
+
+    @Test func currentStepDecodesFreeTextAnalysis() throws {
+        let json = #"{"nodeId":"clue","text":"Que retenez-vous ?","status":"AwaitingValidation","choices":[],"turn":2,"interactionId":"testimony","kind":"FreeText","pendingTextAnalysis":{"interactionId":"testimony","isAccepted":true,"matchedTerms":["lanterne"],"minimumMatches":1,"explanation":"1 required term matched."}}"#
+        let step = try JSONDecoder().decode(CurrentStep.self, from: Data(json.utf8))
+        #expect(step.kind == .freeText)
+        #expect(step.pendingTextAnalysis?.isAccepted == true)
+        #expect(step.pendingTextAnalysis?.matchedTerms == ["lanterne"])
+    }
+
     @Test func publishedContractMapsToPlayableStory() {
         let versionID = UUID()
         let published = PublishedScenarioView(
