@@ -109,7 +109,7 @@ struct PlayerView: View {
                 }
                 HStack {
                     Button("Modifier") { Task { await state.confirmTextAnalysis(false) } }
-                    Button("Confirmer") { Task { await state.confirmTextAnalysis(true) } }.buttonStyle(PrimaryActionStyle())
+                    Button("Confirmer") { Task { await state.confirmTextAnalysis(true); textInput = "" } }.buttonStyle(PrimaryActionStyle())
                 }
                 .disabled(state.isBusy)
             }

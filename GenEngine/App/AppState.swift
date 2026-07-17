@@ -227,13 +227,17 @@ final class AppState {
             let validation = try await self.api.validate(scenarioId: scenario.id)
             guard validation.isValid else {
                 let errors = validation.issues.filter(\.isError).map(\.code).joined(separator: ", ")
-                throw APIError.decoding("Validation refusée : \(errors)")
+                throw APIError.invalidScenario("Validation refusée : \(errors)")
             }
             let analysis = try await self.api.analyze(scenarioId: scenario.id)
             self.developerLog.insert("Analysis: \(analysis.loops.count) loop(s), \(analysis.conditionalDeadEnds.count) conditional dead end(s)", at: 0)
             if let document = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let initialNodeID = document["initialNodeId"] as? String {
-                let preview = try await self.api.preview(scenarioId: scenario.id, request: ScenarioPreviewRequest(nodeId: initialNodeID, turn: 0, variables: [:], characteristics: [:], inventory: [], evidence: [], relations: [:], rewards: [], visitedNodes: []))
-                self.developerLog.insert("Preview: \(preview.currentStep.kind) at \(preview.currentStep.nodeId)", at: 0)
+                do {
+                    let preview = try await self.api.preview(scenarioId: scenario.id, request: ScenarioPreviewRequest(nodeId: initialNodeID, turn: 0, variables: [:], characteristics: [:], inventory: [], evidence: [], relations: [:], rewards: [], visitedNodes: []))
+                    self.developerLog.insert("Preview: \(preview.currentStep.kind) at \(preview.currentStep.nodeId)", at: 0)
+                } catch {
+                    self.developerLog.insert("Preview unavailable for empty injected state: \(error.localizedDescription)", at: 0)
+                }
             }
             let version = try await self.api.publish(scenarioId: scenario.id, expectedRevision: scenario.revision)
             self.scenarioVersionID = version.id

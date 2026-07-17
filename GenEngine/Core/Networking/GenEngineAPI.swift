@@ -26,6 +26,7 @@ protocol GenEngineAPI: Sendable {
 
 enum APIError: LocalizedError {
     case invalidURL
+    case invalidScenario(String)
     case http(Int, ProblemDetails?)
     case decoding(String)
     case transport(String)
@@ -33,6 +34,7 @@ enum APIError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL: "L’adresse du service est invalide."
+        case let .invalidScenario(message): message
         case let .http(code, problem):
             "Le service a répondu \(code)" + [problem?.title, problem?.detail].compactMap { $0 }.filter { !$0.isEmpty }.map { " — \($0)" }.joined()
         case let .decoding(message): "La réponse du service est incompatible — \(message)"
