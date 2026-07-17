@@ -18,13 +18,16 @@ struct LibraryView: View {
                         LibraryStoryCard(story: story) { Task { await state.open(story) } }
                     }
                 }
-                .frame(maxWidth: 980)
                 .padding(22)
                 .padding(.bottom, 100)
+                .containerRelativeFrame(.horizontal) { availableWidth, _ in
+                    min(availableWidth, 1_024)
+                }
             }
         }
         .navigationTitle("Bibliothèque")
         .searchable(text: $query, prompt: "Rechercher une histoire")
+        .task { await state.loadCatalog() }
     }
 }
 

@@ -33,13 +33,21 @@ final class AppState {
     var seedText = "42"
     var isBusy = false
     var errorMessage: String?
+    private(set) var publishedStories: [StorySummary] = []
+    private(set) var isLoadingCatalog = false
+    private var hasLoadedCatalog = false
     private(set) var developerLog: [String] = []
 
     var hasProductAccess: Bool { isAuthenticated || isDemoAccess }
     var stories: [StorySummary] {
-        var items = DemoStory.library
+        var items = [DemoStory.summary]
+        items.append(contentsOf: publishedStories)
+        items.append(contentsOf: DemoStory.library.dropFirst())
         if let scenarioVersionID, let publishedTitle {
-            items.insert(StorySummary(id: scenarioVersionID.uuidString, title: publishedTitle, eyebrow: "Publié localement", synopsis: "Une histoire connectée à votre environnement GenEngine.", duration: "À découvrir", symbol: "network", accent: .verdigris, availability: .published(scenarioVersionID)), at: 1)
+            let id = scenarioVersionID.uuidString.lowercased()
+            if !items.contains(where: { $0.id == id }) {
+                items.insert(StorySummary(id: id, title: publishedTitle, eyebrow: "Publié localement", synopsis: "Une histoire connectée à votre environnement GenEngine.", duration: "À découvrir", symbol: "network", accent: .verdigris, availability: .published(scenarioVersionID)), at: 1)
+            }
         }
         return items
     }
@@ -60,6 +68,21 @@ final class AppState {
     func unlockDemo() {
         isDemoAccess = true
         errorMessage = nil
+    }
+
+    func loadCatalog(force: Bool = false) async {
+        guard !isLoadingCatalog, force || !hasLoadedCatalog else { return }
+        isLoadingCatalog = true
+        defer { isLoadingCatalog = false }
+        do {
+            publishedStories = try await api.listPublishedStories().map(StorySummary.init(published:))
+            hasLoadedCatalog = true
+            developerLog.insert("✓ Catalogue actualisé", at: 0)
+        } catch is CancellationError {
+            developerLog.insert("– Catalogue annulé", at: 0)
+        } catch {
+            developerLog.insert("✗ Catalogue: \(error.localizedDescription)", at: 0)
+        }
     }
 
     func login() async {
@@ -153,6 +176,7 @@ final class AppState {
             self.scenarioVersionID = version.id
             self.publishedTitle = scenario.title
             self.developerLog.insert("Published \(version.id.uuidString.lowercased())", at: 0)
+            await self.loadCatalog(force: true)
         }
     }
     #endif

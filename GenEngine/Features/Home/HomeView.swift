@@ -29,6 +29,7 @@ struct HomeView: View {
         }
         .navigationTitle("Accueil")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await state.loadCatalog() }
     }
 
     private var header: some View {

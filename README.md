@@ -39,7 +39,7 @@ docker compose -f compose.yaml up --build -d --wait
 
 In a Debug build, open **Developer** and configure the three service URLs. Simulator defaults use `localhost`; a physical device needs reachable HTTPS endpoints. App Transport Security is not disabled globally.
 
-The bundled `forest-choice.json` fixture can be imported and published from the Developer screen. Tokens are stored in Keychain; endpoint preferences are stored in `UserDefaults`.
+The public Authoring catalog is loaded on Home and Library, including in demo mode. The bundled `forest-choice.json` fixture can be imported and published from the Developer screen; a successful publication refreshes that catalog. Tokens are stored in Keychain; endpoint preferences are stored in `UserDefaults`.
 
 ## Architecture
 

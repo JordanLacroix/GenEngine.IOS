@@ -13,6 +13,20 @@ struct StorySummary: Identifiable, Hashable, Sendable {
     enum Availability: Hashable, Sendable { case demo, published(UUID), comingSoon }
 }
 
+extension StorySummary {
+    init(published story: PublishedScenarioView) {
+        self.init(
+            id: story.versionId.uuidString.lowercased(),
+            title: story.title,
+            eyebrow: "Version \(story.versionNumber)",
+            synopsis: story.description,
+            duration: "\(story.estimatedMinutes) min",
+            symbol: story.versionNumber.isMultiple(of: 2) ? "moon.stars.fill" : "book.pages.fill",
+            accent: story.versionNumber.isMultiple(of: 2) ? .violet : .verdigris,
+            availability: .published(story.versionId))
+    }
+}
+
 enum StoryAccent: Hashable, Sendable { case ember, verdigris, violet }
 
 struct DemoNode: Equatable, Sendable {
