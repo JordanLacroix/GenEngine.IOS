@@ -1,5 +1,17 @@
 import Foundation
 
+enum MembershipKind: String, Codable, CaseIterable, Sendable { case participant = "Participant", supervisor = "Supervisor" }
+enum AssignedContentType: String, Codable, CaseIterable, Sendable { case journey = "Journey", category = "Category", scenario = "Scenario" }
+struct OrganizationFrontView: Codable, Sendable { let id: UUID; let frontId: String; let name: String; let type: String; let isActive: Bool; let revision: Int; let updatedAt: Date }
+struct OrganizationUnitView: Codable, Identifiable, Sendable { let id: UUID; let frontId: String; let parentId: UUID?; let name: String; let type: String; let code: String; let isActive: Bool; let revision: Int; let updatedAt: Date }
+struct MembershipView: Codable, Identifiable, Sendable { let id: UUID; let frontId: String; let unitId: UUID; let userId: UUID; let kind: MembershipKind; let startsAt: Date; let endsAt: Date?; let isActive: Bool; let revision: Int; let updatedAt: Date }
+struct ContentAssignmentView: Codable, Identifiable, Sendable { let id: UUID; let frontId: String; let unitId: UUID; let contentType: AssignedContentType; let contentId: UUID; let name: String; let required: Bool; let availableFrom: Date?; let dueAt: Date?; let isActive: Bool; let revision: Int; let updatedAt: Date }
+struct PagedMembershipsView: Codable, Sendable { let items: [MembershipView]; let page: Int; let pageSize: Int; let total: Int }
+struct PagedAssignmentsView: Codable, Sendable { let items: [ContentAssignmentView]; let page: Int; let pageSize: Int; let total: Int }
+struct UpsertUnitRequest: Codable, Sendable { let parentId: UUID?; let name: String; let type: String; let code: String; let isActive: Bool; let expectedRevision: Int? }
+struct UpsertMembershipRequest: Codable, Sendable { let unitId: UUID; let userId: UUID; let kind: MembershipKind; let startsAt: Date; let endsAt: Date?; let isActive: Bool; let expectedRevision: Int? }
+struct UpsertAssignmentRequest: Codable, Sendable { let unitId: UUID; let contentType: AssignedContentType; let contentId: UUID; let name: String; let required: Bool; let availableFrom: Date?; let dueAt: Date?; let isActive: Bool; let expectedRevision: Int? }
+
 struct CredentialsRequest: Encodable, Sendable { let userName: String; let password: String }
 struct AccessToken: Decodable, Sendable { let token: String; let expiresAt: Date; let tokenType: String? }
 struct ScenarioView: Decodable, Sendable { let id: UUID; let title: String; let revision: Int; let draftJson: String; let frontId: String?; let categoryId: UUID?; let creationBrief: String?; let isArchived: Bool?; let updatedAt: Date? }
@@ -115,7 +127,7 @@ extension SessionStatus: Decodable {
 }
 
 struct StartSessionRequest: Encodable, Sendable { let scenarioVersionId: UUID; let seed: UInt64 }
-struct SessionView: Decodable, Sendable { let id: UUID; let scenarioId: UUID; let scenarioVersionId: UUID; let snapshotHash: String; let status: SessionStatus; let revision: Int; let turn: Int }
+struct SessionView: Decodable, Sendable { let id: UUID; let scenarioId: UUID; let scenarioVersionId: UUID; var frontId: String? = nil; let snapshotHash: String; let status: SessionStatus; let revision: Int; let turn: Int }
 struct VisibleChoice: Decodable, Identifiable, Equatable, Sendable { let id: String; let text: String }
 struct TextAnalysisResult: Decodable, Equatable, Sendable {
     let interactionId: String

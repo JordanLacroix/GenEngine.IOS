@@ -27,11 +27,13 @@ xcodebuild build -project GenEngine.xcodeproj -scheme GenEngine \
 
 ## Prochaine unité de travail
 
-La hiérarchie école/classes ou entreprise/équipes et l’affectation scoped des rôles sont disponibles. Les copies du jeu viennent du dictionnaire publié et sont éditables dans l’Administration native. La prochaine tranche reliera membres et encadrants à ces unités, puis ajoutera les vrais parcours et affectations. Les contrats backend doivent rester la source de vérité.
+La hiérarchie école/classes ou entreprise/équipes, les rôles scoped et le service Organization sont raccordés. L’Administration native gère unités, participants, encadrants et affectations avec suppression ; Play reste l’autorité qui refuse un scénario non affecté. Les contrats backend doivent rester la source de vérité.
 
 Sur `feat/product-operations-ui`, l'onglet Developer a été supprimé et ses diagnostics intégrés à Administration. Cette dernière gère aussi utilisateurs, rôles custom, parcours, catégories, rattachements et assets licenciés du familier. Le Studio recherche et ouvre les brouillons, affiche leur arborescence, édite le texte/statut de fin d'une scène avec contrôle de révision et archive un scénario. La bibliothèque affiche la progression des catégories et la démo native vise environ quinze minutes.
 
 Validation de la tranche immersive : génération XcodeGen, build Swift 6 et tests sur iPhone 17 Pro Simulator réussis sans signature le 18 juillet 2026.
+
+Validation de la tranche Organization : génération XcodeGen et build Swift 6 générique iOS Simulator réussis sans signature le 18 juillet 2026.
 
 ## Décisions à préserver
 

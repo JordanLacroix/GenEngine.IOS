@@ -13,6 +13,18 @@ struct AdministrationView: View {
     @State private var newLabelKey = ""
     @State private var newLabelValue = ""
     @State private var userSearch = ""
+    @State private var operationsUnitName = ""
+    @State private var operationsUnitCode = ""
+    @State private var operationsUnitType = "Group"
+    @State private var operationsParentID: UUID?
+    @State private var memberUserID: UUID?
+    @State private var memberUnitID: UUID?
+    @State private var memberKind = MembershipKind.participant
+    @State private var assignmentUnitID: UUID?
+    @State private var assignedContentType = AssignedContentType.journey
+    @State private var assignedContentID: UUID?
+    @State private var assignmentName = ""
+    @State private var assignmentRequired = true
 
     var body: some View {
         ZStack {
@@ -62,6 +74,7 @@ struct AdministrationView: View {
         case .player: playerPanel
         case .language: languagePanel
         case .structure: structurePanel
+        case .operations: operationsPanel
         case .users: usersPanel
         case .identity: identityPanel
         case .intelligence: intelligencePanel
@@ -69,6 +82,57 @@ struct AdministrationView: View {
         case .economy: economyPanel
         case .access: accessPanel
         case .technical: technicalPanel
+        }
+    }
+
+    private var operationsPanel: some View {
+        adminPanel("Structures, membres & affectations", symbol: "building.2.crop.circle.fill") {
+            if let front = state.organizationFront {
+                HStack { Label(front.name, systemImage: "building.2"); Spacer(); Text(front.isActive ? "Actif" : "Suspendu").foregroundStyle(front.isActive ? GenEngineTheme.verdigris : .red) }
+                Text("\(state.organizationUnits.count) unités · \(state.memberships.count) memberships · \(state.contentAssignments.count) affectations").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+            }
+
+            Text("Unités opérationnelles").font(.headline).foregroundStyle(GenEngineTheme.ivory)
+            ForEach(state.organizationUnits) { unit in
+                HStack { Image(systemName: "point.3.connected.trianglepath.dotted").foregroundStyle(GenEngineTheme.verdigris); VStack(alignment: .leading) { Text(unit.name).foregroundStyle(GenEngineTheme.ivory); Text("\(unit.type) · \(unit.code)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); if !unit.isActive { Text("Inactive").font(.caption).foregroundStyle(.red) } }
+                    .padding(12).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 14))
+            }
+            TextField("Nom de l’unité", text: $operationsUnitName).textFieldStyle(.roundedBorder)
+            HStack { TextField("Type", text: $operationsUnitType); TextField("Code", text: $operationsUnitCode).textInputAutocapitalization(.characters) }.textFieldStyle(.roundedBorder)
+            Picker("Parent", selection: $operationsParentID) { Text("Aucun").tag(nil as UUID?); ForEach(state.organizationUnits) { Text($0.name).tag(Optional($0.id)) } }
+            Button { Task { await state.createOrganizationUnit(name: operationsUnitName, type: operationsUnitType, code: operationsUnitCode, parentId: operationsParentID); operationsUnitName = ""; operationsUnitCode = "" } } label: { Label("Ajouter l’unité", systemImage: "plus") }.buttonStyle(PrimaryActionStyle()).disabled(operationsUnitName.isEmpty || operationsUnitCode.isEmpty || state.isBusy)
+
+            Divider().overlay(.white.opacity(0.15))
+            Text("Participants & encadrants").font(.headline).foregroundStyle(GenEngineTheme.ivory)
+            ForEach(state.memberships) { membership in
+                HStack { Image(systemName: membership.kind == .supervisor ? "person.badge.key.fill" : "person.fill").foregroundStyle(membership.kind == .supervisor ? GenEngineTheme.amber : GenEngineTheme.verdigris); VStack(alignment: .leading) { Text(state.adminUsers.first { $0.id == membership.userId }?.userName ?? membership.userId.uuidString).lineLimit(1); Text("\(membership.kind == .supervisor ? "Encadrant" : "Participant") · \(state.organizationUnits.first { $0.id == membership.unitId }?.name ?? "Unité")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Button(role: .destructive) { Task { await state.removeMembership(membership) } } label: { Image(systemName: "trash") } }
+                    .padding(12).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 14))
+            }
+            Picker("Utilisateur", selection: $memberUserID) { Text("Sélectionner…").tag(nil as UUID?); ForEach(state.adminUsers.filter(\.isActive)) { Text($0.userName).tag(Optional($0.id)) } }
+            Picker("Unité", selection: $memberUnitID) { Text("Sélectionner…").tag(nil as UUID?); ForEach(state.organizationUnits.filter(\.isActive)) { Text($0.name).tag(Optional($0.id)) } }
+            Picker("Lien", selection: $memberKind) { Text("Participant").tag(MembershipKind.participant); Text("Encadrant").tag(MembershipKind.supervisor) }.pickerStyle(.segmented)
+            Button { guard let memberUserID, let memberUnitID else { return }; Task { await state.createMembership(userId: memberUserID, unitId: memberUnitID, kind: memberKind); self.memberUserID = nil } } label: { Label("Ajouter le membership", systemImage: "person.badge.plus") }.buttonStyle(PrimaryActionStyle()).disabled(memberUserID == nil || memberUnitID == nil || state.isBusy)
+
+            Divider().overlay(.white.opacity(0.15))
+            Text("Contenus affectés").font(.headline).foregroundStyle(GenEngineTheme.ivory)
+            ForEach(state.contentAssignments) { assignment in
+                HStack { VStack(alignment: .leading) { Text(assignment.name).foregroundStyle(GenEngineTheme.ivory); Text("\(assignment.contentType.rawValue) · \(state.organizationUnits.first { $0.id == assignment.unitId }?.name ?? "Unité")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); if assignment.required { Text("Obligatoire").font(.caption).foregroundStyle(GenEngineTheme.verdigris) }; Button(role: .destructive) { Task { await state.removeContentAssignment(assignment) } } label: { Image(systemName: "trash") } }
+                    .padding(12).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 14))
+            }
+            Picker("Unité cible", selection: $assignmentUnitID) { Text("Sélectionner…").tag(nil as UUID?); ForEach(state.organizationUnits.filter(\.isActive)) { Text($0.name).tag(Optional($0.id)) } }
+            Picker("Type de contenu", selection: $assignedContentType) { Text("Parcours").tag(AssignedContentType.journey); Text("Catégorie").tag(AssignedContentType.category); Text("Scénario").tag(AssignedContentType.scenario) }.pickerStyle(.segmented)
+            Picker("Contenu", selection: $assignedContentID) { Text("Sélectionner…").tag(nil as UUID?); ForEach(availableContent, id: \.0) { item in Text(item.1).tag(Optional(item.0)) } }
+            TextField("Nom opérationnel", text: $assignmentName).textFieldStyle(.roundedBorder)
+            Toggle("Affectation obligatoire", isOn: $assignmentRequired)
+            Button { guard let assignmentUnitID, let assignedContentID else { return }; Task { await state.createContentAssignment(unitId: assignmentUnitID, contentType: assignedContentType, contentId: assignedContentID, name: assignmentName, required: assignmentRequired, availableFrom: nil, dueAt: nil); self.assignedContentID = nil; assignmentName = "" } } label: { Label("Affecter le contenu", systemImage: "calendar.badge.plus") }.buttonStyle(PrimaryActionStyle()).disabled(assignmentUnitID == nil || assignedContentID == nil || assignmentName.isEmpty || state.isBusy)
+        }
+    }
+
+    private var availableContent: [(UUID, String)] {
+        switch assignedContentType {
+        case .journey: document?.journeys?.map { ($0.id, $0.name) } ?? []
+        case .category: document?.categories.map { ($0.id, $0.name) } ?? []
+        case .scenario: (document?.categories ?? []).flatMap { category in (category.scenarioIds ?? []).map { ($0, "\(category.name) · \($0.uuidString.prefix(8))") } }
         }
     }
 
@@ -339,6 +403,7 @@ struct AdministrationView: View {
             TextField("Play URL", text: $state.endpoints.play).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
             TextField("Configuration URL", text: $state.endpoints.configuration).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
             TextField("Player Experience URL", text: $state.endpoints.playerExperience).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+            TextField("Organization URL", text: $state.endpoints.organization).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
             Button("Réinitialiser sur localhost") { state.endpoints = .local }
             Divider().overlay(.white.opacity(0.15))
             Text("Journal technique").font(.headline).foregroundStyle(GenEngineTheme.ivory)
@@ -382,8 +447,8 @@ struct AdministrationView: View {
 }
 
 private enum AdminSection: String, CaseIterable, Identifiable {
-    case game, player, structure, language, users, access, identity, intelligence, familiar, economy, technical
+    case game, player, structure, operations, language, users, access, identity, intelligence, familiar, economy, technical
     var id: String { rawValue }
-    var title: String { switch self { case .game: "Jeu"; case .player: "Accueil & aide"; case .language: "Libellés"; case .structure: "Catalogue"; case .users: "Utilisateurs"; case .identity: "Auth"; case .intelligence: "IA"; case .familiar: "Familiers"; case .economy: "Économie"; case .access: "Rôles"; case .technical: "Technique" } }
-    var symbol: String { switch self { case .game: "globe"; case .player: "sparkles.rectangle.stack"; case .language: "character.book.closed"; case .structure: "point.3.connected.trianglepath.dotted"; case .users: "person.3.sequence"; case .identity: "key"; case .intelligence: "brain"; case .familiar: "wand.and.stars"; case .economy: "bag"; case .access: "person.badge.shield.checkmark"; case .technical: "wrench.and.screwdriver" } }
+    var title: String { switch self { case .game: "Jeu"; case .player: "Accueil & aide"; case .language: "Libellés"; case .structure: "Catalogue"; case .operations: "Structures"; case .users: "Utilisateurs"; case .identity: "Auth"; case .intelligence: "IA"; case .familiar: "Familiers"; case .economy: "Économie"; case .access: "Rôles"; case .technical: "Technique" } }
+    var symbol: String { switch self { case .game: "globe"; case .player: "sparkles.rectangle.stack"; case .language: "character.book.closed"; case .structure: "point.3.connected.trianglepath.dotted"; case .operations: "building.2.crop.circle"; case .users: "person.3.sequence"; case .identity: "key"; case .intelligence: "brain"; case .familiar: "wand.and.stars"; case .economy: "bag"; case .access: "person.badge.shield.checkmark"; case .technical: "wrench.and.screwdriver" } }
 }

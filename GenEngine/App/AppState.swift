@@ -51,6 +51,10 @@ final class AppState {
     private(set) var roles: [RoleView] = []
     private(set) var adminUsers: [AdminUserView] = []
     private(set) var adminUsersTotal = 0
+    private(set) var organizationFront: OrganizationFrontView?
+    private(set) var organizationUnits: [OrganizationUnitView] = []
+    private(set) var memberships: [MembershipView] = []
+    private(set) var contentAssignments: [ContentAssignmentView] = []
     private(set) var authorScenarios: [ScenarioView] = []
     private(set) var authorScenariosTotal = 0
     private(set) var generatedScenario: ScenarioView?
@@ -233,6 +237,53 @@ final class AppState {
                 self.adminUsers = page.items
                 self.adminUsersTotal = page.total
             }
+            if self.hasPermission("front.read") || self.hasPermission("front.manage") {
+                async let front = self.api.organizationFront(frontId: self.frontId)
+                async let units = self.api.organizationUnits(frontId: self.frontId)
+                self.organizationFront = try await front
+                self.organizationUnits = try await units
+            }
+            if self.hasPermission("membership.read") || self.hasPermission("membership.manage") {
+                self.memberships = try await self.api.memberships(frontId: self.frontId).items
+            }
+            if self.hasPermission("assignment.read") || self.hasPermission("assignment.manage") {
+                self.contentAssignments = try await self.api.assignments(frontId: self.frontId).items
+            }
+        }
+    }
+
+    func createOrganizationUnit(name: String, type: String, code: String, parentId: UUID?) async {
+        await run("Unité créée") {
+            _ = try await self.api.upsertUnit(frontId: self.frontId, id: UUID(), request: .init(parentId: parentId, name: name, type: type, code: code, isActive: true, expectedRevision: nil))
+            self.organizationUnits = try await self.api.organizationUnits(frontId: self.frontId)
+        }
+    }
+
+    func createMembership(userId: UUID, unitId: UUID, kind: MembershipKind) async {
+        await run("Membership créé") {
+            _ = try await self.api.upsertMembership(frontId: self.frontId, id: UUID(), request: .init(unitId: unitId, userId: userId, kind: kind, startsAt: .now, endsAt: nil, isActive: true, expectedRevision: nil))
+            self.memberships = try await self.api.memberships(frontId: self.frontId).items
+        }
+    }
+
+    func removeMembership(_ membership: MembershipView) async {
+        await run("Membership supprimé") {
+            try await self.api.deleteMembership(frontId: self.frontId, id: membership.id)
+            self.memberships.removeAll { $0.id == membership.id }
+        }
+    }
+
+    func createContentAssignment(unitId: UUID, contentType: AssignedContentType, contentId: UUID, name: String, required: Bool, availableFrom: Date?, dueAt: Date?) async {
+        await run("Contenu affecté") {
+            _ = try await self.api.upsertAssignment(frontId: self.frontId, id: UUID(), request: .init(unitId: unitId, contentType: contentType, contentId: contentId, name: name, required: required, availableFrom: availableFrom, dueAt: dueAt, isActive: true, expectedRevision: nil))
+            self.contentAssignments = try await self.api.assignments(frontId: self.frontId).items
+        }
+    }
+
+    func removeContentAssignment(_ assignment: ContentAssignmentView) async {
+        await run("Affectation supprimée") {
+            try await self.api.deleteAssignment(frontId: self.frontId, id: assignment.id)
+            self.contentAssignments.removeAll { $0.id == assignment.id }
         }
     }
 
@@ -353,6 +404,10 @@ final class AppState {
         permissionsCatalog = []
         roles = []
         adminUsers = []
+        organizationFront = nil
+        organizationUnits = []
+        memberships = []
+        contentAssignments = []
         authorScenarios = []
         generatedScenario = nil
         selectedTab = .home
