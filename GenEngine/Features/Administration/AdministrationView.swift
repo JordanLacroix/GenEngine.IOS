@@ -59,6 +59,7 @@ struct AdministrationView: View {
     @ViewBuilder private var sectionContent: some View {
         switch section {
         case .game: gamePanel
+        case .player: playerPanel
         case .language: languagePanel
         case .structure: structurePanel
         case .users: usersPanel
@@ -152,6 +153,55 @@ struct AdministrationView: View {
                 }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
             }
             Button { if document?.journeys == nil { document?.journeys = [] }; document?.journeys?.append(.init(id: UUID(), name: "Nouveau parcours", description: "", accent: "ember", imageUrl: nil, order: (document?.journeys?.count ?? 0) + 1, isVisible: true, categoryIds: [], prerequisiteJourneyIds: [], tags: [])) } label: { Label("Ajouter un parcours", systemImage: "point.3.connected.trianglepath.dotted") }
+        }
+    }
+
+    private var playerPanel: some View {
+        adminPanel("Accueil, tutoriel & aide", symbol: "sparkles.rectangle.stack.fill") {
+            if let intro = binding(\.intro) {
+                Toggle("Introduction avant connexion", isOn: intro.enabled)
+                Picker("Affichage", selection: intro.displayPolicy) { Text("À chaque lancement").tag("EveryLaunch"); Text("Une fois par version").tag("OncePerVersion"); Text("Première installation").tag("FirstInstall") }
+                Toggle("Introduction skippable", isOn: intro.allowSkip)
+            }
+            Text("Scènes d’introduction").font(.headline).foregroundStyle(GenEngineTheme.ivory)
+            ForEach(0..<(document?.intro.scenes.count ?? 0), id: \.self) { index in
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Sur-titre", text: bindingIntroScene(index, \.eyebrow, fallback: "")).textFieldStyle(.roundedBorder)
+                    TextField("Titre", text: bindingIntroScene(index, \.title, fallback: "")).textFieldStyle(.roundedBorder)
+                    TextField("Texte", text: bindingIntroScene(index, \.body, fallback: ""), axis: .vertical).textFieldStyle(.roundedBorder)
+                    TextField("Image HTTPS", text: optionalIntroScene(index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+                }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
+            }
+            Button { document?.intro.scenes.append(.init(id: UUID(), eyebrow: document?.game.name ?? "GenEngine", title: "Nouvelle scène", body: "", imageUrl: nil, order: (document?.intro.scenes.count ?? 0) + 1)) } label: { Label("Ajouter une scène", systemImage: "plus") }
+            Divider().overlay(.white.opacity(0.15))
+            if let demo = binding(\.demo) {
+                Toggle("Mode démo actif", isOn: demo.enabled)
+                TextField("Slug du scénario de démo", text: demo.scenarioSlug).textFieldStyle(.roundedBorder)
+                Stepper("Durée cible : \(demo.targetMinutes.wrappedValue) min", value: demo.targetMinutes, in: 1...120)
+            }
+            if let onboarding = binding(\.onboarding), let assistant = binding(\.assistantPolicy) {
+                Toggle("Tutoriel actif", isOn: onboarding.enabled)
+                Toggle("Tutoriel skippable", isOn: onboarding.allowSkip)
+                Stepper("Version : \(onboarding.version.wrappedValue)", value: onboarding.version, in: 1...999)
+                Stepper("Fréquence du compagnon : \(assistant.defaultFrequency.wrappedValue)/5", value: assistant.defaultFrequency, in: 0...5)
+                Toggle("Compagnon proactif", isOn: assistant.proactive)
+            }
+            ForEach(0..<(document?.onboarding.steps.count ?? 0), id: \.self) { index in
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Étape", text: bindingOnboardingStep(index, \.title, fallback: "")).textFieldStyle(.roundedBorder)
+                    TextField("Explication", text: bindingOnboardingStep(index, \.body, fallback: ""), axis: .vertical).textFieldStyle(.roundedBorder)
+                    TextField("Cible UI", text: bindingOnboardingStep(index, \.target, fallback: "")).textFieldStyle(.roundedBorder)
+                }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
+            }
+            Divider().overlay(.white.opacity(0.15))
+            Toggle("Centre d’aide actif", isOn: Binding(get: { document?.help.enabled ?? false }, set: { document?.help.enabled = $0 }))
+            ForEach(0..<(document?.help.articles.count ?? 0), id: \.self) { index in
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("Article", text: bindingHelpArticle(index, \.title, fallback: "")).textFieldStyle(.roundedBorder)
+                    TextField("Résumé", text: bindingHelpArticle(index, \.summary, fallback: "")).textFieldStyle(.roundedBorder)
+                    TextField("Contenu", text: bindingHelpArticle(index, \.body, fallback: ""), axis: .vertical).textFieldStyle(.roundedBorder)
+                }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
+            }
         }
     }
 
@@ -324,12 +374,16 @@ struct AdministrationView: View {
     private func optionalJourney(_ index: Int, _ value: WritableKeyPath<JourneyDefinition, String?>) -> Binding<String> { Binding(get: { document?.journeys?[index][keyPath: value] ?? "" }, set: { document?.journeys?[index][keyPath: value] = $0.isEmpty ? nil : $0 }) }
     private func bindingOrganizationUnit<Value>(_ index: Int, _ value: WritableKeyPath<OrganizationUnitDefinition, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?.organization.units[index][keyPath: value] ?? fallback }, set: { document?.organization.units[index][keyPath: value] = $0 }) }
     private func bindingLanguageLabel(_ key: String) -> Binding<String> { Binding(get: { document?.language.labels[key] ?? "" }, set: { document?.language.labels[key] = $0 }) }
+    private func bindingIntroScene<Value>(_ index: Int, _ value: WritableKeyPath<IntroSceneDefinition, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?.intro.scenes[index][keyPath: value] ?? fallback }, set: { document?.intro.scenes[index][keyPath: value] = $0 }) }
+    private func optionalIntroScene(_ index: Int, _ value: WritableKeyPath<IntroSceneDefinition, String?>) -> Binding<String> { Binding(get: { document?.intro.scenes[index][keyPath: value] ?? "" }, set: { document?.intro.scenes[index][keyPath: value] = $0.isEmpty ? nil : $0 }) }
+    private func bindingOnboardingStep<Value>(_ index: Int, _ value: WritableKeyPath<OnboardingStepDefinition, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?.onboarding.steps[index][keyPath: value] ?? fallback }, set: { document?.onboarding.steps[index][keyPath: value] = $0 }) }
+    private func bindingHelpArticle<Value>(_ index: Int, _ value: WritableKeyPath<HelpArticleDefinition, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?.help.articles[index][keyPath: value] ?? fallback }, set: { document?.help.articles[index][keyPath: value] = $0 }) }
     private var defaultUnitType: String { switch document?.organizationType { case "School": "Class"; case "Company": "Team"; case "TrainingProvider": "Cohort"; default: "Group" } }
 }
 
 private enum AdminSection: String, CaseIterable, Identifiable {
-    case game, structure, language, users, access, identity, intelligence, familiar, economy, technical
+    case game, player, structure, language, users, access, identity, intelligence, familiar, economy, technical
     var id: String { rawValue }
-    var title: String { switch self { case .game: "Jeu"; case .language: "Libellés"; case .structure: "Catalogue"; case .users: "Utilisateurs"; case .identity: "Auth"; case .intelligence: "IA"; case .familiar: "Familiers"; case .economy: "Économie"; case .access: "Rôles"; case .technical: "Technique" } }
-    var symbol: String { switch self { case .game: "globe"; case .language: "character.book.closed"; case .structure: "point.3.connected.trianglepath.dotted"; case .users: "person.3.sequence"; case .identity: "key"; case .intelligence: "brain"; case .familiar: "wand.and.stars"; case .economy: "bag"; case .access: "person.badge.shield.checkmark"; case .technical: "wrench.and.screwdriver" } }
+    var title: String { switch self { case .game: "Jeu"; case .player: "Accueil & aide"; case .language: "Libellés"; case .structure: "Catalogue"; case .users: "Utilisateurs"; case .identity: "Auth"; case .intelligence: "IA"; case .familiar: "Familiers"; case .economy: "Économie"; case .access: "Rôles"; case .technical: "Technique" } }
+    var symbol: String { switch self { case .game: "globe"; case .player: "sparkles.rectangle.stack"; case .language: "character.book.closed"; case .structure: "point.3.connected.trianglepath.dotted"; case .users: "person.3.sequence"; case .identity: "key"; case .intelligence: "brain"; case .familiar: "wand.and.stars"; case .economy: "bag"; case .access: "person.badge.shield.checkmark"; case .technical: "wrench.and.screwdriver" } }
 }

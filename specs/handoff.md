@@ -12,6 +12,8 @@ Dernière mise à jour : 18 juillet 2026.
 - Les jetons sont stockés dans Keychain et les références de session restent opaques.
 - Les outils d’import et de publication Authoring sont limités aux builds Debug.
 - La CI régénère, compile et teste l’application sur un simulateur iOS.
+- L'introduction publique respecte sa version de configuration et peut être passée.
+- L'espace joueur consomme le bootstrap serveur et expose tutoriel, carte, recherche, journal, progression, familier illustré, magasin et aide.
 
 ## Démarrage rapide de reprise
 
@@ -29,7 +31,7 @@ La hiérarchie école/classes ou entreprise/équipes et l’affectation scoped d
 
 Sur `feat/product-operations-ui`, l'onglet Developer a été supprimé et ses diagnostics intégrés à Administration. Cette dernière gère aussi utilisateurs, rôles custom, parcours, catégories, rattachements et assets licenciés du familier. Le Studio recherche et ouvre les brouillons, affiche leur arborescence, édite le texte/statut de fin d'une scène avec contrôle de révision et archive un scénario. La bibliothèque affiche la progression des catégories et la démo native vise environ quinze minutes.
 
-Validation de la tranche : génération XcodeGen et build Debug iPhone/iPad Simulator réussis sans signature.
+Validation de la tranche immersive : génération XcodeGen, build Swift 6 et tests sur iPhone 17 Pro Simulator réussis sans signature le 18 juillet 2026.
 
 ## Décisions à préserver
 

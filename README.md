@@ -41,6 +41,10 @@ Le dépôt conserve deux parcours explicitement séparés :
 | Studio de génération contextualisée | ✅ Connecté |
 | Administration jeu, auth, IA, économie et rôles | ✅ Connectée |
 | Microsoft Entra ID (Authorization Code + PKCE) | ✅ Connecté |
+| Introduction publique versionnée et skippable | ✅ Pilotée par Configuration |
+| Bootstrap et tutoriel persistant | ✅ Pilotés par PlayerExperience |
+| Carte, recherche, journal et maîtrise | ✅ Connectés au moteur |
+| Compagnon illustré, aide et fréquence | ✅ Personnalisables |
 
 ## Démarrage rapide
 
@@ -101,7 +105,7 @@ GenEngine/
     ├── Developer/       # Debug uniquement
     ├── Home/
     ├── Library/
-    ├── Experience/     # Familier, monnaie et magasin
+    ├── Experience/     # Bootstrap, carte, journal, familier, magasin et aide
     ├── Studio/         # Génération de scénarios contextualisée
     └── Player/
 ```
@@ -124,7 +128,7 @@ Swift Testing couvre la navigation déterministe de la démonstration et la comp
 
 ## Roadmap
 
-La première plateforme configurable est livrée de bout en bout : jeu global, catégories, vocabulaire/copies éditables, structures hiérarchiques école/classes ou entreprise/équipes, génération assistée, RBAC, Entra ID, familier et économie. Les prochaines tranches relieront membres et encadrants à ces unités et approfondiront les workflows éditoriaux. Voir [`specs/roadmap.md`](specs/roadmap.md).
+La plateforme configurable inclut désormais le flux immersif complet : introduction avant connexion, mode démo, compte et déconnexion explicites, bootstrap autoritatif, tutoriel persistant, carte recherchable, journal, maîtrise cross-session, compagnon illustré et centre d'aide. Les prochaines tranches compléteront l'administration low-code de ces objets et les affectations d'organisation. Voir [`specs/roadmap.md`](specs/roadmap.md).
 
 ## Documentation
 

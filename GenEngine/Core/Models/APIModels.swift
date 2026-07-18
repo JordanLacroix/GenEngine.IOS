@@ -115,7 +115,7 @@ extension SessionStatus: Decodable {
 }
 
 struct StartSessionRequest: Encodable, Sendable { let scenarioVersionId: UUID; let seed: UInt64 }
-struct SessionView: Decodable, Sendable { let id: UUID; let scenarioVersionId: UUID; let snapshotHash: String; let status: SessionStatus; let revision: Int; let turn: Int }
+struct SessionView: Decodable, Sendable { let id: UUID; let scenarioId: UUID; let scenarioVersionId: UUID; let snapshotHash: String; let status: SessionStatus; let revision: Int; let turn: Int }
 struct VisibleChoice: Decodable, Identifiable, Equatable, Sendable { let id: String; let text: String }
 struct TextAnalysisResult: Decodable, Equatable, Sendable {
     let interactionId: String
@@ -325,6 +325,18 @@ struct ModuleDefinition: Codable, Identifiable, Sendable {
     var enabled: Bool
     var requiredPermissions: [String]
 }
+struct IntroSceneDefinition: Codable, Identifiable, Sendable { let id: UUID; var eyebrow: String; var title: String; var body: String; var imageUrl: String?; var order: Int }
+struct IntroDefinition: Codable, Sendable { var enabled: Bool; var displayPolicy: String; var allowSkip: Bool; var minimumDisplaySeconds: Int; var scenes: [IntroSceneDefinition] }
+struct NavigationItemDefinition: Codable, Identifiable, Sendable { var id: String { destination }; var destination: String; var labelKey: String; var icon: String; var order: Int; var enabled: Bool; var requiredModule: String? }
+struct PlayerShellDefinition: Codable, Sendable { var navigation: [NavigationItemDefinition] }
+struct DemoExperienceDefinition: Codable, Sendable { var enabled: Bool; var scenarioSlug: String; var targetMinutes: Int; var familiarId: UUID?; var callToActionLabelKey: String }
+struct HelpArticleDefinition: Codable, Identifiable, Sendable { let id: UUID; var slug: String; var title: String; var summary: String; var body: String; var contexts: [String]; var tags: [String]; var order: Int; var published: Bool }
+struct GlossaryEntryDefinition: Codable, Identifiable, Sendable { var id: String { term }; var term: String; var definition: String }
+struct HelpCenterDefinition: Codable, Sendable { var enabled: Bool; var articles: [HelpArticleDefinition]; var glossary: [GlossaryEntryDefinition] }
+struct OnboardingStepDefinition: Codable, Identifiable, Sendable { let id: UUID; var title: String; var body: String; var target: String; var action: String; var order: Int; var required: Bool }
+struct OnboardingDefinition: Codable, Sendable { var id: UUID; var version: Int; var enabled: Bool; var allowSkip: Bool; var requiredAfterUpgrade: Bool; var steps: [OnboardingStepDefinition] }
+struct AssistantPolicyDefinition: Codable, Sendable { var enabled: Bool; var requireFirstRunConfiguration: Bool; var proactive: Bool; var warnOnKnownPath: Bool; var defaultFrequency: Int; var offlineCapabilities: [String] }
+struct JournalPolicyDefinition: Codable, Sendable { var enabled: Bool; var allowExport: Bool; var retentionDays: Int; var showStoryTimeline: Bool }
 struct ExperienceDocument: Codable, Sendable {
     var frontId: String
     var organizationType: String
@@ -339,6 +351,13 @@ struct ExperienceDocument: Codable, Sendable {
     var modules: [ModuleDefinition]
     var journeys: [JourneyDefinition]? = nil
     var assignments: [CatalogAssignmentDefinition]? = nil
+    var intro: IntroDefinition
+    var playerShell: PlayerShellDefinition
+    var demo: DemoExperienceDefinition
+    var help: HelpCenterDefinition
+    var onboarding: OnboardingDefinition
+    var assistantPolicy: AssistantPolicyDefinition
+    var journal: JournalPolicyDefinition
 }
 struct PublishedExperienceView: Decodable, Sendable {
     let version: Int
@@ -363,6 +382,9 @@ struct FamiliarSelection: Codable, Sendable {
     let writingStyle: String
     let accent: String
     let helpLevel: Int
+    let customName: String?
+    let interventionFrequency: Int
+    let proactive: Bool
 }
 struct WalletEntryView: Decodable, Identifiable, Sendable {
     let id: UUID
@@ -380,9 +402,21 @@ struct PlayerExperienceView: Decodable, Sendable {
     let currencyName: String
     let currencyIcon: String
     let familiar: FamiliarSelection?
+    let familiarDefinition: FamiliarDefinition?
+    let onboarding: OnboardingStateView
+    let masteries: [ScenarioMasteryView]
     let ownedOfferIds: [UUID]
     let recentEntries: [WalletEntryView]
+    let recentJournal: [PlayerJournalEntryView]
 }
+struct OnboardingStateView: Decodable, Sendable { let tutorialId: UUID; let version: Int; let status: String; let completedStepIds: [UUID]; let completedAt: Date?; let skippedAt: Date?; let revision: Int }
+struct ScenarioMasteryView: Decodable, Identifiable, Sendable { var id: UUID { scenarioVersionId }; let scenarioId: UUID; let scenarioVersionId: UUID; let choiceIds: [String]; let nodeIds: [String]; let endingIds: [String]; let discoveredObjectives: Int; let totalObjectives: Int; let masteryPercent: Int; let updatedAt: Date }
+struct PlayerJournalEntryView: Decodable, Identifiable, Sendable { let id: UUID; let type: String; let title: String; let summary: String; let journeyId: UUID?; let categoryId: UUID?; let scenarioId: UUID?; let scenarioVersionId: UUID?; let sessionId: UUID?; let referenceId: String?; let occurredAt: Date }
+struct PlayerBootstrapView: Decodable, Sendable { let nextAction: String; let experience: PlayerExperienceView; let tutorial: OnboardingDefinition; let assistant: AssistantPolicyDefinition }
+struct JournalView: Decodable, Sendable { let items: [PlayerJournalEntryView]; let total: Int; let totalsByType: [String: Int] }
+struct OnboardingCommandRequest: Encodable, Sendable { let idempotencyKey: String }
+struct ContextualHelpRequest: Encodable, Sendable { let context: String; let scenarioVersionId: UUID?; let choiceId: String?; let alreadyExplored: Bool; let authorHint: String? }
+struct ContextualHelpView: Decodable, Sendable { let source: String; let message: String; let isFallback: Bool; let familiarName: String; let avatarUrl: String? }
 struct ConfigureFamiliarRequest: Encodable, Sendable { let expectedRevision: Int; let selection: FamiliarSelection }
 struct PurchaseRequest: Encodable, Sendable { let offerId: UUID; let idempotencyKey: String }
 struct ScenarioGenerationRequest: Encodable, Sendable {
