@@ -14,6 +14,22 @@ struct LibraryView: View {
             StoryCanvas(accent: GenEngineTheme.verdigris)
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    if let categories = state.experience?.document.categories.filter(\.isVisible), !categories.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(categories) { category in
+                                    let scenarioIDs = Set(category.scenarioIds ?? [])
+                                    let stories = state.stories.filter { story in story.scenarioID.map(scenarioIDs.contains) == true }
+                                    let started = stories.filter { story in state.savedSessions.contains { saved in if case let .published(versionID) = story.availability { saved.scenarioVersionId == versionID } else { false } } }.count
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text(category.name).font(.headline).foregroundStyle(GenEngineTheme.ivory)
+                                        Text("\(started) commencé\(started > 1 ? "s" : "") · \(stories.count) scénario\(stories.count > 1 ? "s" : "")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+                                        ProgressView(value: stories.isEmpty ? 0 : Double(started) / Double(stories.count)).tint(GenEngineTheme.verdigris)
+                                    }.padding(16).frame(width: 230, alignment: .leading).glassPanel()
+                                }
+                            }
+                        }
+                    }
                     if state.isAuthenticated && !state.savedSessions.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             EyebrowText(text: state.copy("library.resume", fallback: "Reprendre le fil"), color: GenEngineTheme.amber)

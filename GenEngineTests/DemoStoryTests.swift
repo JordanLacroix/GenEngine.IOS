@@ -12,7 +12,7 @@ struct DemoStoryTests {
             #expect(node != nil)
             pending.append(contentsOf: node?.choices.map(\.target) ?? [])
         }
-        #expect(visited.count == 5)
+        #expect(visited.count == 13)
     }
 
     @Test(arguments: [("\"AwaitingInput\"", SessionStatus.awaitingInput), ("2", SessionStatus.completed)])
@@ -50,7 +50,8 @@ struct DemoStoryTests {
             description: "Une ouverture venue du moteur.",
             estimatedMinutes: 9,
             publishedAt: .now,
-            snapshotHash: "hash")
+            snapshotHash: "hash",
+            categoryId: nil)
 
         let story = StorySummary(published: published)
 

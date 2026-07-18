@@ -27,6 +27,10 @@ xcodebuild build -project GenEngine.xcodeproj -scheme GenEngine \
 
 La hiérarchie école/classes ou entreprise/équipes et l’affectation scoped des rôles sont disponibles. Les copies du jeu viennent du dictionnaire publié et sont éditables dans l’Administration native. La prochaine tranche reliera membres et encadrants à ces unités, puis ajoutera les vrais parcours et affectations. Les contrats backend doivent rester la source de vérité.
 
+Sur `feat/product-operations-ui`, l'onglet Developer a été supprimé et ses diagnostics intégrés à Administration. Cette dernière gère aussi utilisateurs, rôles custom, parcours, catégories, rattachements et assets licenciés du familier. Le Studio recherche et ouvre les brouillons, affiche leur arborescence, édite le texte/statut de fin d'une scène avec contrôle de révision et archive un scénario. La bibliothèque affiche la progression des catégories et la démo native vise environ quinze minutes.
+
+Validation de la tranche : génération XcodeGen et build Debug iPhone/iPad Simulator réussis sans signature.
+
 ## Décisions à préserver
 
 - Backend autoritatif et aucune règle Narrative dans le client.

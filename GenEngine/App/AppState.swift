@@ -7,9 +7,6 @@ enum AppTab: Hashable {
     case experience
     case studio
     case administration
-    #if DEBUG
-    case developer
-    #endif
 }
 
 @MainActor
@@ -48,6 +45,10 @@ final class AppState {
     private(set) var adminConfiguration: ExperienceConfigurationView?
     private(set) var permissionsCatalog: [PermissionView] = []
     private(set) var roles: [RoleView] = []
+    private(set) var adminUsers: [AdminUserView] = []
+    private(set) var adminUsersTotal = 0
+    private(set) var authorScenarios: [ScenarioView] = []
+    private(set) var authorScenariosTotal = 0
     private(set) var generatedScenario: ScenarioView?
     let frontId = "default"
     private let microsoftSignIn = MicrosoftSignInCoordinator()
@@ -184,6 +185,11 @@ final class AppState {
                 self.permissionsCatalog = try await permissions
                 self.roles = try await roles
             }
+            if self.hasPermission("identity.user.read") || self.hasPermission("identity.user.manage") {
+                let page = try await self.api.users(query: "")
+                self.adminUsers = page.items
+                self.adminUsersTotal = page.total
+            }
         }
     }
 
@@ -219,6 +225,39 @@ final class AppState {
         }
     }
 
+    func searchUsers(_ query: String) async {
+        await run("Utilisateurs chargés") {
+            let page = try await self.api.users(query: query)
+            self.adminUsers = page.items
+            self.adminUsersTotal = page.total
+        }
+    }
+
+    func setUserActive(_ user: AdminUserView, isActive: Bool) async {
+        await run(isActive ? "Compte réactivé" : "Compte désactivé") {
+            _ = try await self.api.setUserActive(userId: user.id, isActive: isActive)
+            let page = try await self.api.users(query: "")
+            self.adminUsers = page.items
+            self.adminUsersTotal = page.total
+        }
+    }
+
+    func deleteUser(_ user: AdminUserView) async {
+        await run("Compte supprimé") {
+            try await self.api.deleteUser(userId: user.id)
+            let page = try await self.api.users(query: "")
+            self.adminUsers = page.items
+            self.adminUsersTotal = page.total
+        }
+    }
+
+    func deleteRole(_ role: RoleView) async {
+        await run("Rôle supprimé") {
+            try await self.api.deleteRole(roleId: role.id)
+            self.roles = try await self.api.roles()
+        }
+    }
+
     func generateScenario(categoryId: UUID, prompt: String, provider: String, targetMinutes: Int, tone: String) async {
         await run("Scénario généré") {
             self.generatedScenario = try await self.api.generateScenario(request: ScenarioGenerationRequest(
@@ -228,6 +267,32 @@ final class AppState {
                 provider: provider,
                 targetMinutes: targetMinutes,
                 tone: tone))
+            try await self.refreshScenarios()
+        }
+    }
+
+    func searchScenarios(_ query: String = "") async {
+        await run("Bibliothèque du Studio chargée") { try await self.refreshScenarios(query: query) }
+    }
+
+    func selectScenario(_ scenario: ScenarioView) { generatedScenario = scenario }
+
+    func updateScenario(document: Data) async {
+        guard let current = generatedScenario else { return }
+        await run("Brouillon enregistré") {
+            self.generatedScenario = try await self.api.updateScenario(
+                scenarioId: current.id,
+                expectedRevision: current.revision,
+                document: document)
+            try await self.refreshScenarios()
+        }
+    }
+
+    func archiveScenario(_ scenario: ScenarioView) async {
+        await run("Scénario archivé") {
+            try await self.api.archiveScenario(scenarioId: scenario.id, expectedRevision: scenario.revision)
+            if self.generatedScenario?.id == scenario.id { self.generatedScenario = nil }
+            try await self.refreshScenarios()
         }
     }
 
@@ -420,6 +485,12 @@ final class AppState {
         do { tree = try await api.sessionTree(sessionId: session.id) }
         catch is CancellationError { }
         catch { developerLog.insert("✗ Arbre: \(error.localizedDescription)", at: 0) }
+    }
+
+    private func refreshScenarios(query: String = "") async throws {
+        let page = try await api.scenarios(query: query)
+        authorScenarios = page.items
+        authorScenariosTotal = page.total
     }
 
     private func refreshPlatformContext() async throws {
