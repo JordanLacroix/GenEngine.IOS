@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 private enum UniverseSection: String, CaseIterable, Identifiable {
     case map, journal, companion, shop, help
@@ -20,30 +21,124 @@ struct PlayerExperienceViewScreen: View {
     @State private var helpLevel = 2
     @State private var frequency = 2
     @State private var proactive = true
+    @State private var selectedCategoryID: UUID?
+    @State private var assetPack = FamiliarAssetPackStore.load()
+    @State private var showsAssetImporter = false
+    @State private var showsKeyReward = false
+    @State private var assetMessage: String?
 
     var body: some View {
-        ZStack {
-            StoryCanvas(accent: GenEngineTheme.violet)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
-                    if let bootstrap = state.playerBootstrap, bootstrap.nextAction != "OpenMap" { onboarding(bootstrap) }
-                    sectionPicker
-                    switch section {
-                    case .map: map
-                    case .journal: journal
-                    case .companion: companion
-                    case .shop: shop
-                    case .help: help
-                    }
-                }
-                .padding(.horizontal, 20).padding(.bottom, 120)
-                .containerRelativeFrame(.horizontal) { width, _ in min(width, 960) }
+        Group {
+            if let bootstrap = state.playerBootstrap, bootstrap.nextAction == "ConfigureFamiliar" {
+                familiarFirstRun
+            } else if let bootstrap = state.playerBootstrap, let step = nextTutorialStep(bootstrap) {
+                tutorialStory(step, bootstrap: bootstrap)
+            } else {
+                immersiveWorld
             }
         }
-        .navigationTitle(state.copy("nav.experience", fallback: "Votre aventure"))
+        .toolbar(.hidden, for: .navigationBar)
         .task { await state.loadPlatformContext(); await state.loadCatalog(); await state.loadJournal(); hydrateSelection() }
-        .refreshable { await state.loadPlatformContext(); await state.loadCatalog(force: true); await state.loadJournal(); hydrateSelection() }
+        .fileImporter(isPresented: $showsAssetImporter, allowedContentTypes: [.json]) { importAssetPack($0) }
+        .fullScreenCover(isPresented: $showsKeyReward) { keyReward }
+    }
+
+    private var immersiveWorld: some View {
+        ZStack {
+            Image("WorldMap").resizable().scaledToFill().ignoresSafeArea()
+            LinearGradient(colors: [.black.opacity(0.36), .clear, .black.opacity(0.78)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            worldDoors
+            if section == .map { storyDock }
+            else { sectionOverlay }
+            gameHUD
+        }
+        .background(Color.black).ignoresSafeArea()
+    }
+
+    private var worldDoors: some View {
+        GeometryReader { proxy in
+            ForEach(Array(visibleCategories.prefix(5).enumerated()), id: \.element.id) { index, category in
+                let point = doorPoint(index)
+                Button { withAnimation(.snappy) { selectedCategoryID = category.id; section = .map } } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: selectedCategoryID == category.id ? "door.left.hand.open" : "door.left.hand.closed")
+                            .font(.system(size: 42)).foregroundStyle(GenEngineTheme.amber)
+                        Text(category.name).font(.system(.headline, design: .serif)).multilineTextAlignment(.center)
+                        Text("PORTE \(category.order)").font(.caption2).tracking(1.2)
+                    }
+                    .padding(12).foregroundStyle(GenEngineTheme.ivory)
+                    .background(.black.opacity(selectedCategoryID == category.id ? 0.82 : 0.64), in: RoundedRectangle(cornerRadius: 18))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(selectedCategoryID == category.id ? GenEngineTheme.amber : .white.opacity(0.18)))
+                    .shadow(color: .black.opacity(0.5), radius: 20, y: 10)
+                }
+                .buttonStyle(.plain)
+                .position(x: proxy.size.width * point.x, y: proxy.size.height * point.y)
+                .accessibilityHint("Afficher les histoires de cette région")
+            }
+        }.ignoresSafeArea()
+    }
+
+    private var gameHUD: some View {
+        VStack {
+            HStack(spacing: 12) {
+                Button { state.selectedTab = .home } label: { Label(state.gameName, systemImage: "g.circle.fill").font(.headline) }
+                Spacer()
+                Label(state.playerExperience?.onboarding.status == "Completed" ? "Clé acquise" : "Clé à gagner", systemImage: "key.fill")
+                Text("\(state.playerExperience?.balance ?? 0) \(state.playerExperience?.currencyIcon ?? "✦")").fontWeight(.bold).foregroundStyle(GenEngineTheme.amber)
+                Button { section = .companion } label: { Label(customName.isEmpty ? "Compagnon" : customName, systemImage: "sparkles") }
+                Button { state.selectedTab = .account } label: { Image(systemName: "person.crop.circle.fill").font(.title2) }.accessibilityLabel("Ouvrir le compte")
+            }
+            .font(.subheadline).foregroundStyle(GenEngineTheme.ivory).padding(10).glassPanel()
+            Spacer()
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(UniverseSection.allCases) { item in
+                        Button { withAnimation(.snappy) { section = item } } label: { Label(item.title, systemImage: item.symbol).padding(.horizontal, 12).frame(minHeight: 48) }
+                            .buttonStyle(.plain).foregroundStyle(section == item ? GenEngineTheme.amber : GenEngineTheme.ivory)
+                            .background(section == item ? GenEngineTheme.ember.opacity(0.18) : Color.clear, in: Capsule())
+                    }
+                }.padding(5).glassPanel()
+            }.frame(maxWidth: 620)
+        }
+        .padding(16)
+    }
+
+    @ViewBuilder private var sectionOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.72).ignoresSafeArea().onTapGesture { section = .map }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack { EyebrowText(text: section.title, color: GenEngineTheme.amber); Spacer(); Button("Retour au monde") { section = .map }.buttonStyle(.bordered).tint(GenEngineTheme.ivory) }
+                    switch section { case .journal: journal; case .companion: companion; case .shop: shop; case .help: help; case .map: EmptyView() }
+                }.padding(24).frame(maxWidth: 900)
+            }
+            .safeAreaPadding(.top, 76).safeAreaPadding(.bottom, 82)
+            .background(.ultraThinMaterial).clipShape(RoundedRectangle(cornerRadius: 30))
+            .padding(.horizontal, 70).padding(.vertical, 20)
+        }
+    }
+
+    private var storyDock: some View {
+        VStack { Spacer(); HStack(alignment: .bottom, spacing: 16) {
+            if let category = visibleCategories.first(where: { $0.id == selectedCategoryID }) {
+                VStack(alignment: .leading, spacing: 5) { EyebrowText(text: "PORTE \(category.order)", color: GenEngineTheme.amber); Text(category.name).font(.system(.title2, design: .serif, weight: .bold)); Text(category.description).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2) }.frame(width: 230, alignment: .leading)
+            }
+            ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 10) { ForEach(filteredStories) { story in Button { Task { await state.open(story) } } label: { VStack(alignment: .leading, spacing: 7) { Text(story.eyebrow.uppercased()).font(.caption2).foregroundStyle(GenEngineTheme.amber); Text(story.title).font(.system(.headline, design: .serif)); Text(story.synopsis).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2); Label("Entrer", systemImage: "arrow.right").font(.caption.bold()) }.padding(14).frame(width: 240, alignment: .leading).glassPanel() }.buttonStyle(.plain) } } }
+        }.foregroundStyle(GenEngineTheme.ivory).padding(16).padding(.bottom, 64) }
+    }
+
+    private var familiarFirstRun: some View {
+        ZStack {
+            Image("FamiliarAster").resizable().scaledToFill().ignoresSafeArea()
+            LinearGradient(colors: [.black.opacity(0.2), .black.opacity(0.94)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            ScrollView { familiarCreation.padding(24).frame(maxWidth: 760).frame(maxWidth: .infinity, alignment: .trailing) }
+        }.background(Color.black).ignoresSafeArea()
+    }
+
+    private var keyStatus: some View {
+        let hasKey = state.playerExperience?.onboarding.status == "Completed"
+        return HStack { Label(hasKey ? "Clé du prologue acquise" : "Prologue passé · clé à gagner", systemImage: hasKey ? "key.fill" : "key.horizontal").foregroundStyle(GenEngineTheme.amber); Spacer(); Text(hasKey ? "Toutes les portes sont ouvertes" : "Rejouez le prologue depuis Compte").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }
+            .padding(14).glassPanel()
     }
 
     private var header: some View {
@@ -68,35 +163,64 @@ struct PlayerExperienceViewScreen: View {
         .pickerStyle(.segmented)
     }
 
-    private func onboarding(_ bootstrap: PlayerBootstrapView) -> some View {
-        Group {
-            if bootstrap.nextAction == "ConfigureFamiliar" {
-                OnboardingCard(index: 1, title: "Rencontrez votre compagnon", message: "Choisissez son apparence, son nom et sa façon de vous aider.", action: "Le personnaliser") { section = .companion }
-            } else if let step = bootstrap.tutorial.steps.sorted(by: { $0.order < $1.order }).first(where: { !bootstrap.experience.onboarding.completedStepIds.contains($0.id) }) {
-                OnboardingCard(index: step.order, title: step.title, message: step.body, action: "J’ai compris") { Task { await state.completeOnboardingStep(step) } }
-                    .contextMenu { if bootstrap.tutorial.allowSkip { Button("Passer le tutoriel") { Task { await state.skipOnboarding() } } } }
-            }
-        }
+    private func nextTutorialStep(_ bootstrap: PlayerBootstrapView) -> OnboardingStepDefinition? {
+        bootstrap.tutorial.steps.sorted(by: { $0.order < $1.order }).first { !bootstrap.experience.onboarding.completedStepIds.contains($0.id) }
+    }
+
+    private func tutorialStory(_ step: OnboardingStepDefinition, bootstrap: PlayerBootstrapView) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Image(step.order.isMultiple(of: 2) ? "WorldMap" : "IntroGateway").resizable().scaledToFill().ignoresSafeArea()
+            LinearGradient(colors: [.clear, .black.opacity(0.96)], startPoint: .top, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 16) {
+                EyebrowText(text: "PROLOGUE · ÉTAPE \(step.order)", color: GenEngineTheme.amber)
+                Text(step.title).font(.system(size: 48, weight: .bold, design: .serif)).foregroundStyle(GenEngineTheme.ivory)
+                Text(step.body).font(.title3).foregroundStyle(GenEngineTheme.ivory.opacity(0.86))
+                HStack(spacing: 14) {
+                    Image(systemName: interactionSymbol(step.action)).font(.title).foregroundStyle(GenEngineTheme.amber)
+                    VStack(alignment: .leading) { Text(step.action.isEmpty ? "Faire avancer l’histoire" : step.action).font(.headline); Text("Interaction paramétrée par ce scénario · \(step.target)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }
+                    Spacer()
+                    Button("Interagir") { Task { await completeTutorial(step, bootstrap: bootstrap) } }.buttonStyle(PrimaryActionStyle())
+                }.padding(16).glassPanel()
+                if bootstrap.tutorial.allowSkip { Button("Passer le prologue") { Task { await state.skipOnboarding() } }.foregroundStyle(GenEngineTheme.secondaryText) }
+            }.padding(28).frame(maxWidth: 760)
+        }.background(Color.black).ignoresSafeArea().accessibilityElement(children: .contain)
+    }
+
+    private func completeTutorial(_ step: OnboardingStepDefinition, bootstrap: PlayerBootstrapView) async {
+        let remaining = bootstrap.tutorial.steps.filter { !bootstrap.experience.onboarding.completedStepIds.contains($0.id) }
+        await state.completeOnboardingStep(step)
+        if remaining.count == 1 { showsKeyReward = true }
+    }
+
+    private func interactionSymbol(_ action: String) -> String {
+        let value = action.lowercased()
+        if value.contains("dialog") { return "quote.bubble.fill" }
+        if value.contains("touch") || value.contains("tap") { return "hand.tap.fill" }
+        return "sparkle.magnifyingglass"
     }
 
     private var map: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Label("Carte du monde", systemImage: "map.fill").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
+            VStack(alignment: .leading, spacing: 5) { Label("La carte des portes", systemImage: "map.fill").font(.title2.bold()); Text(state.playerExperience?.onboarding.status == "Completed" ? "Votre clé ouvre n’importe quelle région. Chaque porte rassemble les histoires configurées dans sa catégorie." : "Le prologue a été passé. Rejouez-le pour gagner la clé ; la disponibilité des histoires reste décidée par le serveur.").foregroundStyle(GenEngineTheme.secondaryText) }.foregroundStyle(GenEngineTheme.ivory)
             TextField("Rechercher une histoire", text: $search).textFieldStyle(.roundedBorder)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 14)], spacing: 14) {
-                ForEach((state.experience?.document.categories ?? []).filter(\.isVisible)) { category in
-                    let masteries = state.playerExperience?.masteries.filter { category.scenarioIds?.contains($0.scenarioId) == true } ?? []
-                    let progress = masteries.isEmpty ? 0 : masteries.map(\.masteryPercent).reduce(0, +) / masteries.count
-                    VStack(alignment: .leading, spacing: 12) {
-                        Image(systemName: "point.3.connected.trianglepath.dotted").font(.title).foregroundStyle(GenEngineTheme.verdigris)
-                        EyebrowText(text: "ZONE \(category.order)", color: GenEngineTheme.verdigris)
-                        Text(category.name).font(.system(.title2, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
-                        Text(category.description).font(.subheadline).foregroundStyle(GenEngineTheme.secondaryText)
-                        ProgressView(value: Double(progress), total: 100).tint(GenEngineTheme.ember)
-                        Text("\(progress)% exploré").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
-                    }.padding(20).glassPanel()
+            GeometryReader { proxy in
+                ZStack {
+                    Image("WorldMap").resizable().scaledToFill().frame(width: proxy.size.width, height: proxy.size.height).clipped()
+                    LinearGradient(colors: [.black.opacity(0.08), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+                    ForEach(Array(visibleCategories.prefix(5).enumerated()), id: \.element.id) { index, category in
+                        let point = doorPoint(index)
+                        Button { selectedCategoryID = category.id } label: {
+                            VStack(spacing: 5) {
+                                Image(systemName: selectedCategoryID == category.id ? "door.left.hand.open" : "door.left.hand.closed").font(.system(size: 38)).foregroundStyle(GenEngineTheme.amber)
+                                Text(category.name).font(.system(.headline, design: .serif)).multilineTextAlignment(.center)
+                                Text("PORTE \(category.order)").font(.caption2)
+                            }.padding(10).foregroundStyle(GenEngineTheme.ivory).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(selectedCategoryID == category.id ? GenEngineTheme.amber : .white.opacity(0.18)))
+                        }.buttonStyle(.plain).position(x: proxy.size.width * point.x, y: proxy.size.height * point.y)
+                    }
                 }
             }
+            .frame(height: 620).clipShape(RoundedRectangle(cornerRadius: 28)).overlay(RoundedRectangle(cornerRadius: 28).stroke(.white.opacity(0.12)))
+            if let selected = visibleCategories.first(where: { $0.id == selectedCategoryID }) { Text(selected.description).foregroundStyle(GenEngineTheme.secondaryText) }
             Text("Histoires disponibles").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 14)], spacing: 14) {
                 ForEach(filteredStories) { story in
@@ -107,9 +231,16 @@ struct PlayerExperienceViewScreen: View {
     }
 
     private var filteredStories: [StorySummary] {
-        guard !search.isEmpty else { return state.stories }
-        return state.stories.filter { "\($0.title) \($0.synopsis)".localizedCaseInsensitiveContains(search) }
+        let category = visibleCategories.first { $0.id == selectedCategoryID }
+        return state.stories.filter { story in
+            let matchesSearch = search.isEmpty || "\(story.title) \(story.synopsis)".localizedCaseInsensitiveContains(search)
+            guard matchesSearch, let ids = category?.scenarioIds, !ids.isEmpty else { return matchesSearch }
+            return story.scenarioID.map(ids.contains) ?? false
+        }
     }
+
+    private var visibleCategories: [CategoryDefinition] { (state.experience?.document.categories ?? []).filter(\.isVisible).sorted { $0.order < $1.order } }
+    private func doorPoint(_ index: Int) -> CGPoint { [CGPoint(x: 0.2, y: 0.3), CGPoint(x: 0.5, y: 0.18), CGPoint(x: 0.78, y: 0.34), CGPoint(x: 0.66, y: 0.7), CGPoint(x: 0.28, y: 0.74)][index % 5] }
 
     private var journal: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -139,27 +270,79 @@ struct PlayerExperienceViewScreen: View {
         VStack(alignment: .leading, spacing: 16) {
             Label("Votre compagnon", systemImage: "sparkles").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
             if let definitions = state.experience?.document.familiars, let definition = definitions.first(where: { $0.id == familiarID }) ?? definitions.first {
+                if definitions.count > 1 { Picker("Familier", selection: Binding(get: { familiarID ?? definition.id }, set: { familiarID = $0; hydrateDefinition($0) })) { ForEach(definitions) { Text($0.name).tag($0.id) } } }
                 companionPortrait(definition)
+                assetPackCard
                 TextField("Son nom", text: $customName).textFieldStyle(.roundedBorder)
                 Picker("Forme", selection: $form) { ForEach(definition.availableForms, id: \.self) { Text($0.capitalized).tag($0) } }
                 Picker("Ton", selection: $tone) { ForEach(definition.availableTones, id: \.self) { Text($0).tag($0) } }
                 Stepper("Niveau d’aide : \(helpLevel)/5", value: $helpLevel, in: 0...5)
                 Stepper("Fréquence : \(frequency)/5", value: $frequency, in: 0...5)
                 Toggle("Me proposer de l’aide au bon moment", isOn: $proactive)
-                Button("Enregistrer mon compagnon") { Task { await state.saveFamiliar(.init(familiarId: definition.id, form: form, tone: tone, writingStyle: writingStyle, accent: accent, helpLevel: helpLevel, customName: customName, interventionFrequency: frequency, proactive: proactive)) } }.buttonStyle(PrimaryActionStyle())
+                Button("Finaliser mon compagnon") { Task { await state.saveFamiliar(.init(familiarId: definition.id, form: form, tone: tone, writingStyle: writingStyle, accent: accent, helpLevel: helpLevel, customName: customName, interventionFrequency: frequency, proactive: proactive)) } }.buttonStyle(PrimaryActionStyle()).disabled(customName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.isBusy)
             }
         }.padding(20).glassPanel()
     }
 
+    private var familiarCreation: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            EyebrowText(text: "VOTRE PREMIER ALLIÉ", color: GenEngineTheme.amber)
+            Text("Donnez une forme à la voix qui marchera avec vous.").font(.system(size: 48, weight: .bold, design: .serif)).foregroundStyle(GenEngineTheme.ivory)
+            Text("Le familier peut suggérer et éclairer ; vos choix vous appartiennent toujours. Son pack visuel reste un simple asset local, sans propriété ni économie.").foregroundStyle(GenEngineTheme.secondaryText)
+            companion
+        }
+    }
+
+    private var assetPackCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Pack visuel · \(assetPack.name)", systemImage: "shippingbox.fill").font(.headline).foregroundStyle(GenEngineTheme.verdigris)
+            Text("\(assetPack.license) · \(assetPack.attribution)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+            Button { showsAssetImporter = true } label: { Label("Charger un manifeste JSON", systemImage: "square.and.arrow.down") }.buttonStyle(.bordered).tint(GenEngineTheme.ivory)
+            if let assetMessage { Text(assetMessage).font(.caption).foregroundStyle(GenEngineTheme.amber) }
+        }.padding(14).background(GenEngineTheme.verdigris.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+    }
+
     private func companionPortrait(_ definition: FamiliarDefinition) -> some View {
         VStack(spacing: 10) {
-            if let value = definition.portraitUrl ?? definition.avatarUrl, let url = URL(string: value) {
+            if assetPack.targetFamiliarId == nil || assetPack.targetFamiliarId == definition.id, let name = assetPack.bundledAssetName {
+                Image(name).resizable().scaledToFill().frame(maxWidth: .infinity, minHeight: 300, maxHeight: 440).clipped().clipShape(RoundedRectangle(cornerRadius: 28))
+            } else if assetPack.targetFamiliarId == nil || assetPack.targetFamiliarId == definition.id, let url = assetPack.portraitUrl {
+                AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { ProgressView().tint(GenEngineTheme.amber) }
+                    .frame(maxWidth: .infinity, minHeight: 300, maxHeight: 440).clipped().clipShape(RoundedRectangle(cornerRadius: 28))
+            } else if let value = definition.portraitUrl ?? definition.avatarUrl, let url = URL(string: value) {
                 AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { ProgressView().tint(GenEngineTheme.amber) }
                     .frame(maxWidth: .infinity, minHeight: 240, maxHeight: 360).clipped().clipShape(RoundedRectangle(cornerRadius: 28))
             } else { Image(systemName: "sparkles").font(.system(size: 70)).foregroundStyle(GenEngineTheme.amber).frame(height: 220) }
             Text(customName.isEmpty ? definition.name : customName).font(.system(.title, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
             Text(definition.description).multilineTextAlignment(.center).foregroundStyle(GenEngineTheme.secondaryText)
         }.frame(maxWidth: .infinity)
+    }
+
+    private func importAssetPack(_ result: Result<URL, any Error>) {
+        do {
+            let url = try result.get()
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            let data = try Data(contentsOf: url, options: .mappedIfSafe)
+            guard data.count <= 1_000_000 else { throw FamiliarAssetPackError.invalidManifest }
+            let pack = try JSONDecoder().decode(FamiliarAssetPack.self, from: data).validated()
+            try FamiliarAssetPackStore.save(pack)
+            assetPack = pack
+            assetMessage = "Pack chargé. Seule la présentation locale du familier a changé."
+        } catch { assetMessage = error.localizedDescription }
+    }
+
+    private func hydrateDefinition(_ id: UUID) {
+        guard let definition = state.experience?.document.familiars.first(where: { $0.id == id }) else { return }
+        form = definition.form; tone = definition.tone; writingStyle = definition.writingStyle; accent = definition.accent; helpLevel = definition.helpLevel; customName = definition.name
+    }
+
+    private var keyReward: some View {
+        ZStack {
+            Image("TutorialKey").resizable().scaledToFill().ignoresSafeArea()
+            LinearGradient(colors: [.clear, .black.opacity(0.94)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 16) { Spacer(); EyebrowText(text: "PROLOGUE ACCOMPLI", color: GenEngineTheme.amber); Text("La clé des possibles est à vous.").font(.system(size: 50, weight: .bold, design: .serif)).foregroundStyle(GenEngineTheme.ivory); Text("Elle ouvre n’importe quelle porte de la carte. Votre parcours et vos gains sont conservés dans le journal.").font(.title3).foregroundStyle(GenEngineTheme.ivory.opacity(0.84)); Label("1 clé universelle", systemImage: "key.fill").foregroundStyle(GenEngineTheme.amber); Button("Choisir une porte") { showsKeyReward = false; section = .map }.buttonStyle(PrimaryActionStyle()) }.padding(28).frame(maxWidth: 720)
+        }
     }
 
     private var shop: some View {
@@ -183,15 +366,11 @@ struct PlayerExperienceViewScreen: View {
     }
 
     private func hydrateSelection() {
+        selectedCategoryID = selectedCategoryID ?? visibleCategories.first?.id
         guard let definition = state.playerExperience?.familiarDefinition ?? state.experience?.document.familiars.first else { return }
         let selected = state.playerExperience?.familiar
         familiarID = selected?.familiarId ?? definition.id; form = selected?.form ?? definition.form; tone = selected?.tone ?? definition.tone
         writingStyle = selected?.writingStyle ?? definition.writingStyle; accent = selected?.accent ?? definition.accent; helpLevel = selected?.helpLevel ?? definition.helpLevel
         customName = selected?.customName ?? definition.name; frequency = selected?.interventionFrequency ?? state.playerBootstrap?.assistant.defaultFrequency ?? 2; proactive = selected?.proactive ?? state.playerBootstrap?.assistant.proactive ?? true
     }
-}
-
-private struct OnboardingCard: View {
-    let index: Int; let title: String; let message: String; let action: String; let perform: () -> Void
-    var body: some View { HStack(spacing: 16) { Text(String(format: "%02d", index)).font(.system(size: 34, design: .serif)).foregroundStyle(GenEngineTheme.amber); VStack(alignment: .leading) { EyebrowText(text: "TUTORIEL PERSISTANT", color: GenEngineTheme.amber); Text(title).font(.headline).foregroundStyle(GenEngineTheme.ivory); Text(message).font(.subheadline).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Button(action, action: perform).buttonStyle(.borderedProminent).tint(GenEngineTheme.ember) }.padding(18).glassPanel() }
 }

@@ -39,6 +39,9 @@ struct AccountView: View {
                 Text(roles.map(\.name).joined(separator: " · "))
                     .font(.subheadline).foregroundStyle(GenEngineTheme.secondaryText)
             }
+            Button { Task { await state.resetOnboarding() } } label: {
+                Label("Rejouer le prologue", systemImage: "arrow.counterclockwise.circle.fill").frame(maxWidth: .infinity)
+            }.buttonStyle(.bordered).tint(GenEngineTheme.amber)
             Button(role: .destructive) { state.signOut() } label: {
                 Label("Se déconnecter", systemImage: "rectangle.portrait.and.arrow.right")
                     .frame(maxWidth: .infinity)
@@ -77,7 +80,8 @@ struct AccountView: View {
             .tint(GenEngineTheme.ivory)
             .disabled(state.isBusy)
             if state.isDemoAccess {
-                Button(role: .destructive) { state.signOut() } label: { Text("Quitter la démonstration") }
+                Button { state.leaveDemo() } label: { Label("Revoir l’introduction", systemImage: "play.rectangle.on.rectangle") }
+                Button(role: .destructive) { state.leaveDemo() } label: { Text("Quitter la démonstration") }
                     .disabled(state.isBusy)
             }
         }

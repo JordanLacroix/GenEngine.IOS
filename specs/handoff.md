@@ -14,6 +14,10 @@ Dernière mise à jour : 18 juillet 2026.
 - La CI régénère, compile et teste l’application sur un simulateur iOS.
 - L'introduction publique respecte sa version de configuration et peut être passée.
 - L'espace joueur consomme le bootstrap serveur et expose tutoriel, carte, recherche, journal, progression, familier illustré, magasin et aide.
+- L’introduction est rejouable depuis la connexion, qui propose la démo sous le formulaire sans afficher de profil avant authentification.
+- Le prologue est illustré, matérialise les interactions configurées, remet une clé et ouvre une carte à portes.
+- Les packs visuels de familier sont importables depuis Fichiers avec licence et attribution, sans notion de propriété.
+- La démo s’arrête sur un bilan du chemin et des gains au lieu de boucler.
 
 ## Démarrage rapide de reprise
 
@@ -34,6 +38,8 @@ Sur `feat/product-operations-ui`, l'onglet Developer a été supprimé et ses di
 Validation de la tranche immersive : génération XcodeGen, build Swift 6 et tests sur iPhone 17 Pro Simulator réussis sans signature le 18 juillet 2026.
 
 Validation de la tranche Organization : génération XcodeGen et build Swift 6 générique iOS Simulator réussis sans signature le 18 juillet 2026.
+
+Validation du seuil narratif : génération XcodeGen, build Swift 6 et 9 tests sur iPhone 17 Pro Simulator réussis sans signature le 18 juillet 2026.
 
 ## Décisions à préserver
 

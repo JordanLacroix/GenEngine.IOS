@@ -5,6 +5,7 @@ struct PlayerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var textInput = ""
     @State private var showsTree = false
+    @State private var interactionCompleted = false
 
     var body: some View {
         ZStack {
@@ -25,6 +26,7 @@ struct PlayerView: View {
                                 .id(step.nodeId)
                                 .transition(.opacity)
                                 .accessibilityAddTraits(.isHeader)
+                            interactionArtifact(step)
                             choices(step)
                         }
                         .padding(.horizontal, 24)
@@ -36,6 +38,7 @@ struct PlayerView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showsTree) { SessionTreeView(tree: state.tree) }
+        .onChange(of: state.step?.nodeId) { _, _ in interactionCompleted = false }
     }
 
     private func playerHeader(session: SessionView) -> some View {
@@ -68,12 +71,7 @@ struct PlayerView: View {
     @ViewBuilder
     private func choices(_ step: CurrentStep) -> some View {
         if step.status == .completed || step.status == .abandoned {
-            VStack(spacing: 16) {
-                Image(systemName: "sun.horizon.fill").font(.largeTitle).foregroundStyle(GenEngineTheme.amber)
-                Text("Votre histoire continue ailleurs.").font(.headline).foregroundStyle(GenEngineTheme.secondaryText)
-                Button("Retour à la bibliothèque") { state.endSession() }.buttonStyle(PrimaryActionStyle())
-            }
-            .padding(.top, 18)
+            completionSummary
         } else if step.status == .paused {
             VStack(spacing: 14) {
                 Image(systemName: "pause.circle").font(.largeTitle).foregroundStyle(GenEngineTheme.amber)
@@ -137,11 +135,39 @@ struct PlayerView: View {
                         .glassPanel()
                     }
                     .buttonStyle(.plain)
-                    .disabled(state.isBusy)
+                    .disabled(state.isBusy || requiresDemoInteraction(step))
                     .accessibilityLabel("\(step.kind == .quiz ? "Réponse" : "Choix") \(index + 1), \(choice.text)")
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func interactionArtifact(_ step: CurrentStep) -> some View {
+        if step.status != .completed && step.status != .abandoned {
+            if state.isDemoSession, let interaction = DemoStory.node(id: step.nodeId)?.interaction {
+                HStack(spacing: 14) { Image(systemName: interaction.symbol).font(.title).foregroundStyle(GenEngineTheme.amber); VStack(alignment: .leading) { EyebrowText(text: "INTERACTION DU SCÉNARIO", color: GenEngineTheme.amber); Text(interaction.label).font(.headline).foregroundStyle(GenEngineTheme.ivory); Text(interaction.hint).font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Button(interactionCompleted ? "Signal reçu" : "Interagir") { interactionCompleted = true }.buttonStyle(.borderedProminent).tint(GenEngineTheme.verdigris) }.padding(16).frame(maxWidth: 720).glassPanel()
+            } else if !state.isDemoSession {
+                Label(materializedLabel(step), systemImage: "hand.tap.fill").font(.caption).foregroundStyle(GenEngineTheme.verdigris).padding(12).glassPanel()
+            }
+        }
+    }
+
+    private func requiresDemoInteraction(_ step: CurrentStep) -> Bool { state.isDemoSession && DemoStory.node(id: step.nodeId)?.interaction != nil && !interactionCompleted }
+    private func materializedLabel(_ step: CurrentStep) -> String {
+        switch step.kind { case .quiz: "Question matérialisée par le scénario"; case .freeText: "Expression libre analysée par le moteur"; case .characteristicGate: "Dialogue conditionnel débloqué par votre parcours"; default: "Interaction narrative · \(step.nodeId)" }
+    }
+
+    private var completionSummary: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "trophy.fill").font(.system(size: 42)).foregroundStyle(GenEngineTheme.amber)
+            Text("Chemin accompli").font(.system(.largeTitle, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
+            Text("La démo s’arrête ici : votre histoire ne repart pas en boucle.").foregroundStyle(GenEngineTheme.secondaryText)
+            if state.isDemoSession {
+                VStack(alignment: .leading, spacing: 8) { Label("\(state.demoPath.count) étapes traversées", systemImage: "point.3.connected.trianglepath.dotted").font(.headline); ForEach(Array(state.demoPath.enumerated()), id: \.offset) { index, node in Text("\(index + 1). \(node.capitalized)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Divider(); Label("Sceau du Dernier Phare", systemImage: "seal.fill"); Label("Une page de journal", systemImage: "book.closed.fill"); Label("La confiance de Lueur", systemImage: "sparkles") }.padding(18).frame(maxWidth: 660, alignment: .leading).glassPanel()
+            }
+            HStack { if state.isDemoSession { Button("Explorer un autre chemin") { state.startDemo() }.buttonStyle(.bordered).tint(GenEngineTheme.ivory) }; Button(state.isDemoSession ? "Créer mon aventure" : "Voir mon univers") { state.endSession(); state.selectedTab = state.isAuthenticated ? .experience : .account }.buttonStyle(PrimaryActionStyle()) }
+        }.padding(.top, 18)
     }
 }
 

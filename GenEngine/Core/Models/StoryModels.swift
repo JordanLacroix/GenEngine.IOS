@@ -50,8 +50,11 @@ struct DemoNode: Equatable, Sendable {
     let id: String
     let text: String
     let choices: [DemoChoice]
+    var interaction: DemoInteraction? = nil
     var isEnding: Bool { choices.isEmpty }
 }
+
+struct DemoInteraction: Equatable, Sendable { let label: String; let hint: String; let symbol: String }
 
 struct DemoChoice: Identifiable, Equatable, Sendable { let id: String; let text: String; let target: String }
 
@@ -66,10 +69,10 @@ enum DemoStory {
     static func node(id: String) -> DemoNode? { nodes[id] }
 
     private static let nodes: [String: DemoNode] = [
-        "shore": DemoNode(id: "shore", text: "La brume glisse sur les marches de basalte. Sous l’eau noire, une braise pulse au rythme de votre souffle. Lueur, votre familier, murmure que la cité vient de prononcer votre nom.", choices: [DemoChoice(id: "descend", text: "Descendre vers la lumière", target: "stairs"), DemoChoice(id: "listen", text: "Écouter le chant de la brume", target: "echo")]),
+        "shore": DemoNode(id: "shore", text: "La brume glisse sur les marches de basalte. Sous l’eau noire, une braise pulse au rythme de votre souffle. Lueur, votre familier, murmure que la cité vient de prononcer votre nom.", choices: [DemoChoice(id: "descend", text: "Descendre vers la lumière", target: "stairs"), DemoChoice(id: "listen", text: "Écouter le chant de la brume", target: "echo")], interaction: .init(label: "Accorder la lanterne", hint: "Touchez la lueur jusqu’à ce que le phare vous réponde.", symbol: "hand.tap.fill")),
         "stairs": DemoNode(id: "stairs", text: "Chaque marche rallume un souvenir qui n’est pas le vôtre : une fête, une trahison, une enfant cachant une clé d’ambre. Plus bas, deux portes portent les emblèmes du Phare et des Archives.", choices: [DemoChoice(id: "archives", text: "Suivre l’emblème des Archives", target: "archives"), DemoChoice(id: "beacon", text: "Chercher le Phare englouti", target: "beacon")]),
         "echo": DemoNode(id: "echo", text: "La voix sous l’eau récite les noms des disparus. Le dernier est celui de votre mère. Entre deux vagues, elle vous avertit : la braise conserve les souvenirs, mais exige toujours un échange.", choices: [DemoChoice(id: "promise", text: "Promettre de restaurer la mémoire", target: "ferryman"), DemoChoice(id: "question", text: "Demander quel souvenir sera pris", target: "archives")]),
-        "archives": DemoNode(id: "archives", text: "Les rayonnages respirent comme un animal endormi. Trois livres s’ouvrent seuls : la fondation de la cité, la nuit de sa chute, et une page encore blanche portant la date d’aujourd’hui.", choices: [DemoChoice(id: "fall", text: "Lire la nuit de la chute", target: "truth"), DemoChoice(id: "blank", text: "Écrire votre nom sur la page blanche", target: "mark")]),
+        "archives": DemoNode(id: "archives", text: "Les rayonnages respirent comme un animal endormi. Trois livres s’ouvrent seuls : la fondation de la cité, la nuit de sa chute, et une page encore blanche portant la date d’aujourd’hui.", choices: [DemoChoice(id: "fall", text: "Lire la nuit de la chute", target: "truth"), DemoChoice(id: "blank", text: "Écrire votre nom sur la page blanche", target: "mark")], interaction: .init(label: "Révéler l’encre", hint: "Déplacez le sceau sur la page pour débloquer les dialogues cachés.", symbol: "seal.fill")),
         "beacon": DemoNode(id: "beacon", text: "Le mécanisme du phare tourne encore sous les eaux. Il manque un prisme. Lueur peut prendre sa forme, mais cette transformation effacerait une partie de sa personnalité actuelle.", choices: [DemoChoice(id: "ask", text: "Laisser Lueur choisir", target: "companion"), DemoChoice(id: "search", text: "Refuser le sacrifice et fouiller l’atelier", target: "workshop")]),
         "ferryman": DemoNode(id: "ferryman", text: "Un passeur sans visage vous attend dans une barque de verre. Il réclame un souvenir heureux pour traverser. Vous pouvez aussi lui offrir la peur qui vous accompagne depuis l’enfance.", choices: [DemoChoice(id: "joy", text: "Offrir un souvenir heureux", target: "truth"), DemoChoice(id: "fear", text: "Abandonner votre ancienne peur", target: "workshop")]),
         "truth": DemoNode(id: "truth", text: "La cité n’a pas été noyée par un ennemi. Ses habitants ont choisi de l’effacer pour emprisonner une histoire capable de réécrire toutes les autres. Votre famille gardait la serrure.", choices: [DemoChoice(id: "seal", text: "Préparer un nouveau sceau", target: "convergence"), DemoChoice(id: "free", text: "Décider que toute histoire mérite d’être libre", target: "convergence")]),

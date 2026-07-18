@@ -30,6 +30,7 @@ final class AppState {
     private(set) var step: CurrentStep?
     private(set) var tree: NarrativeTree?
     private(set) var isDemoSession = false
+    private(set) var demoPath: [String] = []
     private(set) var scenarioVersionID: UUID?
     private(set) var publishedTitle: String?
     var seedText = "42"
@@ -106,6 +107,12 @@ final class AppState {
         errorMessage = nil
     }
 
+    func leaveDemo() {
+        isDemoAccess = false
+        selectedTab = .home
+        endSession()
+    }
+
     func loadCatalog(force: Bool = false) async {
         guard !isLoadingCatalog, force || !hasLoadedCatalog else { return }
         isLoadingCatalog = true
@@ -132,6 +139,7 @@ final class AppState {
             self.password = ""
             self.isAuthenticated = true
             try await self.refreshPlatformContext()
+            self.selectedTab = .experience
         }
     }
 
@@ -142,6 +150,7 @@ final class AppState {
             self.password = ""
             self.isAuthenticated = true
             try await self.refreshPlatformContext()
+            self.selectedTab = .experience
         }
     }
 
@@ -156,6 +165,7 @@ final class AppState {
             try self.vault.save(access.token)
             self.isAuthenticated = true
             try await self.refreshPlatformContext()
+            self.selectedTab = .experience
         }
     }
 
@@ -426,6 +436,7 @@ final class AppState {
         guard let node = DemoStory.node(id: DemoStory.openingNodeID) else { return }
         currentStory = DemoStory.summary
         isDemoSession = true
+        demoPath = [node.id]
         session = SessionView(id: UUID(), scenarioId: UUID(), scenarioVersionId: UUID(), snapshotHash: "demo", status: .awaitingInput, revision: 0, turn: 0)
         step = makeStep(node, turn: 0)
     }
@@ -436,6 +447,7 @@ final class AppState {
             guard let choice = DemoStory.node(id: step?.nodeId ?? "")?.choices.first(where: { $0.id == choiceID }),
                   let node = DemoStory.node(id: choice.target) else { return }
             let turn = session.turn + 1
+            demoPath.append(node.id)
             self.session = SessionView(id: session.id, scenarioId: session.scenarioId, scenarioVersionId: session.scenarioVersionId, snapshotHash: session.snapshotHash, status: node.isEnding ? .completed : .awaitingInput, revision: session.revision + 1, turn: turn)
             step = makeStep(node, turn: turn)
             return
@@ -514,6 +526,7 @@ final class AppState {
         step = nil
         currentStory = nil
         isDemoSession = false
+        demoPath = []
         tree = nil
     }
 

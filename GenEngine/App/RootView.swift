@@ -58,17 +58,18 @@ private struct ProductShell: View {
                     .tag(AppTab.administration)
             }
             AccountView()
-                .tabItem { Label(state.copy("nav.account", fallback: "Compte"), systemImage: "person.crop.circle.fill") }
+                .tabItem { Label(state.isAuthenticated ? state.copy("nav.account", fallback: "Compte") : "Se connecter", systemImage: state.isAuthenticated ? "person.crop.circle.fill" : "key.fill") }
                 .tag(AppTab.account)
         }
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        .toolbar(state.selectedTab == .experience ? .hidden : .visible, for: .tabBar)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            if state.isAuthenticated { ToolbarItem(placement: .topBarTrailing) {
                 Button { state.selectedTab = .account } label: {
-                    Label(state.isAuthenticated ? (state.access?.userName ?? "Compte") : "Se connecter", systemImage: state.isAuthenticated ? "person.crop.circle.fill.badge.checkmark" : "person.crop.circle.badge.plus")
+                    Label(state.access?.userName ?? "Compte", systemImage: "person.crop.circle.fill.badge.checkmark")
                 }
-                .accessibilityHint(state.isAuthenticated ? "Gérer le compte et se déconnecter" : "Ouvrir la connexion")
-            }
+                .accessibilityHint("Gérer le compte et se déconnecter")
+            } }
         }
     }
 }

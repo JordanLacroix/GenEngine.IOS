@@ -42,6 +42,12 @@ Introduction publique versionnée, bootstrap moteur, tutoriel persistant, carte 
 
 **Statut : implémenté sur `feat/immersive-player-experience`.** Build Swift 6 et tests simulateur iPhone 17 Pro validés.
 
+## Jalon 3.4 — seuil narratif et monde illustré
+
+Introduction rejouable depuis la connexion, démo sous l’authentification, création finalisable du familier, packs visuels sans propriété, tutoriel présenté comme un scénario, interactions natives, clé universelle, carte à portes et bilan de fin sans boucle automatique.
+
+**Statut : implémenté sur `codex/immersive-onboarding-ux`.** Les projections et transitions restent fournies par les services GenEngine.
+
 ## Jalon 3.2 — opérations produit et Studio visuel
 
 Console utilisateurs recherchable avec activation/suppression, parcours et catégories, assets du familier, progression par catégorie, fusion des outils Developer dans Administration, bibliothèque de brouillons et édition visuelle de scène avec archivage. La démo native compte treize scènes pour une cible d'environ quinze minutes.

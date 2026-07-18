@@ -45,6 +45,10 @@ Le dépôt conserve deux parcours explicitement séparés :
 | Bootstrap et tutoriel persistant | ✅ Pilotés par PlayerExperience |
 | Carte, recherche, journal et maîtrise | ✅ Connectés au moteur |
 | Compagnon illustré, aide et fréquence | ✅ Personnalisables |
+| Intro rejouable, prologue illustré et clé universelle | ✅ Pilotés par la configuration |
+| Carte illustrée à portes et interactions d’écran | ✅ Matérialisées nativement |
+| Packs visuels de familier importables | ✅ Assets locaux, sans propriété |
+| Bilan de fin avec chemin et gains | ✅ Démo et sessions connectées |
 
 ## Démarrage rapide
 
@@ -89,6 +93,12 @@ Pour Entra ID, déclarez l’application iOS comme client public et ajoutez `gen
 
 Les jetons sont conservés dans Keychain. Les préférences d’endpoints et références opaques de sessions sont stockées dans `UserDefaults`. L’état narratif reste exclusivement autoritatif dans Play.
 
+### Packs visuels de familier
+
+L’espace Compagnon importe un manifeste JSON de schéma `1` depuis l’app Fichiers. Il accepte un asset inclus dans l’application ou un portrait HTTPS, avec licence et attribution obligatoires. Le manifeste reste une préférence locale non sensible dans `UserDefaults` : il ne crée ni propriété, ni achat, ni progression. PlayerExperience demeure l’autorité sur la sélection du familier.
+
+Un exemple est fourni dans [`GenEngine/Resources/aster-familiar-pack.json`](GenEngine/Resources/aster-familiar-pack.json).
+
 ## Architecture
 
 ```text
@@ -129,7 +139,7 @@ Swift Testing couvre la navigation déterministe de la démonstration et la comp
 
 ## Roadmap
 
-La plateforme configurable inclut le flux immersif complet et une administration native distincte du Studio. L’espace Structures gère désormais unités école/entreprise/formation, participants, encadrants et affectations de scénarios/catégories/parcours. Voir [`specs/roadmap.md`](specs/roadmap.md).
+La plateforme configurable inclut le flux immersif complet et une administration native distincte du Studio. Sur iPhone et iPad, l’univers joueur occupe tout l’écran : la carte sert de scène, les portes y sont matérialisées et la navigation native disparaît au profit d’une HUD et de panneaux superposés. L’espace Structures gère désormais unités école/entreprise/formation, participants, encadrants et affectations de scénarios/catégories/parcours. Voir [`specs/roadmap.md`](specs/roadmap.md).
 
 ## Documentation
 

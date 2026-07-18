@@ -3,9 +3,9 @@ import SwiftUI
 struct WelcomeView: View {
     @Environment(AppState.self) private var state
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var showsLogin = false
     @State private var introIndex = 0
     @State private var introDismissed = false
+    @State private var forcesIntroduction = false
     @AppStorage("genengine.intro.last-version") private var lastIntroVersion = 0
 
     var body: some View {
@@ -31,10 +31,13 @@ struct WelcomeView: View {
                             .multilineTextAlignment(.center)
                             .foregroundStyle(GenEngineTheme.secondaryText)
                             .frame(maxWidth: 480)
+                        Button { introIndex = 0; introDismissed = false; forcesIntroduction = true } label: {
+                            Label("Revoir l’introduction", systemImage: "play.rectangle.on.rectangle")
+                        }
+                        .buttonStyle(.bordered).tint(GenEngineTheme.ivory)
                     }
 
-                    if showsLogin {
-                        VStack(spacing: 14) {
+                    VStack(spacing: 14) {
                             TextField(state.copy("auth.username", fallback: "Identifiant"), text: $state.userName)
                                 .textContentType(.username)
                                 .textInputAutocapitalization(.never)
@@ -60,27 +63,19 @@ struct WelcomeView: View {
                             .buttonStyle(.bordered)
                             .tint(GenEngineTheme.ivory)
                             .disabled(state.isBusy)
-                        }
-                        .padding(22)
-                        .frame(maxWidth: 440)
-                        .glassPanel()
-                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                    } else {
-                        VStack(spacing: 14) {
-                            Button {
-                                withAnimation(reduceMotion ? nil : .snappy) { state.unlockDemo() }
-                            } label: {
-                                Label(state.copy("demo.explore", fallback: "Explorer la démo"), systemImage: "play.fill").frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(PrimaryActionStyle())
-                            Button(state.copy("auth.existingAccount", fallback: "J’ai déjà un compte")) {
-                                withAnimation(reduceMotion ? nil : .snappy) { showsLogin = true }
-                            }
-                            .font(.headline)
-                            .foregroundStyle(GenEngineTheme.ivory)
-                        }
-                        .frame(maxWidth: 360)
                     }
+                    .padding(22)
+                    .frame(maxWidth: 440)
+                    .glassPanel()
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    VStack(spacing: 9) {
+                        Text("Pas encore prêt à créer un compte ? Essayez une histoire complète, puis consultez le chemin parcouru.")
+                            .font(.caption).multilineTextAlignment(.center).foregroundStyle(GenEngineTheme.secondaryText)
+                        Button { withAnimation(reduceMotion ? nil : .snappy) { state.unlockDemo() } } label: {
+                            Label(state.copy("demo.explore", fallback: "Lancer la démo"), systemImage: "play.fill").frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent).tint(GenEngineTheme.verdigris)
+                    }.frame(maxWidth: 440)
                     Spacer(minLength: 44)
                 }
                 .padding(.horizontal, 24)
@@ -91,23 +86,36 @@ struct WelcomeView: View {
     }
 
     private var introScenes: [IntroSceneDefinition] {
-        (state.experience?.document.intro.scenes ?? []).sorted { $0.order < $1.order }
+        let configured = state.experience?.document.intro.scenes ?? []
+        return (configured.isEmpty ? fallbackIntroScenes : configured).sorted { $0.order < $1.order }
+    }
+
+    private var fallbackIntroScenes: [IntroSceneDefinition] {
+        [
+            .init(id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!, eyebrow: "AVANT LE PREMIER CHOIX", title: "Chaque monde commence par une porte.", body: "Rien n’est écrit à votre place. Vos décisions dessinent la route et les souvenirs.", imageUrl: "IntroGateway", order: 1),
+            .init(id: UUID(uuidString: "10000000-0000-0000-0000-000000000002")!, eyebrow: "UNE PRÉSENCE À VOS CÔTÉS", title: "Créez le familier qui apprendra votre manière d’avancer.", body: "Il conseille, éclaire un détail et reformule une énigme ; il ne choisit jamais pour vous.", imageUrl: "FamiliarAster", order: 2),
+            .init(id: UUID(uuidString: "10000000-0000-0000-0000-000000000003")!, eyebrow: "LE PROLOGUE", title: "Votre première histoire vous remettra une clé.", body: "Terminez le tutoriel, relisez votre chemin, puis ouvrez la porte de votre choix.", imageUrl: "TutorialKey", order: 3)
+        ]
     }
 
     private var shouldShowIntroduction: Bool {
-        guard let experience = state.experience,
-              experience.document.intro.enabled,
-              !introDismissed,
-              introScenes.indices.contains(introIndex) else { return false }
+        guard !introDismissed, introScenes.indices.contains(introIndex) else { return false }
+        if forcesIntroduction { return true }
+        guard let experience = state.experience else { return true }
+        guard experience.document.intro.enabled else { return false }
         return experience.document.intro.displayPolicy == "EveryLaunch" || lastIntroVersion != experience.version
     }
 
     private func introduction(_ scene: IntroSceneDefinition) -> some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            if let value = scene.imageUrl, let url = URL(string: value) {
-                AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
-                    .ignoresSafeArea().opacity(0.55)
+            if let value = scene.imageUrl {
+                if let url = URL(string: value), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                    AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
+                        .ignoresSafeArea().opacity(0.55)
+                } else {
+                    Image(value).resizable().scaledToFill().ignoresSafeArea().opacity(0.55)
+                }
             }
             LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.96)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
             VStack(alignment: .leading, spacing: 18) {
@@ -117,7 +125,7 @@ struct WelcomeView: View {
                 Text(scene.body).font(.title3).foregroundStyle(GenEngineTheme.ivory.opacity(0.82))
                 HStack {
                     Button(introIndex == introScenes.count - 1 ? "Entrer dans le monde" : "Continuer") { advanceIntroduction() }.buttonStyle(PrimaryActionStyle())
-                    if state.experience?.document.intro.allowSkip == true { Button("Passer") { finishIntroduction() }.buttonStyle(.bordered).tint(GenEngineTheme.ivory) }
+                    if state.experience?.document.intro.allowSkip != false { Button("Passer") { finishIntroduction() }.buttonStyle(.bordered).tint(GenEngineTheme.ivory) }
                 }
                 Text("\(introIndex + 1) / \(introScenes.count)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             }.padding(28).frame(maxWidth: 720)
@@ -131,6 +139,7 @@ struct WelcomeView: View {
 
     private func finishIntroduction() {
         if let version = state.experience?.version { lastIntroVersion = version }
+        forcesIntroduction = false
         withAnimation { introDismissed = true }
     }
 }
