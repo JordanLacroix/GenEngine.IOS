@@ -10,6 +10,12 @@ protocol GenEngineAPI: Sendable {
     func access() async throws -> UserAccessView
     func publicExperience(frontId: String) async throws -> PublishedExperienceView
     func playerExperience(frontId: String) async throws -> PlayerExperienceView
+    func playerBootstrap(frontId: String) async throws -> PlayerBootstrapView
+    func completeOnboardingStep(frontId: String, stepId: UUID) async throws -> OnboardingStateView
+    func skipOnboarding(frontId: String) async throws -> OnboardingStateView
+    func resetOnboarding(frontId: String) async throws -> OnboardingStateView
+    func journal(frontId: String) async throws -> JournalView
+    func contextualHelp(frontId: String, request: ContextualHelpRequest) async throws -> ContextualHelpView
     func configureFamiliar(frontId: String, request: ConfigureFamiliarRequest) async throws -> PlayerExperienceView
     func purchase(frontId: String, request: PurchaseRequest) async throws -> PlayerExperienceView
     func adminConfiguration(frontId: String) async throws -> ExperienceConfigurationView
@@ -52,6 +58,12 @@ extension GenEngineAPI {
     func access() async throws -> UserAccessView { throw APIError.invalidScenario("Fonction indisponible.") }
     func publicExperience(frontId _: String) async throws -> PublishedExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
     func playerExperience(frontId _: String) async throws -> PlayerExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func playerBootstrap(frontId _: String) async throws -> PlayerBootstrapView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func completeOnboardingStep(frontId _: String, stepId _: UUID) async throws -> OnboardingStateView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func skipOnboarding(frontId _: String) async throws -> OnboardingStateView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func resetOnboarding(frontId _: String) async throws -> OnboardingStateView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func journal(frontId _: String) async throws -> JournalView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func contextualHelp(frontId _: String, request _: ContextualHelpRequest) async throws -> ContextualHelpView { throw APIError.invalidScenario("Fonction indisponible.") }
     func configureFamiliar(frontId _: String, request _: ConfigureFamiliarRequest) async throws -> PlayerExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
     func purchase(frontId _: String, request _: PurchaseRequest) async throws -> PlayerExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
     func adminConfiguration(frontId _: String) async throws -> ExperienceConfigurationView { throw APIError.invalidScenario("Fonction indisponible.") }
@@ -139,6 +151,30 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     func playerExperience(frontId: String) async throws -> PlayerExperienceView {
         try await perform(method: "GET", base: endpoints.playerExperience, path: "/me/experience?frontId=\(escaped(frontId))", body: nil, authenticated: true)
+    }
+
+    func playerBootstrap(frontId: String) async throws -> PlayerBootstrapView {
+        try await perform(method: "GET", base: endpoints.playerExperience, path: "/me/experience/bootstrap?frontId=\(escaped(frontId))", body: nil, authenticated: true)
+    }
+
+    func completeOnboardingStep(frontId: String, stepId: UUID) async throws -> OnboardingStateView {
+        try await send(method: "POST", base: endpoints.playerExperience, path: "/me/experience/onboarding/steps/\(stepId.uuidString.lowercased())/complete?frontId=\(escaped(frontId))", body: OnboardingCommandRequest(idempotencyKey: UUID().uuidString.lowercased()))
+    }
+
+    func skipOnboarding(frontId: String) async throws -> OnboardingStateView {
+        try await send(method: "POST", base: endpoints.playerExperience, path: "/me/experience/onboarding/skip?frontId=\(escaped(frontId))", body: OnboardingCommandRequest(idempotencyKey: UUID().uuidString.lowercased()))
+    }
+
+    func resetOnboarding(frontId: String) async throws -> OnboardingStateView {
+        try await perform(method: "POST", base: endpoints.playerExperience, path: "/me/experience/onboarding/reset?frontId=\(escaped(frontId))", body: nil, authenticated: true)
+    }
+
+    func journal(frontId: String) async throws -> JournalView {
+        try await perform(method: "GET", base: endpoints.playerExperience, path: "/me/experience/journal?frontId=\(escaped(frontId))&limit=100", body: nil, authenticated: true)
+    }
+
+    func contextualHelp(frontId: String, request: ContextualHelpRequest) async throws -> ContextualHelpView {
+        try await send(method: "POST", base: endpoints.playerExperience, path: "/me/experience/assistant/contextual-help?frontId=\(escaped(frontId))", body: request)
     }
 
     func configureFamiliar(frontId: String, request: ConfigureFamiliarRequest) async throws -> PlayerExperienceView {

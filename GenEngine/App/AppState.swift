@@ -43,6 +43,9 @@ final class AppState {
     private(set) var access: UserAccessView?
     private(set) var experience: PublishedExperienceView?
     private(set) var playerExperience: PlayerExperienceView?
+    private(set) var playerBootstrap: PlayerBootstrapView?
+    private(set) var playerJournal: JournalView?
+    private(set) var contextualHelp: ContextualHelpView?
     private(set) var adminConfiguration: ExperienceConfigurationView?
     private(set) var permissionsCatalog: [PermissionView] = []
     private(set) var roles: [RoleView] = []
@@ -164,7 +167,47 @@ final class AppState {
             self.playerExperience = try await self.api.configureFamiliar(
                 frontId: self.frontId,
                 request: ConfigureFamiliarRequest(expectedRevision: playerExperience.revision, selection: selection))
+            self.playerBootstrap = try await self.api.playerBootstrap(frontId: self.frontId)
+            self.selectedTab = .experience
         }
+    }
+
+    func completeOnboardingStep(_ step: OnboardingStepDefinition) async {
+        await run("Étape du tutoriel terminée") {
+            _ = try await self.api.completeOnboardingStep(frontId: self.frontId, stepId: step.id)
+            self.playerBootstrap = try await self.api.playerBootstrap(frontId: self.frontId)
+            self.playerExperience = self.playerBootstrap?.experience
+        }
+    }
+
+    func skipOnboarding() async {
+        await run("Tutoriel passé") {
+            _ = try await self.api.skipOnboarding(frontId: self.frontId)
+            self.playerBootstrap = try await self.api.playerBootstrap(frontId: self.frontId)
+            self.playerExperience = self.playerBootstrap?.experience
+        }
+    }
+
+    func resetOnboarding() async {
+        await run("Tutoriel recommencé") {
+            _ = try await self.api.resetOnboarding(frontId: self.frontId)
+            self.playerBootstrap = try await self.api.playerBootstrap(frontId: self.frontId)
+            self.playerExperience = self.playerBootstrap?.experience
+            self.selectedTab = .experience
+        }
+    }
+
+    func loadJournal() async {
+        guard isAuthenticated else { return }
+        do { playerJournal = try await api.journal(frontId: frontId) }
+        catch is CancellationError { }
+        catch { developerLog.insert("✗ Journal: \(error.localizedDescription)", at: 0) }
+    }
+
+    func requestHelp(context: String, choiceID: String? = nil, alreadyExplored: Bool = false) async {
+        do {
+            contextualHelp = try await api.contextualHelp(frontId: frontId, request: ContextualHelpRequest(context: context, scenarioVersionId: session?.scenarioVersionId, choiceId: choiceID, alreadyExplored: alreadyExplored, authorHint: nil))
+        } catch { developerLog.insert("✗ Aide: \(error.localizedDescription)", at: 0) }
     }
 
     func purchase(_ offer: OfferDefinition) async {
@@ -303,6 +346,9 @@ final class AppState {
         isDemoAccess = false
         access = nil
         playerExperience = nil
+        playerBootstrap = nil
+        playerJournal = nil
+        contextualHelp = nil
         adminConfiguration = nil
         permissionsCatalog = []
         roles = []
@@ -325,7 +371,7 @@ final class AppState {
         guard let node = DemoStory.node(id: DemoStory.openingNodeID) else { return }
         currentStory = DemoStory.summary
         isDemoSession = true
-        session = SessionView(id: UUID(), scenarioVersionId: UUID(), snapshotHash: "demo", status: .awaitingInput, revision: 0, turn: 0)
+        session = SessionView(id: UUID(), scenarioId: UUID(), scenarioVersionId: UUID(), snapshotHash: "demo", status: .awaitingInput, revision: 0, turn: 0)
         step = makeStep(node, turn: 0)
     }
 
@@ -335,7 +381,7 @@ final class AppState {
             guard let choice = DemoStory.node(id: step?.nodeId ?? "")?.choices.first(where: { $0.id == choiceID }),
                   let node = DemoStory.node(id: choice.target) else { return }
             let turn = session.turn + 1
-            self.session = SessionView(id: session.id, scenarioVersionId: session.scenarioVersionId, snapshotHash: session.snapshotHash, status: node.isEnding ? .completed : .awaitingInput, revision: session.revision + 1, turn: turn)
+            self.session = SessionView(id: session.id, scenarioId: session.scenarioId, scenarioVersionId: session.scenarioVersionId, snapshotHash: session.snapshotHash, status: node.isEnding ? .completed : .awaitingInput, revision: session.revision + 1, turn: turn)
             step = makeStep(node, turn: turn)
             return
         }
@@ -505,7 +551,11 @@ final class AppState {
         self.access = try await access
         self.experience = try await experience
         if hasPermission("session.play") {
-            self.playerExperience = try await api.playerExperience(frontId: frontId)
+            let bootstrap = try await api.playerBootstrap(frontId: frontId)
+            self.playerBootstrap = bootstrap
+            self.playerExperience = bootstrap.experience
+            self.playerJournal = try? await api.journal(frontId: frontId)
+            if bootstrap.nextAction != "OpenMap" { self.selectedTab = .experience }
         }
     }
 

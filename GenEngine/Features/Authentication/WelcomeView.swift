@@ -4,6 +4,9 @@ struct WelcomeView: View {
     @Environment(AppState.self) private var state
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showsLogin = false
+    @State private var introIndex = 0
+    @State private var introDismissed = false
+    @AppStorage("genengine.intro.last-version") private var lastIntroVersion = 0
 
     var body: some View {
         @Bindable var state = state
@@ -82,7 +85,52 @@ struct WelcomeView: View {
                 }
                 .padding(.horizontal, 24)
             }
+            if shouldShowIntroduction { introduction(introScenes[introIndex]) }
         }
         .navigationBarHidden(true)
+    }
+
+    private var introScenes: [IntroSceneDefinition] {
+        (state.experience?.document.intro.scenes ?? []).sorted { $0.order < $1.order }
+    }
+
+    private var shouldShowIntroduction: Bool {
+        guard let experience = state.experience,
+              experience.document.intro.enabled,
+              !introDismissed,
+              introScenes.indices.contains(introIndex) else { return false }
+        return experience.document.intro.displayPolicy == "EveryLaunch" || lastIntroVersion != experience.version
+    }
+
+    private func introduction(_ scene: IntroSceneDefinition) -> some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if let value = scene.imageUrl, let url = URL(string: value) {
+                AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
+                    .ignoresSafeArea().opacity(0.55)
+            }
+            LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.96)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 18) {
+                Spacer()
+                EyebrowText(text: scene.eyebrow, color: GenEngineTheme.amber)
+                Text(scene.title).font(.system(size: 54, weight: .bold, design: .serif)).foregroundStyle(GenEngineTheme.ivory)
+                Text(scene.body).font(.title3).foregroundStyle(GenEngineTheme.ivory.opacity(0.82))
+                HStack {
+                    Button(introIndex == introScenes.count - 1 ? "Entrer dans le monde" : "Continuer") { advanceIntroduction() }.buttonStyle(PrimaryActionStyle())
+                    if state.experience?.document.intro.allowSkip == true { Button("Passer") { finishIntroduction() }.buttonStyle(.bordered).tint(GenEngineTheme.ivory) }
+                }
+                Text("\(introIndex + 1) / \(introScenes.count)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+            }.padding(28).frame(maxWidth: 720)
+        }.transition(.opacity)
+    }
+
+    private func advanceIntroduction() {
+        if introIndex < introScenes.count - 1 { withAnimation { introIndex += 1 } }
+        else { finishIntroduction() }
+    }
+
+    private func finishIntroduction() {
+        if let version = state.experience?.version { lastIntroVersion = version }
+        withAnimation { introDismissed = true }
     }
 }
