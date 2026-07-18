@@ -107,29 +107,74 @@ struct WelcomeView: View {
     }
 
     private func introduction(_ scene: IntroSceneDefinition) -> some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            if let value = scene.imageUrl {
-                if let url = URL(string: value), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
-                    AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
-                        .ignoresSafeArea().opacity(0.55)
-                } else {
-                    Image(value).resizable().scaledToFill().ignoresSafeArea().opacity(0.55)
+        VStack(alignment: .leading, spacing: 18) {
+            // Le texte défile si la scène est longue ou si Dynamic Type est agrandi ;
+            // les commandes restent hors du ScrollView, donc toujours visibles.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    EyebrowText(text: scene.eyebrow, color: GenEngineTheme.amber)
+                    Text(scene.title)
+                        .font(.system(.largeTitle, design: .serif, weight: .bold))
+                        .foregroundStyle(GenEngineTheme.ivory)
+                    Text(scene.body).font(.title3).foregroundStyle(GenEngineTheme.ivory.opacity(0.82))
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.96)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 18) {
-                Spacer()
-                EyebrowText(text: scene.eyebrow, color: GenEngineTheme.amber)
-                Text(scene.title).font(.system(size: 54, weight: .bold, design: .serif)).foregroundStyle(GenEngineTheme.ivory)
-                Text(scene.body).font(.title3).foregroundStyle(GenEngineTheme.ivory.opacity(0.82))
-                HStack {
-                    Button(introIndex == introScenes.count - 1 ? "Entrer dans le monde" : "Continuer") { advanceIntroduction() }.buttonStyle(PrimaryActionStyle())
-                    if state.experience?.document.intro.allowSkip != false { Button("Passer") { finishIntroduction() }.buttonStyle(.bordered).tint(GenEngineTheme.ivory) }
+            .scrollBounceBehavior(.basedOnSize)
+            .defaultScrollAnchor(.bottom)
+
+            introductionControls
+        }
+        .padding(28)
+        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Le décor passe en `background` : une image `scaledToFill` placée en
+        // frère de ZStack impose sa taille intrinsèque (l'asset carré 1254×1254
+        // dépassait la hauteur de l'écran) et poussait les commandes hors cadre.
+        .background { introductionBackdrop(scene) }
+        .transition(.opacity)
+    }
+
+    private func introductionBackdrop(_ scene: IntroSceneDefinition) -> some View {
+        ZStack {
+            Color.black
+            if let value = scene.imageUrl {
+                Color.clear.overlay {
+                    if let url = URL(string: value), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                        AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
+                    } else {
+                        Image(value).resizable().scaledToFill()
+                    }
                 }
-                Text("\(introIndex + 1) / \(introScenes.count)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
-            }.padding(28).frame(maxWidth: 720)
-        }.transition(.opacity)
+                .clipped()
+                .opacity(0.55)
+            }
+            LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.96)], startPoint: .top, endPoint: .bottom)
+        }
+        .ignoresSafeArea()
+    }
+
+    private var introductionControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Les boutons passent en pile si la largeur disponible ne suffit plus.
+            ViewThatFits(in: .horizontal) {
+                HStack { introductionAdvanceButton; introductionSkipButton }
+                VStack(alignment: .leading, spacing: 12) { introductionAdvanceButton; introductionSkipButton }
+            }
+            Text("\(introIndex + 1) / \(introScenes.count)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+        }
+    }
+
+    private var introductionAdvanceButton: some View {
+        Button(introIndex == introScenes.count - 1 ? "Entrer dans le monde" : "Continuer") { advanceIntroduction() }
+            .buttonStyle(PrimaryActionStyle())
+    }
+
+    @ViewBuilder
+    private var introductionSkipButton: some View {
+        if state.experience?.document.intro.allowSkip != false {
+            Button("Passer") { finishIntroduction() }.buttonStyle(.bordered).tint(GenEngineTheme.ivory)
+        }
     }
 
     private func advanceIntroduction() {

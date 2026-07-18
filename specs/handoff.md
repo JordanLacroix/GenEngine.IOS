@@ -44,6 +44,8 @@ Validation du seuil narratif : génération XcodeGen, build Swift 6 et 9 tests s
 
 Validation de la stabilisation joueur : projection de carte et localisation couvertes par Swift Testing, avec build universel iPhone/iPad le 18 juillet 2026.
 
+Correction de l'introduction publique : le décor de scène est passé en arrière-plan clippé afin qu'une image `scaledToFill` ne dicte plus la hauteur du conteneur, et les commandes sont sorties du défilement pour rester atteignables. Génération XcodeGen, build Swift 6 et 11 tests sur iPhone 17 Pro Simulator réussis sans signature le 19 juillet 2026.
+
 ## Décisions à préserver
 
 - Backend autoritatif et aucune règle Narrative dans le client.
