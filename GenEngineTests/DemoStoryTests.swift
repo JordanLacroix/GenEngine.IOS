@@ -15,6 +15,19 @@ struct DemoStoryTests {
         #expect(visited.count == 13)
     }
 
+    @Test func demoEndingsStopInsteadOfLooping() {
+        #expect(DemoStory.node(id: "dawn")?.choices.isEmpty == true)
+        #expect(DemoStory.node(id: "watch")?.choices.isEmpty == true)
+        #expect(DemoStory.node(id: "shore")?.interaction != nil)
+    }
+
+    @Test func familiarAssetPackRequiresHTTPSOrBundledAsset() throws {
+        #expect(throws: FamiliarAssetPackError.self) {
+            _ = try FamiliarAssetPack(schemaVersion: 1, id: "unsafe", name: "Unsafe", targetFamiliarId: nil, bundledAssetName: nil, portraitUrl: URL(string: "http://example.test/pet.png"), license: "Test", attribution: "Test").validated()
+        }
+        #expect(try FamiliarAssetPack.aster.validated().id == "genengine.aster.original")
+    }
+
     @Test(arguments: [("\"AwaitingInput\"", SessionStatus.awaitingInput), ("2", SessionStatus.completed)])
     func sessionStatusAcceptsStringAndNumericContracts(json: String, expected: SessionStatus) throws {
         let decoded = try JSONDecoder().decode(SessionStatus.self, from: Data(json.utf8))
