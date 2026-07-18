@@ -42,6 +42,21 @@ private struct ProductShell: View {
             LibraryView()
                 .tabItem { Label("Bibliothèque", systemImage: "books.vertical.fill") }
                 .tag(AppTab.library)
+            if state.hasPermission("session.play") {
+                PlayerExperienceViewScreen()
+                    .tabItem { Label("Mon univers", systemImage: "wand.and.stars") }
+                    .tag(AppTab.experience)
+            }
+            if state.hasPermission("scenario.author") {
+                StudioView()
+                    .tabItem { Label("Studio", systemImage: "pencil.and.outline") }
+                    .tag(AppTab.studio)
+            }
+            if state.hasPermission("config.read") {
+                AdministrationView()
+                    .tabItem { Label("Admin", systemImage: "slider.horizontal.3") }
+                    .tag(AppTab.administration)
+            }
             #if DEBUG
             DeveloperView()
                 .tabItem { Label("Developer", systemImage: "hammer.fill") }

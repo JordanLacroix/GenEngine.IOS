@@ -12,6 +12,8 @@ struct DeveloperView: View {
                     TextField("Identity URL", text: $state.endpoints.identity).textInputAutocapitalization(.never).autocorrectionDisabled()
                     TextField("Authoring URL", text: $state.endpoints.authoring).textInputAutocapitalization(.never).autocorrectionDisabled()
                     TextField("Play URL", text: $state.endpoints.play).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("Configuration URL", text: $state.endpoints.configuration).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("Player Experience URL", text: $state.endpoints.playerExperience).textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button("Réinitialiser sur localhost") { state.endpoints = .local }
                 }
                 Section("Scénario de développement") {

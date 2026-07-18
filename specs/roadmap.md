@@ -20,6 +20,12 @@ Identity, outils Authoring Debug, session Play, interactions typées, pause/repr
 
 ## Jalon 3 — première expérience produit
 
-Exposer progressivement les capacités du jalon 4 du backend : configuration, RBAC, organisations, assistant et économie.
+Configuration publique, navigation pilotée par les permissions, familier personnalisable, portefeuille, magasin, Studio contextualisé et console d’administration séparée.
 
-**Statut : en attente de contrats publiés et d’un besoin produit validé.** Le client ne doit ni anticiper les modèles ni dupliquer les règles serveur.
+**Statut : terminé.**
+
+## Jalon 4 — structures et exploitation avancées
+
+Relier membres et encadrants aux unités d’organisation, appliquer les scopes aux données, approfondir l’édition des règles économiques et le cycle éditorial collaboratif des scénarios.
+
+**Statut : planifié.** Les règles restent autoritatives dans les services backend.

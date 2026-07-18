@@ -36,7 +36,11 @@ Le dépôt conserve deux parcours explicitement séparés :
 | Pause, reprise et arbre explicable | ✅ Connecté à Play |
 | Outils Authoring | ✅ Disponibles en Debug uniquement |
 | Support universel iPhone/iPad | ✅ Configuré |
-| Configuration, organisations, assistant et économie | 📋 En attente des contrats backend |
+| Navigation pilotée par les permissions RBAC | ✅ Connectée |
+| Familier personnalisable, portefeuille et magasin | ✅ Connectés |
+| Studio de génération contextualisée | ✅ Connecté |
+| Administration jeu, auth, IA, économie et rôles | ✅ Connectée |
+| Microsoft Entra ID (Authorization Code + PKCE) | ✅ Connecté |
 
 ## Démarrage rapide
 
@@ -66,13 +70,17 @@ Depuis le dépôt backend :
 docker compose up --build --detach --wait
 ```
 
-Dans une compilation Debug, ouvrez **Developer** et configurez les trois services. Le simulateur utilise `localhost` ; un appareil physique exige des endpoints HTTPS joignables. App Transport Security n’est pas désactivé globalement.
+Dans une compilation Debug, ouvrez **Developer** pour modifier les endpoints. Le simulateur utilise `localhost` ; un appareil physique exige des endpoints HTTPS joignables. App Transport Security n’est pas désactivé globalement.
 
 | Service | URL locale |
 |---|---|
 | Authoring | `http://localhost:5201` |
 | Play | `http://localhost:5202` |
 | Identity | `http://localhost:5203` |
+| Configuration | `http://localhost:5204` |
+| Player Experience | `http://localhost:5205` |
+
+Pour Entra ID, déclarez l’application iOS comme client public et ajoutez `genengine://auth` à ses URI de redirection. Le client utilise Authorization Code avec PKCE puis échange le jeton Entra contre un jeton GenEngine.
 
 Les jetons sont conservés dans Keychain. Les préférences d’endpoints et références opaques de sessions sont stockées dans `UserDefaults`. L’état narratif reste exclusivement autoritatif dans Play.
 
@@ -89,9 +97,12 @@ GenEngine/
 │   └── Security/        # Credentials protégés par Keychain
 └── Features/
     ├── Authentication/
+    ├── Administration/ # Control plane, providers et RBAC
     ├── Developer/       # Debug uniquement
     ├── Home/
     ├── Library/
+    ├── Experience/     # Familier, monnaie et magasin
+    ├── Studio/         # Génération de scénarios contextualisée
     └── Player/
 ```
 
@@ -113,7 +124,7 @@ Swift Testing couvre la navigation déterministe de la démonstration et la comp
 
 ## Roadmap
 
-Le client a livré sa fondation visuelle puis la connexion au parcours narratif actuel. Les prochaines tranches suivront les contrats publiés du backend, sans anticiper les règles de configuration, d’autorisation ou d’organisation. Voir [`specs/roadmap.md`](specs/roadmap.md).
+La première plateforme configurable est livrée de bout en bout : jeu global, catégories, structures hiérarchiques école/classes ou entreprise/équipes, génération assistée, RBAC, Entra ID, familier et économie. Les prochaines tranches relieront membres et encadrants à ces unités et approfondiront les workflows éditoriaux. Voir [`specs/roadmap.md`](specs/roadmap.md).
 
 ## Documentation
 

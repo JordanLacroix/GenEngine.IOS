@@ -4,6 +4,9 @@ import Observation
 enum AppTab: Hashable {
     case home
     case library
+    case experience
+    case studio
+    case administration
     #if DEBUG
     case developer
     #endif
@@ -39,8 +42,19 @@ final class AppState {
     private var hasLoadedCatalog = false
     private(set) var developerLog: [String] = []
     private(set) var savedSessions: [SavedSession] = SessionStore.load()
+    private(set) var access: UserAccessView?
+    private(set) var experience: PublishedExperienceView?
+    private(set) var playerExperience: PlayerExperienceView?
+    private(set) var adminConfiguration: ExperienceConfigurationView?
+    private(set) var permissionsCatalog: [PermissionView] = []
+    private(set) var roles: [RoleView] = []
+    private(set) var generatedScenario: ScenarioView?
+    let frontId = "default"
+    private let microsoftSignIn = MicrosoftSignInCoordinator()
 
     var hasProductAccess: Bool { isAuthenticated || isDemoAccess }
+    var gameName: String { experience?.document.game.name ?? "GenEngine" }
+    func hasPermission(_ permission: String) -> Bool { access?.permissions.contains(permission) == true }
     var stories: [StorySummary] {
         var items = [DemoStory.summary]
         items.append(contentsOf: publishedStories)
@@ -65,6 +79,7 @@ final class AppState {
         self.vault = vault
         self.api = api ?? LiveGenEngineAPI(endpoints: endpoints, token: token)
         self.isAuthenticated = token != nil
+        if token != nil { Task { await self.loadPlatformContext() } }
     }
 
     func unlockDemo() {
@@ -97,6 +112,7 @@ final class AppState {
             try self.vault.save(access.token)
             self.password = ""
             self.isAuthenticated = true
+            try await self.refreshPlatformContext()
         }
     }
 
@@ -106,6 +122,101 @@ final class AppState {
             try self.vault.save(access.token)
             self.password = ""
             self.isAuthenticated = true
+            try await self.refreshPlatformContext()
+        }
+    }
+
+    func loginWithMicrosoft() async {
+        await run("Connexion Microsoft") {
+            let providers = try await self.api.authenticationProviders()
+            guard providers.entraEnabled, let authority = providers.authority, let clientId = providers.clientId else {
+                throw APIError.invalidScenario("La connexion Microsoft n’est pas activée pour ce jeu.")
+            }
+            let externalToken = try await self.microsoftSignIn.signIn(authority: authority, clientId: clientId)
+            let access = try await self.api.exchangeEntra(accessToken: externalToken)
+            try self.vault.save(access.token)
+            self.isAuthenticated = true
+            try await self.refreshPlatformContext()
+        }
+    }
+
+    func loadPlatformContext() async {
+        do { try await refreshPlatformContext() }
+        catch is CancellationError { }
+        catch { developerLog.insert("✗ Plateforme: \(error.localizedDescription)", at: 0) }
+    }
+
+    func saveFamiliar(_ selection: FamiliarSelection) async {
+        guard let playerExperience else { return }
+        await run("Familier configuré") {
+            self.playerExperience = try await self.api.configureFamiliar(
+                frontId: self.frontId,
+                request: ConfigureFamiliarRequest(expectedRevision: playerExperience.revision, selection: selection))
+        }
+    }
+
+    func purchase(_ offer: OfferDefinition) async {
+        await run("Achat \(offer.name)") {
+            self.playerExperience = try await self.api.purchase(
+                frontId: self.frontId,
+                request: PurchaseRequest(offerId: offer.id, idempotencyKey: UUID().uuidString.lowercased()))
+        }
+    }
+
+    func loadAdministration() async {
+        guard hasPermission("config.read") else { return }
+        await run("Administration chargée") {
+            self.adminConfiguration = try await self.api.adminConfiguration(frontId: self.frontId)
+            if self.hasPermission("rbac.manage") {
+                async let permissions = self.api.permissions()
+                async let roles = self.api.roles()
+                self.permissionsCatalog = try await permissions
+                self.roles = try await roles
+            }
+        }
+    }
+
+    func saveConfiguration(_ document: ExperienceDocument) async {
+        guard let current = adminConfiguration else { return }
+        await run("Configuration enregistrée") {
+            self.adminConfiguration = try await self.api.updateConfiguration(
+                frontId: self.frontId,
+                request: UpdateConfigurationRequest(expectedRevision: current.revision, document: document))
+        }
+    }
+
+    func publishConfiguration() async {
+        guard let current = adminConfiguration else { return }
+        await run("Configuration publiée") {
+            self.adminConfiguration = try await self.api.publishConfiguration(
+                frontId: self.frontId,
+                request: PublishConfigurationRequest(expectedRevision: current.revision))
+            self.experience = try await self.api.publicExperience(frontId: self.frontId)
+        }
+    }
+
+    func createRole(name: String, description: String, permissions: [String]) async {
+        await run("Rôle créé") {
+            _ = try await self.api.createRole(request: RoleRequest(name: name, description: description, permissions: permissions))
+            self.roles = try await self.api.roles()
+        }
+    }
+
+    func assignRole(userId: UUID, roleId: UUID, scope: String?) async {
+        await run("Rôle affecté") {
+            try await self.api.assignRole(userId: userId, request: AssignRoleRequest(roleId: roleId, scope: scope, expiresAt: nil))
+        }
+    }
+
+    func generateScenario(categoryId: UUID, prompt: String, provider: String, targetMinutes: Int, tone: String) async {
+        await run("Scénario généré") {
+            self.generatedScenario = try await self.api.generateScenario(request: ScenarioGenerationRequest(
+                frontId: self.frontId,
+                categoryId: categoryId,
+                prompt: prompt,
+                provider: provider,
+                targetMinutes: targetMinutes,
+                tone: tone))
         }
     }
 
@@ -114,6 +225,9 @@ final class AppState {
         Task { await api.setToken(nil) }
         isAuthenticated = false
         isDemoAccess = false
+        access = nil
+        playerExperience = nil
+        adminConfiguration = nil
         endSession()
     }
 
@@ -295,6 +409,16 @@ final class AppState {
         do { tree = try await api.sessionTree(sessionId: session.id) }
         catch is CancellationError { }
         catch { developerLog.insert("✗ Arbre: \(error.localizedDescription)", at: 0) }
+    }
+
+    private func refreshPlatformContext() async throws {
+        async let access = api.access()
+        async let experience = api.publicExperience(frontId: frontId)
+        self.access = try await access
+        self.experience = try await experience
+        if hasPermission("session.play") {
+            self.playerExperience = try await api.playerExperience(frontId: frontId)
+        }
     }
 
     private func remember(_ session: SessionView) {
