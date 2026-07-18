@@ -83,6 +83,7 @@ Dans une compilation Debug, ouvrez **Developer** pour modifier les endpoints. Le
 | Identity | `http://localhost:5203` |
 | Configuration | `http://localhost:5204` |
 | Player Experience | `http://localhost:5205` |
+| Organization | `http://localhost:5206` |
 
 Pour Entra ID, déclarez l’application iOS comme client public et ajoutez `genengine://auth` à ses URI de redirection. Le client utilise Authorization Code avec PKCE puis échange le jeton Entra contre un jeton GenEngine.
 
@@ -128,7 +129,7 @@ Swift Testing couvre la navigation déterministe de la démonstration et la comp
 
 ## Roadmap
 
-La plateforme configurable inclut désormais le flux immersif complet : introduction avant connexion, mode démo, compte et déconnexion explicites, bootstrap autoritatif, tutoriel persistant, carte recherchable, journal, maîtrise cross-session, compagnon illustré et centre d'aide. Les prochaines tranches compléteront l'administration low-code de ces objets et les affectations d'organisation. Voir [`specs/roadmap.md`](specs/roadmap.md).
+La plateforme configurable inclut le flux immersif complet et une administration native distincte du Studio. L’espace Structures gère désormais unités école/entreprise/formation, participants, encadrants et affectations de scénarios/catégories/parcours. Voir [`specs/roadmap.md`](specs/roadmap.md).
 
 ## Documentation
 

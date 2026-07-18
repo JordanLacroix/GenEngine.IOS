@@ -71,4 +71,13 @@ struct DemoStoryTests {
 
         #expect(result.map(\.id) == ["v2"])
     }
+
+    @Test func legacyEndpointPreferencesKeepPhysicalDeviceHost() throws {
+        let json = #"{"identity":"http://192.168.1.20:5203","authoring":"http://192.168.1.20:5201","play":"http://192.168.1.20:5202","configuration":"http://192.168.1.20:5204","playerExperience":"http://192.168.1.20:5205"}"#
+
+        let endpoints = try JSONDecoder().decode(ServiceEndpoints.self, from: Data(json.utf8))
+
+        #expect(endpoints.organization == "http://192.168.1.20:5206")
+        #expect(endpoints.identity == "http://192.168.1.20:5203")
+    }
 }

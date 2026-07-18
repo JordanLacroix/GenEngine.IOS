@@ -29,6 +29,15 @@ protocol GenEngineAPI: Sendable {
     func setUserActive(userId: UUID, isActive: Bool) async throws -> AdminUserView
     func deleteUser(userId: UUID) async throws
     func deleteRole(roleId: UUID) async throws
+    func organizationFront(frontId: String) async throws -> OrganizationFrontView
+    func organizationUnits(frontId: String) async throws -> [OrganizationUnitView]
+    func memberships(frontId: String) async throws -> PagedMembershipsView
+    func assignments(frontId: String) async throws -> PagedAssignmentsView
+    func upsertUnit(frontId: String, id: UUID, request: UpsertUnitRequest) async throws -> OrganizationUnitView
+    func upsertMembership(frontId: String, id: UUID, request: UpsertMembershipRequest) async throws -> MembershipView
+    func deleteMembership(frontId: String, id: UUID) async throws
+    func upsertAssignment(frontId: String, id: UUID, request: UpsertAssignmentRequest) async throws -> ContentAssignmentView
+    func deleteAssignment(frontId: String, id: UUID) async throws
     func scenarios(query: String) async throws -> PagedScenariosView
     func updateScenario(scenarioId: UUID, expectedRevision: Int, document: Data) async throws -> ScenarioView
     func archiveScenario(scenarioId: UUID, expectedRevision: Int) async throws
@@ -77,6 +86,15 @@ extension GenEngineAPI {
     func setUserActive(userId _: UUID, isActive _: Bool) async throws -> AdminUserView { throw APIError.invalidScenario("Fonction indisponible.") }
     func deleteUser(userId _: UUID) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
     func deleteRole(roleId _: UUID) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
+    func organizationFront(frontId _: String) async throws -> OrganizationFrontView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func organizationUnits(frontId _: String) async throws -> [OrganizationUnitView] { throw APIError.invalidScenario("Fonction indisponible.") }
+    func memberships(frontId _: String) async throws -> PagedMembershipsView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func assignments(frontId _: String) async throws -> PagedAssignmentsView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func upsertUnit(frontId _: String, id _: UUID, request _: UpsertUnitRequest) async throws -> OrganizationUnitView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func upsertMembership(frontId _: String, id _: UUID, request _: UpsertMembershipRequest) async throws -> MembershipView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func deleteMembership(frontId _: String, id _: UUID) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
+    func upsertAssignment(frontId _: String, id _: UUID, request _: UpsertAssignmentRequest) async throws -> ContentAssignmentView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func deleteAssignment(frontId _: String, id _: UUID) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
     func scenarios(query _: String) async throws -> PagedScenariosView { throw APIError.invalidScenario("Fonction indisponible.") }
     func updateScenario(scenarioId _: UUID, expectedRevision _: Int, document _: Data) async throws -> ScenarioView { throw APIError.invalidScenario("Fonction indisponible.") }
     func archiveScenario(scenarioId _: UUID, expectedRevision _: Int) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
@@ -227,6 +245,42 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     func deleteRole(roleId: UUID) async throws {
         try await performVoid(method: "DELETE", base: endpoints.identity, path: "/admin/access/roles/\(roleId.uuidString.lowercased())")
+    }
+
+    func organizationFront(frontId: String) async throws -> OrganizationFrontView {
+        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))", body: nil, authenticated: true)
+    }
+
+    func organizationUnits(frontId: String) async throws -> [OrganizationUnitView] {
+        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/units", body: nil, authenticated: true)
+    }
+
+    func memberships(frontId: String) async throws -> PagedMembershipsView {
+        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/memberships?pageSize=100", body: nil, authenticated: true)
+    }
+
+    func assignments(frontId: String) async throws -> PagedAssignmentsView {
+        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/assignments?pageSize=100", body: nil, authenticated: true)
+    }
+
+    func upsertUnit(frontId: String, id: UUID, request: UpsertUnitRequest) async throws -> OrganizationUnitView {
+        try await send(method: "PUT", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/units/\(id.uuidString.lowercased())", body: request)
+    }
+
+    func upsertMembership(frontId: String, id: UUID, request: UpsertMembershipRequest) async throws -> MembershipView {
+        try await send(method: "PUT", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/memberships/\(id.uuidString.lowercased())", body: request)
+    }
+
+    func deleteMembership(frontId: String, id: UUID) async throws {
+        try await performVoid(method: "DELETE", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/memberships/\(id.uuidString.lowercased())")
+    }
+
+    func upsertAssignment(frontId: String, id: UUID, request: UpsertAssignmentRequest) async throws -> ContentAssignmentView {
+        try await send(method: "PUT", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/assignments/\(id.uuidString.lowercased())", body: request)
+    }
+
+    func deleteAssignment(frontId: String, id: UUID) async throws {
+        try await performVoid(method: "DELETE", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/assignments/\(id.uuidString.lowercased())")
     }
 
     func scenarios(query: String) async throws -> PagedScenariosView {

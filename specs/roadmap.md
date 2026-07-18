@@ -32,9 +32,9 @@ Dictionnaire extensible de copies publié par le moteur, éditeur natif de libel
 
 ## Jalon 4 — structures et exploitation avancées
 
-Relier membres et encadrants aux unités d’organisation, appliquer les scopes aux données, approfondir l’édition des règles économiques et le cycle éditorial collaboratif des scénarios.
+Les membres, encadrants, unités et affectations opérationnelles sont raccordés. Restent périodes, imports de masse, reporting collectif, édition économique avancée et cycle éditorial collaboratif.
 
-**Statut : planifié.** Les règles restent autoritatives dans les services backend.
+**Statut : en cours.** Les règles restent autoritatives dans les services backend.
 
 ## Jalon 3.3 — expérience joueur immersive
 
