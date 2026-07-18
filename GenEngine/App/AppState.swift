@@ -7,6 +7,7 @@ enum AppTab: Hashable {
     case experience
     case studio
     case administration
+    case account
 }
 
 @MainActor
@@ -61,16 +62,15 @@ final class AppState {
     }
     func hasPermission(_ permission: String) -> Bool { access?.permissions.contains(permission) == true }
     var stories: [StorySummary] {
-        var items = [DemoStory.summary]
-        items.append(contentsOf: publishedStories)
-        items.append(contentsOf: DemoStory.library.dropFirst())
+        var items = publishedStories
         if let scenarioVersionID, let publishedTitle {
             let id = scenarioVersionID.uuidString.lowercased()
             if !items.contains(where: { $0.id == id }) {
-                items.insert(StorySummary(id: id, title: publishedTitle, eyebrow: "Publié localement", synopsis: "Une histoire connectée à votre environnement GenEngine.", duration: "À découvrir", symbol: "network", accent: .verdigris, availability: .published(scenarioVersionID)), at: 1)
+                items.insert(StorySummary(id: id, title: publishedTitle, eyebrow: "Publié localement", synopsis: "Une histoire connectée à votre environnement GenEngine.", duration: "À découvrir", symbol: "network", accent: .verdigris, availability: .published(scenarioVersionID)), at: 0)
             }
         }
-        return items
+        items.append(contentsOf: DemoStory.library)
+        return StoryCatalog.unique(items)
     }
 
     private let api: any GenEngineAPI
@@ -304,6 +304,12 @@ final class AppState {
         access = nil
         playerExperience = nil
         adminConfiguration = nil
+        permissionsCatalog = []
+        roles = []
+        adminUsers = []
+        authorScenarios = []
+        generatedScenario = nil
+        selectedTab = .home
         endSession()
     }
 

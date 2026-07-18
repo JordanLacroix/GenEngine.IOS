@@ -57,7 +57,18 @@ private struct ProductShell: View {
                     .tabItem { Label(state.copy("nav.administration", fallback: "Administration"), systemImage: "slider.horizontal.3") }
                     .tag(AppTab.administration)
             }
+            AccountView()
+                .tabItem { Label(state.copy("nav.account", fallback: "Compte"), systemImage: "person.crop.circle.fill") }
+                .tag(AppTab.account)
         }
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { state.selectedTab = .account } label: {
+                    Label(state.isAuthenticated ? (state.access?.userName ?? "Compte") : "Se connecter", systemImage: state.isAuthenticated ? "person.crop.circle.fill.badge.checkmark" : "person.crop.circle.badge.plus")
+                }
+                .accessibilityHint(state.isAuthenticated ? "Gérer le compte et se déconnecter" : "Ouvrir la connexion")
+            }
+        }
     }
 }
