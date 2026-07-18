@@ -57,11 +57,6 @@ private struct ProductShell: View {
                     .tabItem { Label(state.copy("nav.administration", fallback: "Administration"), systemImage: "slider.horizontal.3") }
                     .tag(AppTab.administration)
             }
-            #if DEBUG
-            DeveloperView()
-                .tabItem { Label("Developer", systemImage: "hammer.fill") }
-                .tag(AppTab.developer)
-            #endif
         }
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
     }

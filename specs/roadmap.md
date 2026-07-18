@@ -35,3 +35,9 @@ Dictionnaire extensible de copies publié par le moteur, éditeur natif de libel
 Relier membres et encadrants aux unités d’organisation, appliquer les scopes aux données, approfondir l’édition des règles économiques et le cycle éditorial collaboratif des scénarios.
 
 **Statut : planifié.** Les règles restent autoritatives dans les services backend.
+
+## Jalon 3.2 — opérations produit et Studio visuel
+
+Console utilisateurs recherchable avec activation/suppression, parcours et catégories, assets du familier, progression par catégorie, fusion des outils Developer dans Administration, bibliothèque de brouillons et édition visuelle de scène avec archivage. La démo native compte treize scènes pour une cible d'environ quinze minutes.
+
+**Statut : terminé sur `feat/product-operations-ui`, en attente de revue.**

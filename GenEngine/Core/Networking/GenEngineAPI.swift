@@ -19,6 +19,13 @@ protocol GenEngineAPI: Sendable {
     func roles() async throws -> [RoleView]
     func createRole(request: RoleRequest) async throws -> RoleView
     func assignRole(userId: UUID, request: AssignRoleRequest) async throws
+    func users(query: String) async throws -> PagedUsersView
+    func setUserActive(userId: UUID, isActive: Bool) async throws -> AdminUserView
+    func deleteUser(userId: UUID) async throws
+    func deleteRole(roleId: UUID) async throws
+    func scenarios(query: String) async throws -> PagedScenariosView
+    func updateScenario(scenarioId: UUID, expectedRevision: Int, document: Data) async throws -> ScenarioView
+    func archiveScenario(scenarioId: UUID, expectedRevision: Int) async throws
     func generateScenario(request: ScenarioGenerationRequest) async throws -> ScenarioView
     func listPublishedStories() async throws -> [PublishedScenarioView]
     func importScenario(rawJSON: Data) async throws -> ScenarioView
@@ -54,6 +61,13 @@ extension GenEngineAPI {
     func roles() async throws -> [RoleView] { throw APIError.invalidScenario("Fonction indisponible.") }
     func createRole(request _: RoleRequest) async throws -> RoleView { throw APIError.invalidScenario("Fonction indisponible.") }
     func assignRole(userId _: UUID, request _: AssignRoleRequest) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
+    func users(query _: String) async throws -> PagedUsersView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func setUserActive(userId _: UUID, isActive _: Bool) async throws -> AdminUserView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func deleteUser(userId _: UUID) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
+    func deleteRole(roleId _: UUID) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
+    func scenarios(query _: String) async throws -> PagedScenariosView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func updateScenario(scenarioId _: UUID, expectedRevision _: Int, document _: Data) async throws -> ScenarioView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func archiveScenario(scenarioId _: UUID, expectedRevision _: Int) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
     func generateScenario(request _: ScenarioGenerationRequest) async throws -> ScenarioView { throw APIError.invalidScenario("Fonction indisponible.") }
 }
 
@@ -163,6 +177,38 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await sendVoid(method: "POST", base: endpoints.identity, path: "/admin/access/users/\(userId.uuidString.lowercased())/roles", body: request, authenticated: true)
     }
 
+    func users(query: String) async throws -> PagedUsersView {
+        try await perform(method: "GET", base: endpoints.identity, path: "/admin/users?query=\(escaped(query))&pageSize=50", body: nil, authenticated: true)
+    }
+
+    func setUserActive(userId: UUID, isActive: Bool) async throws -> AdminUserView {
+        try await send(method: "PATCH", base: endpoints.identity, path: "/admin/users/\(userId.uuidString.lowercased())/status", body: UserStatusRequest(isActive: isActive))
+    }
+
+    func deleteUser(userId: UUID) async throws {
+        try await performVoid(method: "DELETE", base: endpoints.identity, path: "/admin/users/\(userId.uuidString.lowercased())")
+    }
+
+    func deleteRole(roleId: UUID) async throws {
+        try await performVoid(method: "DELETE", base: endpoints.identity, path: "/admin/access/roles/\(roleId.uuidString.lowercased())")
+    }
+
+    func scenarios(query: String) async throws -> PagedScenariosView {
+        try await perform(method: "GET", base: endpoints.authoring, path: "/scenarios?query=\(escaped(query))&pageSize=50", body: nil, authenticated: true)
+    }
+
+    func updateScenario(scenarioId: UUID, expectedRevision: Int, document: Data) async throws -> ScenarioView {
+        guard let object = try JSONSerialization.jsonObject(with: document) as? [String: Any] else {
+            throw APIError.invalidScenario("Le document narratif est invalide.")
+        }
+        let body = try JSONSerialization.data(withJSONObject: ["expectedRevision": expectedRevision, "document": object])
+        return try await perform(method: "PUT", base: endpoints.authoring, path: scenarioPath(scenarioId), body: body, authenticated: true)
+    }
+
+    func archiveScenario(scenarioId: UUID, expectedRevision: Int) async throws {
+        try await performVoid(method: "DELETE", base: endpoints.authoring, path: "\(scenarioPath(scenarioId))?expectedRevision=\(expectedRevision)")
+    }
+
     func generateScenario(request: ScenarioGenerationRequest) async throws -> ScenarioView {
         try await send(method: "POST", base: endpoints.authoring, path: "/scenarios/generate", body: request)
     }
@@ -252,6 +298,10 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     private func postWithoutBody<Response: Decodable>(base: String, path: String) async throws -> Response {
         try await perform(method: "POST", base: base, path: path, body: nil, authenticated: true)
+    }
+
+    private func performVoid(method: String, base: String, path: String) async throws {
+        _ = try await request(method: method, base: base, path: path, body: nil, authenticated: true)
     }
 
     private func perform<Response: Decodable>(method: String, base: String, path: String, body: Data?, authenticated: Bool, bearer: String? = nil) async throws -> Response {

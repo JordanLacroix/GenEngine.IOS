@@ -12,6 +12,7 @@ struct AdministrationView: View {
     @State private var assignmentScope = ""
     @State private var newLabelKey = ""
     @State private var newLabelValue = ""
+    @State private var userSearch = ""
 
     var body: some View {
         ZStack {
@@ -60,11 +61,13 @@ struct AdministrationView: View {
         case .game: gamePanel
         case .language: languagePanel
         case .structure: structurePanel
+        case .users: usersPanel
         case .identity: identityPanel
         case .intelligence: intelligencePanel
         case .familiar: familiarPanel
         case .economy: economyPanel
         case .access: accessPanel
+        case .technical: technicalPanel
         }
     }
 
@@ -118,6 +121,7 @@ struct AdministrationView: View {
                             ForEach(document?.organization.units.filter { $0.id != document?.organization.units[index].id } ?? []) { unit in Text(unit.name).tag(Optional(unit.id)) }
                         }
                         Toggle("Active", isOn: bindingOrganizationUnit(index, \.enabled, fallback: true))
+                        Button("Supprimer l’unité", role: .destructive) { let id = document?.organization.units[index].id; document?.organization.units.remove(at: index); document?.assignments?.removeAll { $0.organizationUnitId == id } }
                     }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
                 }
             }
@@ -130,10 +134,48 @@ struct AdministrationView: View {
                         TextField("Nom", text: bindingArray(\.categories, index, \.name, fallback: "" )).font(.headline)
                         TextField("Description", text: bindingArray(\.categories, index, \.description, fallback: ""), axis: .vertical)
                         Toggle("Visible dans les clients", isOn: bindingArray(\.categories, index, \.isVisible, fallback: true))
+                        TextField("Image HTTPS", text: optionalArray(\.categories, index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+                        Button("Supprimer la catégorie", role: .destructive) { let id = document?.categories[index].id; document?.categories.remove(at: index); document?.journeys?.indices.forEach { document?.journeys?[$0].categoryIds.removeAll { $0 == id } } }
                     }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
                 }
             }
             Button { document?.categories.append(.init(id: UUID(), name: "Nouvelle catégorie", description: "", accent: "amber", order: (document?.categories.count ?? 0) + 1, isVisible: true)) } label: { Label("Ajouter une catégorie", systemImage: "plus") }
+            Divider().overlay(.white.opacity(0.15))
+            Text("Parcours").font(.headline).foregroundStyle(GenEngineTheme.ivory)
+            ForEach(document?.journeys?.indices ?? [].indices, id: \.self) { index in
+                VStack(alignment: .leading, spacing: 9) {
+                    TextField("Nom du parcours", text: bindingJourney(index, \.name, fallback: "" )).font(.headline)
+                    TextField("Description", text: bindingJourney(index, \.description, fallback: ""), axis: .vertical)
+                    TextField("Image HTTPS", text: optionalJourney(index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+                    ForEach(document?.categories ?? []) { category in Toggle(category.name, isOn: Binding(get: { document?.journeys?[index].categoryIds.contains(category.id) == true }, set: { enabled in if enabled { document?.journeys?[index].categoryIds.append(category.id) } else { document?.journeys?[index].categoryIds.removeAll { $0 == category.id } } })) }
+                    Button("Supprimer le parcours", role: .destructive) { document?.journeys?.remove(at: index) }
+                }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
+            }
+            Button { if document?.journeys == nil { document?.journeys = [] }; document?.journeys?.append(.init(id: UUID(), name: "Nouveau parcours", description: "", accent: "ember", imageUrl: nil, order: (document?.journeys?.count ?? 0) + 1, isVisible: true, categoryIds: [], prerequisiteJourneyIds: [], tags: [])) } label: { Label("Ajouter un parcours", systemImage: "point.3.connected.trianglepath.dotted") }
+        }
+    }
+
+    private var usersPanel: some View {
+        adminPanel("Utilisateurs", symbol: "person.3.sequence.fill") {
+            HStack { TextField("Rechercher un identifiant", text: $userSearch).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never); Button { Task { await state.searchUsers(userSearch) } } label: { Image(systemName: "magnifyingglass") } }
+            Text("\(state.adminUsersTotal) comptes").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+            ForEach(state.adminUsers) { user in
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack { VStack(alignment: .leading) { Text(user.userName).font(.headline); Text(user.externalProvider == nil ? "Compte GenEngine" : "Microsoft Entra ID").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Text(user.isActive ? "ACTIF" : "DÉSACTIVÉ").font(.caption2.bold()).foregroundStyle(user.isActive ? GenEngineTheme.verdigris : .red) }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(user.roleAssignments) { assignment in
+                                Text("\(assignment.roleName) · \(assignment.scope)")
+                                    .font(.caption2)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                                    .background(.white.opacity(0.06), in: Capsule())
+                            }
+                        }
+                    }
+                    HStack { Button(user.isActive ? "Désactiver" : "Réactiver") { Task { await state.setUserActive(user, isActive: !user.isActive) } }; Button("Supprimer", role: .destructive) { Task { await state.deleteUser(user) } } }
+                }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
+            }
         }
     }
 
@@ -178,6 +220,12 @@ struct AdministrationView: View {
                         HStack { TextField("Forme", text: bindingArray(\.familiars, index, \.form, fallback: "spark")); TextField("Ton", text: bindingArray(\.familiars, index, \.tone, fallback: "Warm")) }.textFieldStyle(.roundedBorder)
                         TextField("Style d’écriture", text: bindingArray(\.familiars, index, \.writingStyle, fallback: "Socratic")).textFieldStyle(.roundedBorder)
                         Stepper("Aide par défaut : \(document?.familiars[index].helpLevel ?? 0)", value: bindingArray(\.familiars, index, \.helpLevel, fallback: 2), in: 0...5)
+                        TextField("Portrait HTTPS", text: optionalArray(\.familiars, index, \.portraitUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+                        TextField("Avatar HTTPS", text: optionalArray(\.familiars, index, \.avatarUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+                        TextField("Arrière-plan HTTPS", text: optionalArray(\.familiars, index, \.backgroundUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+                        TextField("Licence", text: optionalArray(\.familiars, index, \.license)).textFieldStyle(.roundedBorder)
+                        if let urlString = document?.familiars[index].portraitUrl, let url = URL(string: urlString) { AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { ProgressView() }.frame(height: 180).clipShape(RoundedRectangle(cornerRadius: 16)) }
+                        Button("Supprimer le familier", role: .destructive) { document?.familiars.remove(at: index) }
                     }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
                 }
             }
@@ -207,6 +255,7 @@ struct AdministrationView: View {
             ForEach(state.roles) { role in
                 VStack(alignment: .leading, spacing: 4) { HStack { Text(role.name).font(.headline); if role.isSystem { Text("SYSTÈME").font(.caption2).foregroundStyle(GenEngineTheme.amber) } }; Text(role.description).font(.subheadline); Text(role.permissions.joined(separator: " · ")).font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }
                     .padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
+                if !role.isSystem { Button("Supprimer \(role.name)", role: .destructive) { Task { await state.deleteRole(role) } } }
             }
             if state.hasPermission("rbac.manage") {
                 TextField("Nom du rôle", text: $roleName).textFieldStyle(.roundedBorder)
@@ -231,6 +280,25 @@ struct AdministrationView: View {
         }
     }
 
+    private var technicalPanel: some View {
+        adminPanel("Environnement & diagnostic", symbol: "wrench.and.screwdriver.fill") {
+            #if DEBUG
+            @Bindable var state = state
+            TextField("Identity URL", text: $state.endpoints.identity).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+            TextField("Authoring URL", text: $state.endpoints.authoring).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+            TextField("Play URL", text: $state.endpoints.play).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+            TextField("Configuration URL", text: $state.endpoints.configuration).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+            TextField("Player Experience URL", text: $state.endpoints.playerExperience).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+            Button("Réinitialiser sur localhost") { state.endpoints = .local }
+            Divider().overlay(.white.opacity(0.15))
+            Text("Journal technique").font(.headline).foregroundStyle(GenEngineTheme.ivory)
+            ForEach(Array(state.developerLog.prefix(12).enumerated()), id: \.offset) { _, line in Text(line).font(.caption.monospaced()).foregroundStyle(GenEngineTheme.secondaryText) }
+            #else
+            Text("Les outils d’environnement sont disponibles uniquement dans les builds Debug.").foregroundStyle(GenEngineTheme.secondaryText)
+            #endif
+        }
+    }
+
     @ViewBuilder private var actionBar: some View {
         if let document {
             HStack {
@@ -252,14 +320,16 @@ struct AdministrationView: View {
     private func bindingArray<Element, Value>(_ path: WritableKeyPath<ExperienceDocument, [Element]>, _ index: Int, _ value: WritableKeyPath<Element, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?[keyPath: path][index][keyPath: value] ?? fallback }, set: { document?[keyPath: path][index][keyPath: value] = $0 }) }
     private func optional(_ binding: Binding<String?>) -> Binding<String> { Binding(get: { binding.wrappedValue ?? "" }, set: { binding.wrappedValue = $0.isEmpty ? nil : $0 }) }
     private func optionalArray<Element>(_ path: WritableKeyPath<ExperienceDocument, [Element]>, _ index: Int, _ value: WritableKeyPath<Element, String?>) -> Binding<String> { Binding(get: { document?[keyPath: path][index][keyPath: value] ?? "" }, set: { document?[keyPath: path][index][keyPath: value] = $0.isEmpty ? nil : $0 }) }
+    private func bindingJourney<Value>(_ index: Int, _ value: WritableKeyPath<JourneyDefinition, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?.journeys?[index][keyPath: value] ?? fallback }, set: { document?.journeys?[index][keyPath: value] = $0 }) }
+    private func optionalJourney(_ index: Int, _ value: WritableKeyPath<JourneyDefinition, String?>) -> Binding<String> { Binding(get: { document?.journeys?[index][keyPath: value] ?? "" }, set: { document?.journeys?[index][keyPath: value] = $0.isEmpty ? nil : $0 }) }
     private func bindingOrganizationUnit<Value>(_ index: Int, _ value: WritableKeyPath<OrganizationUnitDefinition, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?.organization.units[index][keyPath: value] ?? fallback }, set: { document?.organization.units[index][keyPath: value] = $0 }) }
     private func bindingLanguageLabel(_ key: String) -> Binding<String> { Binding(get: { document?.language.labels[key] ?? "" }, set: { document?.language.labels[key] = $0 }) }
     private var defaultUnitType: String { switch document?.organizationType { case "School": "Class"; case "Company": "Team"; case "TrainingProvider": "Cohort"; default: "Group" } }
 }
 
 private enum AdminSection: String, CaseIterable, Identifiable {
-    case game, language, structure, identity, intelligence, familiar, economy, access
+    case game, structure, language, users, access, identity, intelligence, familiar, economy, technical
     var id: String { rawValue }
-    var title: String { switch self { case .game: "Jeu"; case .language: "Libellés"; case .structure: "Structure"; case .identity: "Auth"; case .intelligence: "IA"; case .familiar: "Familier"; case .economy: "Économie"; case .access: "Accès" } }
-    var symbol: String { switch self { case .game: "globe"; case .language: "character.book.closed"; case .structure: "square.grid.2x2"; case .identity: "key"; case .intelligence: "brain"; case .familiar: "wand.and.stars"; case .economy: "bag"; case .access: "person.3" } }
+    var title: String { switch self { case .game: "Jeu"; case .language: "Libellés"; case .structure: "Catalogue"; case .users: "Utilisateurs"; case .identity: "Auth"; case .intelligence: "IA"; case .familiar: "Familiers"; case .economy: "Économie"; case .access: "Rôles"; case .technical: "Technique" } }
+    var symbol: String { switch self { case .game: "globe"; case .language: "character.book.closed"; case .structure: "point.3.connected.trianglepath.dotted"; case .users: "person.3.sequence"; case .identity: "key"; case .intelligence: "brain"; case .familiar: "wand.and.stars"; case .economy: "bag"; case .access: "person.badge.shield.checkmark"; case .technical: "wrench.and.screwdriver" } }
 }

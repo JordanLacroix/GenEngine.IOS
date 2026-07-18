@@ -2,7 +2,8 @@ import Foundation
 
 struct CredentialsRequest: Encodable, Sendable { let userName: String; let password: String }
 struct AccessToken: Decodable, Sendable { let token: String; let expiresAt: Date; let tokenType: String? }
-struct ScenarioView: Decodable, Sendable { let id: UUID; let title: String; let revision: Int; let draftJson: String }
+struct ScenarioView: Decodable, Sendable { let id: UUID; let title: String; let revision: Int; let draftJson: String; let frontId: String?; let categoryId: UUID?; let creationBrief: String?; let isArchived: Bool?; let updatedAt: Date? }
+struct PagedScenariosView: Decodable, Sendable { let items: [ScenarioView]; let total: Int; let page: Int; let pageSize: Int }
 struct PublishRequest: Encodable, Sendable { let expectedRevision: Int }
 struct ScenarioVersionView: Decodable, Sendable { let id: UUID; let scenarioId: UUID; let number: Int; let snapshotHash: String; let publishedAt: Date }
 struct ValidationIssue: Decodable, Sendable { let code: String; let path: String; let message: String; let isError: Bool }
@@ -36,6 +37,7 @@ struct PublishedScenarioView: Decodable, Sendable {
     let estimatedMinutes: Int
     let publishedAt: Date
     let snapshotHash: String
+    let categoryId: UUID?
 }
 
 enum SessionStatus: Equatable, Sendable {
@@ -213,6 +215,10 @@ struct PermissionView: Codable, Identifiable, Sendable {
 }
 struct RoleRequest: Encodable, Sendable { let name: String; let description: String; let permissions: [String] }
 struct AssignRoleRequest: Encodable, Sendable { let roleId: UUID; let scope: String?; let expiresAt: Date? }
+struct RoleAssignmentView: Decodable, Identifiable, Sendable { var id: String { "\(roleId)-\(scope)" }; let roleId: UUID; let roleName: String; let scope: String; let expiresAt: Date?; let assignedAt: Date }
+struct AdminUserView: Decodable, Identifiable, Sendable { let id: UUID; let userName: String; let createdAt: Date; let isActive: Bool; let deletedAt: Date?; let externalProvider: String?; let roleAssignments: [RoleAssignmentView] }
+struct PagedUsersView: Decodable, Sendable { let items: [AdminUserView]; let page: Int; let pageSize: Int; let total: Int }
+struct UserStatusRequest: Encodable, Sendable { let isActive: Bool }
 
 struct GameDefinition: Codable, Sendable {
     var name: String
@@ -264,7 +270,12 @@ struct CategoryDefinition: Codable, Identifiable, Hashable, Sendable {
     var accent: String
     var order: Int
     var isVisible: Bool
+    var imageUrl: String? = nil
+    var tags: [String]? = nil
+    var scenarioIds: [UUID]? = nil
 }
+struct JourneyDefinition: Codable, Identifiable, Hashable, Sendable { let id: UUID; var name: String; var description: String; var accent: String; var imageUrl: String?; var order: Int; var isVisible: Bool; var categoryIds: [UUID]; var prerequisiteJourneyIds: [UUID]; var tags: [String] }
+struct CatalogAssignmentDefinition: Codable, Identifiable, Hashable, Sendable { let id: UUID; var organizationUnitId: UUID; var contentType: String; var contentId: UUID; var name: String; var required: Bool; var availableFrom: Date?; var dueAt: Date? }
 struct FamiliarDefinition: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     var name: String
@@ -277,6 +288,11 @@ struct FamiliarDefinition: Codable, Identifiable, Hashable, Sendable {
     var capabilities: [String]
     var availableForms: [String]
     var availableTones: [String]
+    var portraitUrl: String? = nil
+    var avatarUrl: String? = nil
+    var backgroundUrl: String? = nil
+    var license: String? = nil
+    var attribution: String? = nil
 }
 struct RewardRuleDefinition: Codable, Identifiable, Sendable {
     var id: String { "\(trigger)-\(referenceId)" }
@@ -321,6 +337,8 @@ struct ExperienceDocument: Codable, Sendable {
     var familiars: [FamiliarDefinition]
     var economy: EconomyDefinition
     var modules: [ModuleDefinition]
+    var journeys: [JourneyDefinition]? = nil
+    var assignments: [CatalogAssignmentDefinition]? = nil
 }
 struct PublishedExperienceView: Decodable, Sendable {
     let version: Int
