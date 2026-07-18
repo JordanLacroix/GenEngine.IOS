@@ -4,12 +4,19 @@ enum MembershipKind: String, Codable, CaseIterable, Sendable { case participant 
 enum AssignedContentType: String, Codable, CaseIterable, Sendable { case journey = "Journey", category = "Category", scenario = "Scenario" }
 struct OrganizationFrontView: Codable, Sendable { let id: UUID; let frontId: String; let name: String; let type: String; let isActive: Bool; let revision: Int; let updatedAt: Date }
 struct OrganizationUnitView: Codable, Identifiable, Sendable { let id: UUID; let frontId: String; let parentId: UUID?; let name: String; let type: String; let code: String; let isActive: Bool; let revision: Int; let updatedAt: Date }
-struct MembershipView: Codable, Identifiable, Sendable { let id: UUID; let frontId: String; let unitId: UUID; let userId: UUID; let kind: MembershipKind; let startsAt: Date; let endsAt: Date?; let isActive: Bool; let revision: Int; let updatedAt: Date }
+struct OperatingPeriodView: Codable, Identifiable, Sendable { let id: UUID; let frontId: String; let name: String; let code: String; let startsAt: Date; let endsAt: Date; let isActive: Bool; let revision: Int; let updatedAt: Date }
+struct MembershipView: Codable, Identifiable, Sendable { let id: UUID; let frontId: String; let unitId: UUID; let userId: UUID; let periodId: UUID?; let kind: MembershipKind; let startsAt: Date; let endsAt: Date?; let isActive: Bool; let revision: Int; let updatedAt: Date }
 struct ContentAssignmentView: Codable, Identifiable, Sendable { let id: UUID; let frontId: String; let unitId: UUID; let contentType: AssignedContentType; let contentId: UUID; let name: String; let required: Bool; let availableFrom: Date?; let dueAt: Date?; let isActive: Bool; let revision: Int; let updatedAt: Date }
 struct PagedMembershipsView: Codable, Sendable { let items: [MembershipView]; let page: Int; let pageSize: Int; let total: Int }
 struct PagedAssignmentsView: Codable, Sendable { let items: [ContentAssignmentView]; let page: Int; let pageSize: Int; let total: Int }
+struct PlayerOrganizationContextView: Codable, Sendable { let frontId: String; let isMember: Bool; let unitIds: [UUID]; let supervisedUnitIds: [UUID]; let assignments: [ContentAssignmentView]; let hasGlobalScope: Bool }
 struct UpsertUnitRequest: Codable, Sendable { let parentId: UUID?; let name: String; let type: String; let code: String; let isActive: Bool; let expectedRevision: Int? }
-struct UpsertMembershipRequest: Codable, Sendable { let unitId: UUID; let userId: UUID; let kind: MembershipKind; let startsAt: Date; let endsAt: Date?; let isActive: Bool; let expectedRevision: Int? }
+struct UpsertPeriodRequest: Codable, Sendable { let name: String; let code: String; let startsAt: Date; let endsAt: Date; let isActive: Bool; let expectedRevision: Int? }
+struct UpsertMembershipRequest: Codable, Sendable { let unitId: UUID; let userId: UUID; let periodId: UUID?; let kind: MembershipKind; let startsAt: Date; let endsAt: Date?; let isActive: Bool; let expectedRevision: Int? }
+struct MembershipImportRow: Codable, Identifiable, Sendable { let id: UUID; let unitId: UUID; let userId: UUID; let periodId: UUID?; let kind: MembershipKind; let startsAt: Date; let endsAt: Date? }
+struct MembershipImportError: Codable, Sendable { let row: Int; let code: String; let message: String }
+struct MembershipImportView: Codable, Sendable { let dryRun: Bool; let received: Int; let created: Int; let unchanged: Int; let errors: [MembershipImportError] }
+struct ImportMembershipsRequest: Codable, Sendable { let dryRun: Bool; let rows: [MembershipImportRow] }
 struct UpsertAssignmentRequest: Codable, Sendable { let unitId: UUID; let contentType: AssignedContentType; let contentId: UUID; let name: String; let required: Bool; let availableFrom: Date?; let dueAt: Date?; let isActive: Bool; let expectedRevision: Int? }
 
 struct CredentialsRequest: Encodable, Sendable { let userName: String; let password: String }

@@ -51,6 +51,8 @@ Le dépôt conserve deux parcours explicitement séparés :
 | Bilan de fin avec chemin et gains | ✅ Démo et sessions connectées |
 | Journal francisé et sans projections dupliquées | ✅ Normalisé côté présentation |
 | Portes ancrées aux repères de la carte | ✅ Adaptées à `scaledToFill` |
+| Périodes métier et import CSV de memberships | ✅ Prévalidation, rapport d’erreurs et application idempotente |
+| Affectations de parcours et catalogue filtré | ✅ Résolues côté serveur et reflétées nativement |
 
 ## Démarrage rapide
 
@@ -143,7 +145,7 @@ Swift Testing couvre la navigation déterministe de la démonstration et la comp
 
 ## Roadmap
 
-La plateforme configurable inclut le flux immersif complet et une administration native distincte du Studio. Sur iPhone et iPad, l’univers joueur occupe tout l’écran : la carte sert de scène, les portes y sont matérialisées et la navigation native disparaît au profit d’une HUD et de panneaux superposés. L’espace Structures gère désormais unités école/entreprise/formation, participants, encadrants et affectations de scénarios/catégories/parcours. Voir [`specs/roadmap.md`](specs/roadmap.md).
+La plateforme configurable inclut le flux immersif complet et une administration native distincte du Studio. Sur iPhone et iPad, l’univers joueur occupe tout l’écran : la carte sert de scène, les portes y sont matérialisées et la navigation native disparaît au profit d’une HUD et de panneaux superposés. L’espace Structures gère désormais périodes, unités école/entreprise/formation, participants, encadrants, import CSV prévalidé et affectations de scénarios/catégories/parcours. La carte connectée filtre les catégories d’un membre selon ses affectations effectives. Voir [`specs/roadmap.md`](specs/roadmap.md).
 
 ## Documentation
 

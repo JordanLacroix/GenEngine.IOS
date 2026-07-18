@@ -54,6 +54,7 @@ final class AppState {
     private(set) var adminUsersTotal = 0
     private(set) var organizationFront: OrganizationFrontView?
     private(set) var organizationUnits: [OrganizationUnitView] = []
+    private(set) var operatingPeriods: [OperatingPeriodView] = []
     private(set) var memberships: [MembershipView] = []
     private(set) var contentAssignments: [ContentAssignmentView] = []
     private(set) var authorScenarios: [ScenarioView] = []
@@ -253,6 +254,9 @@ final class AppState {
                 self.organizationFront = try await front
                 self.organizationUnits = try await units
             }
+            if self.hasPermission("period.read") || self.hasPermission("period.manage") {
+                self.operatingPeriods = try await self.api.operatingPeriods(frontId: self.frontId)
+            }
             if self.hasPermission("membership.read") || self.hasPermission("membership.manage") {
                 self.memberships = try await self.api.memberships(frontId: self.frontId).items
             }
@@ -269,11 +273,28 @@ final class AppState {
         }
     }
 
-    func createMembership(userId: UUID, unitId: UUID, kind: MembershipKind) async {
+    func createOperatingPeriod(name: String, code: String, startsAt: Date, endsAt: Date) async {
+        await run("Période créée") {
+            _ = try await self.api.upsertPeriod(frontId: self.frontId, id: UUID(), request: .init(name: name, code: code, startsAt: startsAt, endsAt: endsAt, isActive: true, expectedRevision: nil))
+            self.operatingPeriods = try await self.api.operatingPeriods(frontId: self.frontId)
+        }
+    }
+
+    func createMembership(userId: UUID, unitId: UUID, periodId: UUID?, kind: MembershipKind) async {
         await run("Membership créé") {
-            _ = try await self.api.upsertMembership(frontId: self.frontId, id: UUID(), request: .init(unitId: unitId, userId: userId, kind: kind, startsAt: .now, endsAt: nil, isActive: true, expectedRevision: nil))
+            let period = self.operatingPeriods.first { $0.id == periodId }
+            _ = try await self.api.upsertMembership(frontId: self.frontId, id: UUID(), request: .init(unitId: unitId, userId: userId, periodId: periodId, kind: kind, startsAt: period?.startsAt ?? .now, endsAt: period?.endsAt, isActive: true, expectedRevision: nil))
             self.memberships = try await self.api.memberships(frontId: self.frontId).items
         }
+    }
+
+    func importMemberships(_ rows: [MembershipImportRow], dryRun: Bool) async -> MembershipImportView? {
+        var report: MembershipImportView?
+        await run(dryRun ? "Prévalidation terminée" : "Import terminé") {
+            report = try await self.api.importMemberships(frontId: self.frontId, request: .init(dryRun: dryRun, rows: rows))
+            if !dryRun, report?.errors.isEmpty == true { self.memberships = try await self.api.memberships(frontId: self.frontId).items }
+        }
+        return report
     }
 
     func removeMembership(_ membership: MembershipView) async {
@@ -416,6 +437,7 @@ final class AppState {
         adminUsers = []
         organizationFront = nil
         organizationUnits = []
+        operatingPeriods = []
         memberships = []
         contentAssignments = []
         authorScenarios = []
@@ -616,8 +638,11 @@ final class AppState {
     private func refreshPlatformContext() async throws {
         async let access = api.access()
         async let experience = api.publicExperience(frontId: frontId)
+        async let organization = api.playerOrganizationContext(frontId: frontId)
         self.access = try await access
-        self.experience = try await experience
+        let publishedExperience = try await experience
+        let organizationContext = try await organization
+        self.experience = organizationContext.hasGlobalScope ? publishedExperience : Self.filterAssignedCatalog(publishedExperience, organization: organizationContext)
         if hasPermission("session.play") {
             let bootstrap = try await api.playerBootstrap(frontId: frontId)
             self.playerBootstrap = bootstrap
@@ -625,6 +650,19 @@ final class AppState {
             self.playerJournal = try? await api.journal(frontId: frontId)
             if bootstrap.nextAction != "OpenMap" { self.selectedTab = .experience }
         }
+    }
+
+    private static func filterAssignedCatalog(_ experience: PublishedExperienceView, organization: PlayerOrganizationContextView) -> PublishedExperienceView {
+        var document = experience.document
+        let journeyIds = Set(organization.assignments.filter { $0.contentType == .journey }.map(\.contentId))
+        var categoryIds = Set(organization.assignments.filter { $0.contentType == .category }.map(\.contentId))
+        let scenarioIds = Set(organization.assignments.filter { $0.contentType == .scenario }.map(\.contentId))
+        for journey in document.journeys ?? [] where journeyIds.contains(journey.id) { categoryIds.formUnion(journey.categoryIds) }
+        for category in document.categories where (category.scenarioIds ?? []).contains(where: scenarioIds.contains) { categoryIds.insert(category.id) }
+        document.categories = document.categories.filter { categoryIds.contains($0.id) }
+        let visibleCategoryIds = Set(document.categories.map(\.id))
+        document.journeys = (document.journeys ?? []).filter { journeyIds.contains($0.id) || $0.categoryIds.contains(where: visibleCategoryIds.contains) }
+        return .init(version: experience.version, publishedAt: experience.publishedAt, document: document)
     }
 
     private func remember(_ session: SessionView) {

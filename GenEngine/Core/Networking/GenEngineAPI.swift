@@ -30,12 +30,16 @@ protocol GenEngineAPI: Sendable {
     func deleteUser(userId: UUID) async throws
     func deleteRole(roleId: UUID) async throws
     func organizationFront(frontId: String) async throws -> OrganizationFrontView
+    func playerOrganizationContext(frontId: String) async throws -> PlayerOrganizationContextView
     func organizationUnits(frontId: String) async throws -> [OrganizationUnitView]
+    func operatingPeriods(frontId: String) async throws -> [OperatingPeriodView]
     func memberships(frontId: String) async throws -> PagedMembershipsView
     func assignments(frontId: String) async throws -> PagedAssignmentsView
     func upsertUnit(frontId: String, id: UUID, request: UpsertUnitRequest) async throws -> OrganizationUnitView
+    func upsertPeriod(frontId: String, id: UUID, request: UpsertPeriodRequest) async throws -> OperatingPeriodView
     func upsertMembership(frontId: String, id: UUID, request: UpsertMembershipRequest) async throws -> MembershipView
     func deleteMembership(frontId: String, id: UUID) async throws
+    func importMemberships(frontId: String, request: ImportMembershipsRequest) async throws -> MembershipImportView
     func upsertAssignment(frontId: String, id: UUID, request: UpsertAssignmentRequest) async throws -> ContentAssignmentView
     func deleteAssignment(frontId: String, id: UUID) async throws
     func scenarios(query: String) async throws -> PagedScenariosView
@@ -87,12 +91,16 @@ extension GenEngineAPI {
     func deleteUser(userId _: UUID) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
     func deleteRole(roleId _: UUID) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
     func organizationFront(frontId _: String) async throws -> OrganizationFrontView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func playerOrganizationContext(frontId _: String) async throws -> PlayerOrganizationContextView { throw APIError.invalidScenario("Fonction indisponible.") }
     func organizationUnits(frontId _: String) async throws -> [OrganizationUnitView] { throw APIError.invalidScenario("Fonction indisponible.") }
+    func operatingPeriods(frontId _: String) async throws -> [OperatingPeriodView] { throw APIError.invalidScenario("Fonction indisponible.") }
     func memberships(frontId _: String) async throws -> PagedMembershipsView { throw APIError.invalidScenario("Fonction indisponible.") }
     func assignments(frontId _: String) async throws -> PagedAssignmentsView { throw APIError.invalidScenario("Fonction indisponible.") }
     func upsertUnit(frontId _: String, id _: UUID, request _: UpsertUnitRequest) async throws -> OrganizationUnitView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func upsertPeriod(frontId _: String, id _: UUID, request _: UpsertPeriodRequest) async throws -> OperatingPeriodView { throw APIError.invalidScenario("Fonction indisponible.") }
     func upsertMembership(frontId _: String, id _: UUID, request _: UpsertMembershipRequest) async throws -> MembershipView { throw APIError.invalidScenario("Fonction indisponible.") }
     func deleteMembership(frontId _: String, id _: UUID) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
+    func importMemberships(frontId _: String, request _: ImportMembershipsRequest) async throws -> MembershipImportView { throw APIError.invalidScenario("Fonction indisponible.") }
     func upsertAssignment(frontId _: String, id _: UUID, request _: UpsertAssignmentRequest) async throws -> ContentAssignmentView { throw APIError.invalidScenario("Fonction indisponible.") }
     func deleteAssignment(frontId _: String, id _: UUID) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
     func scenarios(query _: String) async throws -> PagedScenariosView { throw APIError.invalidScenario("Fonction indisponible.") }
@@ -251,8 +259,16 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))", body: nil, authenticated: true)
     }
 
+    func playerOrganizationContext(frontId: String) async throws -> PlayerOrganizationContextView {
+        try await perform(method: "GET", base: endpoints.organization, path: "/me/organization/\(escaped(frontId))", body: nil, authenticated: true)
+    }
+
     func organizationUnits(frontId: String) async throws -> [OrganizationUnitView] {
         try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/units", body: nil, authenticated: true)
+    }
+
+    func operatingPeriods(frontId: String) async throws -> [OperatingPeriodView] {
+        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/periods", body: nil, authenticated: true)
     }
 
     func memberships(frontId: String) async throws -> PagedMembershipsView {
@@ -267,12 +283,20 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await send(method: "PUT", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/units/\(id.uuidString.lowercased())", body: request)
     }
 
+    func upsertPeriod(frontId: String, id: UUID, request: UpsertPeriodRequest) async throws -> OperatingPeriodView {
+        try await send(method: "PUT", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/periods/\(id.uuidString.lowercased())", body: request)
+    }
+
     func upsertMembership(frontId: String, id: UUID, request: UpsertMembershipRequest) async throws -> MembershipView {
         try await send(method: "PUT", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/memberships/\(id.uuidString.lowercased())", body: request)
     }
 
     func deleteMembership(frontId: String, id: UUID) async throws {
         try await performVoid(method: "DELETE", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/memberships/\(id.uuidString.lowercased())")
+    }
+
+    func importMemberships(frontId: String, request: ImportMembershipsRequest) async throws -> MembershipImportView {
+        try await send(method: "POST", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/memberships/import", body: request)
     }
 
     func upsertAssignment(frontId: String, id: UUID, request: UpsertAssignmentRequest) async throws -> ContentAssignmentView {
