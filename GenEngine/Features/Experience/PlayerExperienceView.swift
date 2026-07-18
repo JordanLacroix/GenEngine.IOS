@@ -58,7 +58,8 @@ struct PlayerExperienceViewScreen: View {
     private var worldDoors: some View {
         GeometryReader { proxy in
             ForEach(Array(visibleCategories.prefix(5).enumerated()), id: \.element.id) { index, category in
-                let point = doorPoint(index)
+                let anchors = PlayerExperiencePresentation.doorAnchors(for: proxy.size)
+                let point = PlayerExperiencePresentation.projectMapPoint(anchors[index % anchors.count], into: proxy.size)
                 Button { withAnimation(.snappy) { selectedCategoryID = category.id; section = .map } } label: {
                     VStack(spacing: 5) {
                         Image(systemName: selectedCategoryID == category.id ? "door.left.hand.open" : "door.left.hand.closed")
@@ -72,7 +73,7 @@ struct PlayerExperienceViewScreen: View {
                     .shadow(color: .black.opacity(0.5), radius: 20, y: 10)
                 }
                 .buttonStyle(.plain)
-                .position(x: proxy.size.width * point.x, y: proxy.size.height * point.y)
+                .position(point)
                 .accessibilityHint("Afficher les histoires de cette région")
             }
         }.ignoresSafeArea()
@@ -108,7 +109,7 @@ struct PlayerExperienceViewScreen: View {
             Color.black.opacity(0.72).ignoresSafeArea().onTapGesture { section = .map }
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    HStack { EyebrowText(text: section.title, color: GenEngineTheme.amber); Spacer(); Button("Retour au monde") { section = .map }.buttonStyle(.bordered).tint(GenEngineTheme.ivory) }
+                    HStack { EyebrowText(text: section.title, color: GenEngineTheme.amber); Spacer(); Button { section = .map } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }.buttonStyle(.bordered).buttonBorderShape(.circle).tint(GenEngineTheme.ivory).accessibilityLabel("Fermer ce panneau et revenir à la carte") }
                     switch section { case .journal: journal; case .companion: companion; case .shop: shop; case .help: help; case .map: EmptyView() }
                 }.padding(24).frame(maxWidth: 900)
             }
@@ -208,14 +209,15 @@ struct PlayerExperienceViewScreen: View {
                     Image("WorldMap").resizable().scaledToFill().frame(width: proxy.size.width, height: proxy.size.height).clipped()
                     LinearGradient(colors: [.black.opacity(0.08), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
                     ForEach(Array(visibleCategories.prefix(5).enumerated()), id: \.element.id) { index, category in
-                        let point = doorPoint(index)
+                        let anchors = PlayerExperiencePresentation.doorAnchors(for: proxy.size)
+                        let point = PlayerExperiencePresentation.projectMapPoint(anchors[index % anchors.count], into: proxy.size)
                         Button { selectedCategoryID = category.id } label: {
                             VStack(spacing: 5) {
                                 Image(systemName: selectedCategoryID == category.id ? "door.left.hand.open" : "door.left.hand.closed").font(.system(size: 38)).foregroundStyle(GenEngineTheme.amber)
                                 Text(category.name).font(.system(.headline, design: .serif)).multilineTextAlignment(.center)
                                 Text("PORTE \(category.order)").font(.caption2)
                             }.padding(10).foregroundStyle(GenEngineTheme.ivory).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(selectedCategoryID == category.id ? GenEngineTheme.amber : .white.opacity(0.18)))
-                        }.buttonStyle(.plain).position(x: proxy.size.width * point.x, y: proxy.size.height * point.y)
+                        }.buttonStyle(.plain).position(point)
                     }
                 }
             }
@@ -240,23 +242,23 @@ struct PlayerExperienceViewScreen: View {
     }
 
     private var visibleCategories: [CategoryDefinition] { (state.experience?.document.categories ?? []).filter(\.isVisible).sorted { $0.order < $1.order } }
-    private func doorPoint(_ index: Int) -> CGPoint { [CGPoint(x: 0.2, y: 0.3), CGPoint(x: 0.5, y: 0.18), CGPoint(x: 0.78, y: 0.34), CGPoint(x: 0.66, y: 0.7), CGPoint(x: 0.28, y: 0.74)][index % 5] }
-
     private var journal: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack { Label("Journal de votre parcours", systemImage: "book.pages.fill").font(.title2.bold()); Spacer(); Text("\(state.playerJournal?.total ?? 0) traces").foregroundStyle(GenEngineTheme.amber) }.foregroundStyle(GenEngineTheme.ivory)
-            ForEach(state.playerExperience?.masteries ?? []) { mastery in
+            let entries = PlayerExperiencePresentation.uniqueJournalEntries(state.playerJournal?.items ?? state.playerExperience?.recentJournal ?? [])
+            let masteries = PlayerExperiencePresentation.uniqueMasteries(state.playerExperience?.masteries ?? [])
+            HStack { Label("Journal de votre parcours", systemImage: "book.pages.fill").font(.title2.bold()); Spacer(); Text("\(entries.count) trace\(entries.count > 1 ? "s" : "")").foregroundStyle(GenEngineTheme.amber) }.foregroundStyle(GenEngineTheme.ivory)
+            ForEach(masteries) { mastery in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack { Text("Histoire explorée").font(.headline); Spacer(); Text("\(mastery.masteryPercent)%").foregroundStyle(GenEngineTheme.amber) }
                     Text("\(mastery.choiceIds.count) choix · \(mastery.endingIds.count) fin(s)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
                     ProgressView(value: Double(mastery.masteryPercent), total: 100).tint(GenEngineTheme.verdigris)
                 }.padding(16).glassPanel()
             }
-            ForEach(state.playerJournal?.items ?? state.playerExperience?.recentJournal ?? []) { entry in
+            ForEach(entries) { entry in
                 HStack(alignment: .top, spacing: 14) {
                     Circle().fill(GenEngineTheme.ember).frame(width: 10, height: 10).shadow(color: GenEngineTheme.ember, radius: 8)
                     VStack(alignment: .leading, spacing: 5) {
-                        EyebrowText(text: entry.type, color: GenEngineTheme.ember)
+                        EyebrowText(text: PlayerExperiencePresentation.journalTypeLabel(entry.type), color: GenEngineTheme.ember)
                         Text(entry.title).font(.system(.title3, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
                         Text(entry.summary).foregroundStyle(GenEngineTheme.secondaryText)
                         Text(entry.occurredAt.formatted(date: .abbreviated, time: .shortened)).font(.caption2).foregroundStyle(GenEngineTheme.secondaryText)
@@ -271,17 +273,28 @@ struct PlayerExperienceViewScreen: View {
             Label("Votre compagnon", systemImage: "sparkles").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
             if let definitions = state.experience?.document.familiars, let definition = definitions.first(where: { $0.id == familiarID }) ?? definitions.first {
                 if definitions.count > 1 { Picker("Familier", selection: Binding(get: { familiarID ?? definition.id }, set: { familiarID = $0; hydrateDefinition($0) })) { ForEach(definitions) { Text($0.name).tag($0.id) } } }
-                companionPortrait(definition)
-                assetPackCard
-                TextField("Son nom", text: $customName).textFieldStyle(.roundedBorder)
-                Picker("Forme", selection: $form) { ForEach(definition.availableForms, id: \.self) { Text($0.capitalized).tag($0) } }
-                Picker("Ton", selection: $tone) { ForEach(definition.availableTones, id: \.self) { Text($0).tag($0) } }
-                Stepper("Niveau d’aide : \(helpLevel)/5", value: $helpLevel, in: 0...5)
-                Stepper("Fréquence : \(frequency)/5", value: $frequency, in: 0...5)
-                Toggle("Me proposer de l’aide au bon moment", isOn: $proactive)
-                Button("Finaliser mon compagnon") { Task { await state.saveFamiliar(.init(familiarId: definition.id, form: form, tone: tone, writingStyle: writingStyle, accent: accent, helpLevel: helpLevel, customName: customName, interventionFrequency: frequency, proactive: proactive)) } }.buttonStyle(PrimaryActionStyle()).disabled(customName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.isBusy)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 24) {
+                        VStack(spacing: 16) { companionPortrait(definition); assetPackCard }.frame(maxWidth: 390)
+                        companionControls(definition)
+                    }
+                    VStack(spacing: 16) { companionPortrait(definition); assetPackCard; companionControls(definition) }
+                }
             }
         }.padding(20).glassPanel()
+    }
+
+    private func companionControls(_ definition: FamiliarDefinition) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            TextField("Son nom", text: $customName).textFieldStyle(.roundedBorder)
+            Picker("Forme", selection: $form) { ForEach(definition.availableForms, id: \.self) { Text(PlayerExperiencePresentation.familiarOptionLabel($0)).tag($0) } }
+            Picker("Personnalité", selection: $tone) { ForEach(definition.availableTones, id: \.self) { Text(PlayerExperiencePresentation.familiarOptionLabel($0)).tag($0) } }
+            Stepper("Niveau d’aide : \(helpLevel)/5", value: $helpLevel, in: 0...5)
+            Stepper("Fréquence d’intervention : \(frequency)/5", value: $frequency, in: 0...5)
+            Toggle("Me proposer de l’aide au bon moment", isOn: $proactive)
+            Button("Enregistrer les réglages") { Task { await state.saveFamiliar(.init(familiarId: definition.id, form: form, tone: tone, writingStyle: writingStyle, accent: accent, helpLevel: helpLevel, customName: customName, interventionFrequency: frequency, proactive: proactive)) } }
+                .buttonStyle(PrimaryActionStyle()).disabled(customName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.isBusy)
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var familiarCreation: some View {

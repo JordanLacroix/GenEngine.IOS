@@ -48,6 +48,8 @@ Introduction rejouable depuis la connexion, démo sous l’authentification, cr�
 
 **Statut : implémenté sur `codex/immersive-onboarding-ux`.** Les projections et transitions restent fournies par les services GenEngine.
 
+La passe corrective `codex/fix-player-experience-polish` remplace le retour textuel par une fermeture compacte, rend l’édition du compagnon adaptative, francise les valeurs techniques, déduplique les projections du journal et ancre les portes aux lieux dessinés avec le même calcul que `scaledToFill`.
+
 ## Jalon 3.2 — opérations produit et Studio visuel
 
 Console utilisateurs recherchable avec activation/suppression, parcours et catégories, assets du familier, progression par catégorie, fusion des outils Developer dans Administration, bibliothèque de brouillons et édition visuelle de scène avec archivage. La démo native compte treize scènes pour une cible d'environ quinze minutes.

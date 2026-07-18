@@ -28,6 +28,22 @@ struct DemoStoryTests {
         #expect(try FamiliarAssetPack.aster.validated().id == "genengine.aster.original")
     }
 
+    @Test func worldDoorAnchorsFollowTheScaledMap() {
+        let center = PlayerExperiencePresentation.projectMapPoint(CGPoint(x: 768, y: 512), into: CGSize(width: 2048, height: 930))
+        let lighthouse = PlayerExperiencePresentation.projectMapPoint(CGPoint(x: 390, y: 330), into: CGSize(width: 2048, height: 930))
+        #expect(center.x == 1024)
+        #expect(center.y == 465)
+        #expect(abs(lighthouse.x - 520) < 0.01)
+        #expect(abs(lighthouse.y - 222.333) < 0.01)
+        #expect(PlayerExperiencePresentation.doorAnchors(for: CGSize(width: 768, height: 1024))[1] == CGPoint(x: 770, y: 570))
+    }
+
+    @Test func playerExperienceValuesAreLocalized() {
+        #expect(PlayerExperiencePresentation.journalTypeLabel("ChoiceSelected") == "Choix effectué")
+        #expect(PlayerExperiencePresentation.familiarOptionLabel("spark") == "Étincelle")
+        #expect(PlayerExperiencePresentation.familiarOptionLabel("Mysterious") == "Mystérieux")
+    }
+
     @Test(arguments: [("\"AwaitingInput\"", SessionStatus.awaitingInput), ("2", SessionStatus.completed)])
     func sessionStatusAcceptsStringAndNumericContracts(json: String, expected: SessionStatus) throws {
         let decoded = try JSONDecoder().decode(SessionStatus.self, from: Data(json.utf8))
