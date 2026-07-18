@@ -49,6 +49,8 @@ Le dépôt conserve deux parcours explicitement séparés :
 | Carte illustrée à portes et interactions d’écran | ✅ Matérialisées nativement |
 | Packs visuels de familier importables | ✅ Assets locaux, sans propriété |
 | Bilan de fin avec chemin et gains | ✅ Démo et sessions connectées |
+| Journal francisé et sans projections dupliquées | ✅ Normalisé côté présentation |
+| Portes ancrées aux repères de la carte | ✅ Adaptées à `scaledToFill` |
 
 ## Démarrage rapide
 
@@ -96,6 +98,8 @@ Les jetons sont conservés dans Keychain. Les préférences d’endpoints et ré
 ### Packs visuels de familier
 
 L’espace Compagnon importe un manifeste JSON de schéma `1` depuis l’app Fichiers. Il accepte un asset inclus dans l’application ou un portrait HTTPS, avec licence et attribution obligatoires. Le manifeste reste une préférence locale non sensible dans `UserDefaults` : il ne crée ni propriété, ni achat, ni progression. PlayerExperience demeure l’autorité sur la sélection du familier.
+
+Le configurateur s’adapte en deux colonnes sur iPad et en pile sur les largeurs compactes. Les valeurs contractuelles restent inchangées à l’enregistrement tandis que leurs libellés sont présentés en français.
 
 Un exemple est fourni dans [`GenEngine/Resources/aster-familiar-pack.json`](GenEngine/Resources/aster-familiar-pack.json).
 

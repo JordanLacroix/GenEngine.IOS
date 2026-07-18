@@ -18,6 +18,7 @@ Dernière mise à jour : 18 juillet 2026.
 - Le prologue est illustré, matérialise les interactions configurées, remet une clé et ouvre une carte à portes.
 - Les packs visuels de familier sont importables depuis Fichiers avec licence et attribution, sans notion de propriété.
 - La démo s’arrête sur un bilan du chemin et des gains au lieu de boucler.
+- La passe de stabilisation de l’univers joueur localise les valeurs moteur, déduplique journal et maîtrises, rend le configurateur du compagnon adaptatif et projette les portes sur les repères réels de l’illustration sur iPhone comme sur iPad.
 
 ## Démarrage rapide de reprise
 
@@ -40,6 +41,8 @@ Validation de la tranche immersive : génération XcodeGen, build Swift 6 et tes
 Validation de la tranche Organization : génération XcodeGen et build Swift 6 générique iOS Simulator réussis sans signature le 18 juillet 2026.
 
 Validation du seuil narratif : génération XcodeGen, build Swift 6 et 9 tests sur iPhone 17 Pro Simulator réussis sans signature le 18 juillet 2026.
+
+Validation de la stabilisation joueur : projection de carte et localisation couvertes par Swift Testing, avec build universel iPhone/iPad le 18 juillet 2026.
 
 ## Décisions à préserver
 
