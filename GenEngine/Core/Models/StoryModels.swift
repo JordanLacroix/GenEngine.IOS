@@ -29,6 +29,21 @@ extension StorySummary {
     }
 }
 
+enum StoryCatalog {
+    static func unique(_ stories: [StorySummary]) -> [StorySummary] {
+        var scenarioIDs = Set<UUID>()
+        var normalizedTitles = Set<String>()
+
+        return stories.filter { story in
+            let title = story.title.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if let scenarioID = story.scenarioID, !scenarioIDs.insert(scenarioID).inserted { return false }
+            guard normalizedTitles.insert(title).inserted else { return false }
+            return true
+        }
+    }
+}
+
 enum StoryAccent: Hashable, Sendable { case ember, verdigris, violet }
 
 struct DemoNode: Equatable, Sendable {

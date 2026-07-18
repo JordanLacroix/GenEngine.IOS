@@ -60,4 +60,15 @@ struct DemoStoryTests {
         #expect(story.duration == "9 min")
         #expect(story.availability == .published(versionID))
     }
+
+    @Test func catalogRemovesDuplicateScenarioVersionsAndDemoTitles() {
+        let scenarioID = UUID()
+        let first = StorySummary(id: "v2", title: "Les braises sous la brume", eyebrow: "Publié", synopsis: "A", duration: "15 min", symbol: "book", accent: .ember, availability: .published(UUID()), scenarioID: scenarioID)
+        let older = StorySummary(id: "v1", title: "Ancien titre", eyebrow: "Publié", synopsis: "B", duration: "15 min", symbol: "book", accent: .ember, availability: .published(UUID()), scenarioID: scenarioID)
+        let demo = StorySummary(id: "demo", title: "LES BRAISES SOUS LA BRUME", eyebrow: "Démo", synopsis: "C", duration: "15 min", symbol: "book", accent: .ember, availability: .demo)
+
+        let result = StoryCatalog.unique([first, older, demo])
+
+        #expect(result.map(\.id) == ["v2"])
+    }
 }
