@@ -221,6 +221,9 @@ struct GameDefinition: Codable, Sendable {
     var locale: String
     var timeZone: String
 }
+struct GameLanguageDefinition: Codable, Sendable {
+    var labels: [String: String]
+}
 struct OrganizationUnitDefinition: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     var parentId: UUID?
@@ -311,6 +314,7 @@ struct ExperienceDocument: Codable, Sendable {
     var organizationType: String
     var organization: OrganizationDefinition
     var game: GameDefinition
+    var language: GameLanguageDefinition
     var authentication: AuthenticationDefinition
     var aiProviders: [AIProviderDefinition]
     var categories: [CategoryDefinition]

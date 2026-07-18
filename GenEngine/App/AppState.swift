@@ -54,6 +54,10 @@ final class AppState {
 
     var hasProductAccess: Bool { isAuthenticated || isDemoAccess }
     var gameName: String { experience?.document.game.name ?? "GenEngine" }
+    func copy(_ key: String, fallback: String) -> String {
+        guard let value = experience?.document.language.labels[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return fallback }
+        return value
+    }
     func hasPermission(_ permission: String) -> Bool { access?.permissions.contains(permission) == true }
     var stories: [StorySummary] {
         var items = [DemoStory.summary]
@@ -80,6 +84,13 @@ final class AppState {
         self.api = api ?? LiveGenEngineAPI(endpoints: endpoints, token: token)
         self.isAuthenticated = token != nil
         if token != nil { Task { await self.loadPlatformContext() } }
+        else { Task { await self.loadPublicExperience() } }
+    }
+
+    func loadPublicExperience() async {
+        do { experience = try await api.publicExperience(frontId: frontId) }
+        catch is CancellationError { }
+        catch { developerLog.insert("✗ Configuration publique: \(error.localizedDescription)", at: 0) }
     }
 
     func unlockDemo() {

@@ -24,7 +24,7 @@ struct PlayerExperienceViewScreen: View {
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 900) }
             }
         }
-        .navigationTitle("Mon univers")
+        .navigationTitle(state.copy("nav.experience", fallback: "Mon univers"))
         .task { await state.loadPlatformContext(); hydrateSelection() }
         .refreshable { await state.loadPlatformContext(); hydrateSelection() }
     }
@@ -40,7 +40,7 @@ struct PlayerExperienceViewScreen: View {
     private var wallet: some View {
         HStack {
             VStack(alignment: .leading) {
-                EyebrowText(text: "Portefeuille", color: GenEngineTheme.verdigris)
+                EyebrowText(text: state.copy("experience.wallet.title", fallback: "Portefeuille"), color: GenEngineTheme.verdigris)
                 Text("\(state.playerExperience?.balance ?? 0)").font(.system(size: 42, weight: .bold, design: .rounded)).foregroundStyle(GenEngineTheme.ivory)
                 Text(state.playerExperience?.currencyName ?? "Braises").foregroundStyle(GenEngineTheme.secondaryText)
             }
@@ -52,7 +52,7 @@ struct PlayerExperienceViewScreen: View {
 
     private var familiar: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Votre familier", systemImage: "sparkle.magnifyingglass").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
+            Label(state.copy("experience.familiar.title", fallback: "Mon familier"), systemImage: "sparkle.magnifyingglass").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
             if let definitions = state.experience?.document.familiars, !definitions.isEmpty {
                 Picker("Compagnon", selection: Binding(get: { familiarID ?? definitions[0].id }, set: { newID in familiarID = newID; adopt(definitions.first { $0.id == newID }) })) {
                     ForEach(definitions) { Text($0.name).tag($0.id) }
@@ -60,11 +60,11 @@ struct PlayerExperienceViewScreen: View {
                 .pickerStyle(.segmented)
                 if let definition = definitions.first(where: { $0.id == familiarID }) ?? definitions.first {
                     Text(definition.description).foregroundStyle(GenEngineTheme.secondaryText)
-                    Picker("Forme", selection: $form) { ForEach(definition.availableForms, id: \.self) { Text($0.capitalized).tag($0) } }
-                    Picker("Ton", selection: $tone) { ForEach(definition.availableTones, id: \.self) { Text($0).tag($0) } }
+                    Picker(state.copy("experience.familiar.form", fallback: "Forme"), selection: $form) { ForEach(definition.availableForms, id: \.self) { Text($0.capitalized).tag($0) } }
+                    Picker(state.copy("experience.familiar.tone", fallback: "Ton"), selection: $tone) { ForEach(definition.availableTones, id: \.self) { Text($0).tag($0) } }
                     TextField("Style d’écriture", text: $writingStyle).textFieldStyle(.roundedBorder)
-                    Stepper("Niveau d’aide : \(helpLevel)", value: $helpLevel, in: 0...5).foregroundStyle(GenEngineTheme.ivory)
-                    Button("Enregistrer mon familier") {
+                    Stepper("\(state.copy("experience.familiar.helpLevel", fallback: "Niveau d’aide")) : \(helpLevel)", value: $helpLevel, in: 0...5).foregroundStyle(GenEngineTheme.ivory)
+                    Button(state.copy("experience.familiar.apply", fallback: "Appliquer cette personnalité")) {
                         Task { await state.saveFamiliar(.init(familiarId: definition.id, form: form, tone: tone, writingStyle: writingStyle, accent: accent, helpLevel: helpLevel)) }
                     }.buttonStyle(PrimaryActionStyle())
                 }
@@ -75,7 +75,7 @@ struct PlayerExperienceViewScreen: View {
 
     private var shop: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("Magasin", systemImage: "bag.fill").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
+            Label(state.copy("experience.shop.title", fallback: "Magasin"), systemImage: "bag.fill").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
             ForEach(state.experience?.document.economy.offers.filter(\.enabled) ?? []) { offer in
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -83,7 +83,7 @@ struct PlayerExperienceViewScreen: View {
                         Text(offer.description).font(.subheadline).foregroundStyle(GenEngineTheme.secondaryText)
                     }
                     Spacer()
-                    if state.playerExperience?.ownedOfferIds.contains(offer.id) == true { Label("Acquis", systemImage: "checkmark.seal.fill").foregroundStyle(GenEngineTheme.verdigris) }
+                    if state.playerExperience?.ownedOfferIds.contains(offer.id) == true { Label(state.copy("experience.shop.owned", fallback: "Acquis"), systemImage: "checkmark.seal.fill").foregroundStyle(GenEngineTheme.verdigris) }
                     else { Button("\(offer.price) \(state.playerExperience?.currencyIcon ?? "✦")") { Task { await state.purchase(offer) } }.buttonStyle(.borderedProminent).tint(GenEngineTheme.ember) }
                 }
                 .padding(16).background(GenEngineTheme.midnight.opacity(0.7), in: RoundedRectangle(cornerRadius: 18))

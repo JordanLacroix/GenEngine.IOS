@@ -14,9 +14,9 @@ struct StudioView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 7) {
-                        EyebrowText(text: "Studio narratif", color: GenEngineTheme.verdigris)
-                        Text("Donnez vie à un chapitre").font(.system(.title, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
-                        Text("Le moteur assemble l’histoire globale, la catégorie et votre intention pour produire un brouillon jouable.").foregroundStyle(GenEngineTheme.secondaryText)
+                        EyebrowText(text: state.copy("studio.eyebrow", fallback: "Atelier narratif"), color: GenEngineTheme.verdigris)
+                        Text(state.copy("studio.title", fallback: "Créer une nouvelle histoire")).font(.system(.title, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
+                        Text(state.copy("studio.copilot.subtitle", fallback: "Le moteur assemble l’histoire globale, la catégorie et votre intention pour produire un brouillon jouable.")).foregroundStyle(GenEngineTheme.secondaryText)
                     }
                     contextCard
                     creationForm
@@ -26,7 +26,7 @@ struct StudioView: View {
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 900) }
             }
         }
-        .navigationTitle("Studio")
+        .navigationTitle(state.copy("nav.studio", fallback: "Studio"))
         .task { await state.loadPlatformContext(); categoryID = categoryID ?? categories.first?.id }
     }
 
@@ -42,20 +42,20 @@ struct StudioView: View {
 
     private var creationForm: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Nouveau scénario").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
-            Picker("Catégorie", selection: Binding(get: { categoryID ?? categories.first?.id }, set: { categoryID = $0 })) {
+            Text(state.copy("studio.title", fallback: "Créer une nouvelle histoire")).font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
+            Picker(state.copy("studio.category.label", fallback: "Catégorie"), selection: Binding(get: { categoryID ?? categories.first?.id }, set: { categoryID = $0 })) {
                 ForEach(categories) { Text($0.name).tag(Optional($0.id)) }
             }
             .tint(GenEngineTheme.amber)
-            TextField("Que doit vivre le joueur ?", text: $prompt, axis: .vertical)
+            TextField(state.copy("studio.prompt.label", fallback: "Votre intention"), text: $prompt, axis: .vertical)
                 .lineLimit(5...10).textFieldStyle(.roundedBorder)
             HStack {
-                Picker("Ton", selection: $tone) {
+                Picker(state.copy("studio.tone.label", fallback: "Ton"), selection: $tone) {
                     Text("Immersif").tag("immersive"); Text("Lumineux").tag("hopeful"); Text("Mystérieux").tag("mysterious"); Text("Tendu").tag("tense")
                 }
                 Stepper("\(targetMinutes) min", value: $targetMinutes, in: 5...45, step: 5).foregroundStyle(GenEngineTheme.ivory)
             }
-            Picker("Moteur", selection: $provider) {
+            Picker(state.copy("studio.provider.label", fallback: "Provider"), selection: $provider) {
                 Text("Hors ligne · déterministe").tag("offline")
                 if state.experience?.document.aiProviders.contains(where: { $0.enabled && $0.type.lowercased().contains("azure") }) == true {
                     Text("Azure AI Foundry").tag("azureAiFoundry")
@@ -65,7 +65,7 @@ struct StudioView: View {
                 guard let categoryID else { return }
                 Task { await state.generateScenario(categoryId: categoryID, prompt: prompt, provider: provider, targetMinutes: targetMinutes, tone: tone) }
             } label: {
-                HStack { Label("Générer le brouillon", systemImage: "wand.and.sparkles"); if state.isBusy { ProgressView() } }.frame(maxWidth: .infinity)
+                HStack { Label(state.copy("studio.generateDraft", fallback: "Générer le brouillon"), systemImage: "wand.and.sparkles"); if state.isBusy { ProgressView() } }.frame(maxWidth: .infinity)
             }
             .buttonStyle(PrimaryActionStyle()).disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || categoryID == nil || state.isBusy)
         }.padding(22).glassPanel()
