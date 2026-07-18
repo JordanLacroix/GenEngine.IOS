@@ -183,3 +183,175 @@ struct SavedSession: Codable, Identifiable, Equatable, Sendable {
     var updatedAt: Date
 }
 struct ProblemDetails: Decodable, Error, Sendable { let title: String?; let detail: String?; let status: Int? }
+
+// MARK: - Configurable platform
+
+struct RoleView: Codable, Identifiable, Sendable {
+    let id: UUID
+    var name: String
+    var description: String
+    let isSystem: Bool
+    var permissions: [String]
+}
+struct UserAccessView: Decodable, Sendable {
+    let id: UUID
+    let userName: String
+    let roles: [RoleView]
+    let permissions: [String]
+}
+struct AuthenticationProvidersView: Decodable, Sendable {
+    let mode: String
+    let localEnabled: Bool
+    let entraEnabled: Bool
+    let authority: String?
+    let clientId: String?
+}
+struct PermissionView: Codable, Identifiable, Sendable {
+    var id: String { code }
+    let code: String
+    let description: String
+}
+struct RoleRequest: Encodable, Sendable { let name: String; let description: String; let permissions: [String] }
+struct AssignRoleRequest: Encodable, Sendable { let roleId: UUID; let scope: String?; let expiresAt: Date? }
+
+struct GameDefinition: Codable, Sendable {
+    var name: String
+    var description: String
+    var globalStory: String
+    var locale: String
+    var timeZone: String
+}
+struct AuthenticationDefinition: Codable, Sendable {
+    var mode: String
+    var localEnabled: Bool
+    var entraEnabled: Bool
+    var entraTenantId: String?
+    var entraClientId: String?
+}
+struct AIProviderDefinition: Codable, Identifiable, Sendable {
+    let id: UUID
+    var name: String
+    var type: String
+    var enabled: Bool
+    var endpoint: String
+    var deployment: String
+    var authentication: String
+    var secretReference: String?
+    var capabilities: [String]
+}
+struct CategoryDefinition: Codable, Identifiable, Hashable, Sendable {
+    let id: UUID
+    var name: String
+    var description: String
+    var accent: String
+    var order: Int
+    var isVisible: Bool
+}
+struct FamiliarDefinition: Codable, Identifiable, Hashable, Sendable {
+    let id: UUID
+    var name: String
+    var description: String
+    var form: String
+    var writingStyle: String
+    var tone: String
+    var accent: String
+    var helpLevel: Int
+    var capabilities: [String]
+    var availableForms: [String]
+    var availableTones: [String]
+}
+struct RewardRuleDefinition: Codable, Identifiable, Sendable {
+    var id: String { "\(trigger)-\(referenceId)" }
+    var trigger: String
+    var referenceId: String
+    var amount: Int
+    var description: String
+}
+struct OfferDefinition: Codable, Identifiable, Sendable {
+    let id: UUID
+    var name: String
+    var description: String
+    var price: Int
+    var rewardType: String
+    var rewardReference: String
+    var enabled: Bool
+}
+struct EconomyDefinition: Codable, Sendable {
+    var currencyCode: String
+    var currencyName: String
+    var currencyIcon: String
+    var initialBalance: Int
+    var rewardRules: [RewardRuleDefinition]
+    var offers: [OfferDefinition]
+}
+struct ModuleDefinition: Codable, Identifiable, Sendable {
+    let id: String
+    var name: String
+    var description: String
+    var enabled: Bool
+    var requiredPermissions: [String]
+}
+struct ExperienceDocument: Codable, Sendable {
+    var frontId: String
+    var organizationType: String
+    var game: GameDefinition
+    var authentication: AuthenticationDefinition
+    var aiProviders: [AIProviderDefinition]
+    var categories: [CategoryDefinition]
+    var familiars: [FamiliarDefinition]
+    var economy: EconomyDefinition
+    var modules: [ModuleDefinition]
+}
+struct PublishedExperienceView: Decodable, Sendable {
+    let version: Int
+    let publishedAt: Date
+    let document: ExperienceDocument
+}
+struct ExperienceConfigurationView: Codable, Sendable {
+    let id: UUID
+    var revision: Int
+    var publishedVersion: Int
+    let updatedAt: Date
+    let publishedAt: Date?
+    var document: ExperienceDocument
+}
+struct UpdateConfigurationRequest: Encodable, Sendable { let expectedRevision: Int?; let document: ExperienceDocument }
+struct PublishConfigurationRequest: Encodable, Sendable { let expectedRevision: Int }
+
+struct FamiliarSelection: Codable, Sendable {
+    let familiarId: UUID
+    let form: String
+    let tone: String
+    let writingStyle: String
+    let accent: String
+    let helpLevel: Int
+}
+struct WalletEntryView: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let amount: Int
+    let reason: String
+    let balanceAfter: Int
+    let createdAt: Date
+}
+struct PlayerExperienceView: Decodable, Sendable {
+    let id: UUID
+    let frontId: String
+    let revision: Int
+    let balance: Int
+    let currencyCode: String
+    let currencyName: String
+    let currencyIcon: String
+    let familiar: FamiliarSelection?
+    let ownedOfferIds: [UUID]
+    let recentEntries: [WalletEntryView]
+}
+struct ConfigureFamiliarRequest: Encodable, Sendable { let expectedRevision: Int; let selection: FamiliarSelection }
+struct PurchaseRequest: Encodable, Sendable { let offerId: UUID; let idempotencyKey: String }
+struct ScenarioGenerationRequest: Encodable, Sendable {
+    let frontId: String
+    let categoryId: UUID
+    let prompt: String
+    let provider: String
+    let targetMinutes: Int
+    let tone: String
+}

@@ -5,6 +5,21 @@ protocol GenEngineAPI: Sendable {
     func setToken(_ token: String?) async
     func register(userName: String, password: String) async throws -> AccessToken
     func login(userName: String, password: String) async throws -> AccessToken
+    func authenticationProviders() async throws -> AuthenticationProvidersView
+    func exchangeEntra(accessToken: String) async throws -> AccessToken
+    func access() async throws -> UserAccessView
+    func publicExperience(frontId: String) async throws -> PublishedExperienceView
+    func playerExperience(frontId: String) async throws -> PlayerExperienceView
+    func configureFamiliar(frontId: String, request: ConfigureFamiliarRequest) async throws -> PlayerExperienceView
+    func purchase(frontId: String, request: PurchaseRequest) async throws -> PlayerExperienceView
+    func adminConfiguration(frontId: String) async throws -> ExperienceConfigurationView
+    func updateConfiguration(frontId: String, request: UpdateConfigurationRequest) async throws -> ExperienceConfigurationView
+    func publishConfiguration(frontId: String, request: PublishConfigurationRequest) async throws -> ExperienceConfigurationView
+    func permissions() async throws -> [PermissionView]
+    func roles() async throws -> [RoleView]
+    func createRole(request: RoleRequest) async throws -> RoleView
+    func assignRole(userId: UUID, request: AssignRoleRequest) async throws
+    func generateScenario(request: ScenarioGenerationRequest) async throws -> ScenarioView
     func listPublishedStories() async throws -> [PublishedScenarioView]
     func importScenario(rawJSON: Data) async throws -> ScenarioView
     func validate(scenarioId: UUID) async throws -> ValidationReport
@@ -22,6 +37,24 @@ protocol GenEngineAPI: Sendable {
     func confirmTextAnalysis(sessionId: UUID, commandId: UUID, expectedRevision: Int, confirmed: Bool) async throws -> InputResult
     func pause(sessionId: UUID, expectedRevision: Int) async throws -> SessionView
     func resume(sessionId: UUID, expectedRevision: Int) async throws -> SessionView
+}
+
+extension GenEngineAPI {
+    func authenticationProviders() async throws -> AuthenticationProvidersView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func exchangeEntra(accessToken _: String) async throws -> AccessToken { throw APIError.invalidScenario("Fonction indisponible.") }
+    func access() async throws -> UserAccessView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func publicExperience(frontId _: String) async throws -> PublishedExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func playerExperience(frontId _: String) async throws -> PlayerExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func configureFamiliar(frontId _: String, request _: ConfigureFamiliarRequest) async throws -> PlayerExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func purchase(frontId _: String, request _: PurchaseRequest) async throws -> PlayerExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func adminConfiguration(frontId _: String) async throws -> ExperienceConfigurationView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func updateConfiguration(frontId _: String, request _: UpdateConfigurationRequest) async throws -> ExperienceConfigurationView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func publishConfiguration(frontId _: String, request _: PublishConfigurationRequest) async throws -> ExperienceConfigurationView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func permissions() async throws -> [PermissionView] { throw APIError.invalidScenario("Fonction indisponible.") }
+    func roles() async throws -> [RoleView] { throw APIError.invalidScenario("Fonction indisponible.") }
+    func createRole(request _: RoleRequest) async throws -> RoleView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func assignRole(userId _: UUID, request _: AssignRoleRequest) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
+    func generateScenario(request _: ScenarioGenerationRequest) async throws -> ScenarioView { throw APIError.invalidScenario("Fonction indisponible.") }
 }
 
 enum APIError: LocalizedError {
@@ -70,6 +103,68 @@ actor LiveGenEngineAPI: GenEngineAPI {
         let access: AccessToken = try await send(method: "POST", base: endpoints.identity, path: "/auth/login", body: CredentialsRequest(userName: userName, password: password), authenticated: false)
         token = access.token
         return access
+    }
+
+    func authenticationProviders() async throws -> AuthenticationProvidersView {
+        try await perform(method: "GET", base: endpoints.identity, path: "/auth/providers", body: nil, authenticated: false)
+    }
+
+    func exchangeEntra(accessToken: String) async throws -> AccessToken {
+        let access: AccessToken = try await perform(method: "POST", base: endpoints.identity, path: "/auth/entra/exchange", body: nil, authenticated: false, bearer: accessToken)
+        token = access.token
+        return access
+    }
+
+    func access() async throws -> UserAccessView {
+        try await perform(method: "GET", base: endpoints.identity, path: "/me", body: nil, authenticated: true)
+    }
+
+    func publicExperience(frontId: String) async throws -> PublishedExperienceView {
+        try await perform(method: "GET", base: endpoints.configuration, path: "/experience/\(escaped(frontId))", body: nil, authenticated: false)
+    }
+
+    func playerExperience(frontId: String) async throws -> PlayerExperienceView {
+        try await perform(method: "GET", base: endpoints.playerExperience, path: "/me/experience?frontId=\(escaped(frontId))", body: nil, authenticated: true)
+    }
+
+    func configureFamiliar(frontId: String, request: ConfigureFamiliarRequest) async throws -> PlayerExperienceView {
+        try await send(method: "PUT", base: endpoints.playerExperience, path: "/me/experience/familiar?frontId=\(escaped(frontId))", body: request)
+    }
+
+    func purchase(frontId: String, request: PurchaseRequest) async throws -> PlayerExperienceView {
+        try await send(method: "POST", base: endpoints.playerExperience, path: "/me/experience/shop/purchases?frontId=\(escaped(frontId))", body: request)
+    }
+
+    func adminConfiguration(frontId: String) async throws -> ExperienceConfigurationView {
+        try await perform(method: "GET", base: endpoints.configuration, path: "/admin/configuration/\(escaped(frontId))", body: nil, authenticated: true)
+    }
+
+    func updateConfiguration(frontId: String, request: UpdateConfigurationRequest) async throws -> ExperienceConfigurationView {
+        try await send(method: "PUT", base: endpoints.configuration, path: "/admin/configuration/\(escaped(frontId))", body: request)
+    }
+
+    func publishConfiguration(frontId: String, request: PublishConfigurationRequest) async throws -> ExperienceConfigurationView {
+        try await send(method: "POST", base: endpoints.configuration, path: "/admin/configuration/\(escaped(frontId))/publish", body: request)
+    }
+
+    func permissions() async throws -> [PermissionView] {
+        try await perform(method: "GET", base: endpoints.identity, path: "/admin/access/permissions", body: nil, authenticated: true)
+    }
+
+    func roles() async throws -> [RoleView] {
+        try await perform(method: "GET", base: endpoints.identity, path: "/admin/access/roles", body: nil, authenticated: true)
+    }
+
+    func createRole(request: RoleRequest) async throws -> RoleView {
+        try await send(method: "POST", base: endpoints.identity, path: "/admin/access/roles", body: request)
+    }
+
+    func assignRole(userId: UUID, request: AssignRoleRequest) async throws {
+        try await sendVoid(method: "POST", base: endpoints.identity, path: "/admin/access/users/\(userId.uuidString.lowercased())/roles", body: request, authenticated: true)
+    }
+
+    func generateScenario(request: ScenarioGenerationRequest) async throws -> ScenarioView {
+        try await send(method: "POST", base: endpoints.authoring, path: "/scenarios/generate", body: request)
     }
 
     func listPublishedStories() async throws -> [PublishedScenarioView] {
@@ -159,20 +254,21 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await perform(method: "POST", base: base, path: path, body: nil, authenticated: true)
     }
 
-    private func perform<Response: Decodable>(method: String, base: String, path: String, body: Data?, authenticated: Bool) async throws -> Response {
-        let data = try await request(method: method, base: base, path: path, body: body, authenticated: authenticated)
+    private func perform<Response: Decodable>(method: String, base: String, path: String, body: Data?, authenticated: Bool, bearer: String? = nil) async throws -> Response {
+        let data = try await request(method: method, base: base, path: path, body: body, authenticated: authenticated, bearer: bearer)
         do { return try makeDecoder().decode(Response.self, from: data) }
         catch { throw APIError.decoding(error.localizedDescription) }
     }
 
-    private func request(method: String, base: String, path: String, body: Data?, authenticated: Bool) async throws -> Data {
+    private func request(method: String, base: String, path: String, body: Data?, authenticated: Bool, bearer: String? = nil) async throws -> Data {
         guard let url = URL(string: base + path) else { throw APIError.invalidURL }
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
-        if authenticated, let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        if let bearer { request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization") }
+        else if authenticated, let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         let data: Data
         let response: URLResponse
         do { (data, response) = try await session.data(for: request) }
@@ -219,4 +315,5 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     private func sessionPath(_ id: UUID) -> String { "/sessions/\(id.uuidString.lowercased())" }
     private func scenarioPath(_ id: UUID) -> String { "/scenarios/\(id.uuidString.lowercased())" }
+    private func escaped(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value }
 }

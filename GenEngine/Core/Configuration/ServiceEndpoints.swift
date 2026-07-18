@@ -4,11 +4,15 @@ struct ServiceEndpoints: Codable, Equatable, Sendable {
     var identity: String
     var authoring: String
     var play: String
+    var configuration: String
+    var playerExperience: String
 
     static let local = ServiceEndpoints(
         identity: "http://localhost:5203",
         authoring: "http://localhost:5201",
-        play: "http://localhost:5202"
+        play: "http://localhost:5202",
+        configuration: "http://localhost:5204",
+        playerExperience: "http://localhost:5205"
     )
 }
 

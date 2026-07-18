@@ -7,6 +7,8 @@ Dernière mise à jour : 18 juillet 2026.
 - `main` contient une application SwiftUI universelle générée avec XcodeGen.
 - La démonstration hors ligne reste isolée et navigable sans backend.
 - Le client consomme le catalogue Authoring, Identity et le parcours Play complet.
+- Les onglets sont affichés selon les permissions et séparent jeu, Studio et Administration.
+- Configuration, Azure AI Foundry, modes d’authentification, Entra ID, familier, monnaie, magasin et rôles sont raccordés aux contrats backend.
 - Les jetons sont stockés dans Keychain et les références de session restent opaques.
 - Les outils d’import et de publication Authoring sont limités aux builds Debug.
 - La CI régénère, compile et teste l’application sur un simulateur iOS.
@@ -23,7 +25,7 @@ xcodebuild build -project GenEngine.xcodeproj -scheme GenEngine \
 
 ## Prochaine unité de travail
 
-La prochaine tranche fonctionnelle dépend des contrats publiés du jalon 4 du backend. Avant toute implémentation, confirmer le besoin produit, le contrat HTTP, les permissions et le comportement hors ligne. Ne pas créer de modèle local anticipé pour Configuration, Organization, Assistant ou Economy.
+La prochaine tranche fonctionnelle est la modélisation détaillée des structures d’organisation et de leurs scopes : école/classes ou entreprise/équipes, puis l’affectation des rôles custom à ces périmètres. Les contrats backend doivent rester la source de vérité.
 
 ## Décisions à préserver
 

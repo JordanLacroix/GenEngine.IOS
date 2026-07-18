@@ -48,6 +48,15 @@ struct WelcomeView: View {
                             .disabled(state.isBusy)
                             Button("Créer un compte") { Task { await state.register() } }
                                 .disabled(state.isBusy)
+                            HStack { Rectangle().frame(height: 1); Text("OU").font(.caption); Rectangle().frame(height: 1) }
+                                .foregroundStyle(GenEngineTheme.secondaryText.opacity(0.5))
+                            Button { Task { await state.loginWithMicrosoft() } } label: {
+                                Label("Continuer avec Microsoft", systemImage: "building.2.fill")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(GenEngineTheme.ivory)
+                            .disabled(state.isBusy)
                         }
                         .padding(22)
                         .frame(maxWidth: 440)
