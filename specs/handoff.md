@@ -32,7 +32,7 @@ xcodebuild build -project GenEngine.xcodeproj -scheme GenEngine \
 
 ## Prochaine unité de travail
 
-La hiérarchie école/classes ou entreprise/équipes, les rôles scoped et le service Organization sont raccordés. L’Administration native gère unités, participants, encadrants et affectations avec suppression ; Play reste l’autorité qui refuse un scénario non affecté. Les contrats backend doivent rester la source de vérité.
+La hiérarchie école/classes ou entreprise/équipes, les rôles scoped et le service Organization sont raccordés. L’Administration native gère périodes métier, unités, participants, encadrants, import CSV depuis Fichiers et affectations avec suppression. Play résout les parcours et reste l’autorité qui refuse un scénario non affecté ; la carte native filtre les catégories d'un membre selon ses affectations.
 
 Sur `feat/product-operations-ui`, l'onglet Developer a été supprimé et ses diagnostics intégrés à Administration. Cette dernière gère aussi utilisateurs, rôles custom, parcours, catégories, rattachements et assets licenciés du familier. Le Studio recherche et ouvre les brouillons, affiche leur arborescence, édite le texte/statut de fin d'une scène avec contrôle de révision et archive un scénario. La bibliothèque affiche la progression des catégories et la démo native vise environ quinze minutes.
 

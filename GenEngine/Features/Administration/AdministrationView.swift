@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AdministrationView: View {
     @Environment(AppState.self) private var state
@@ -17,9 +18,17 @@ struct AdministrationView: View {
     @State private var operationsUnitCode = ""
     @State private var operationsUnitType = "Group"
     @State private var operationsParentID: UUID?
+    @State private var periodName = ""
+    @State private var periodCode = ""
+    @State private var periodStartsAt = Date()
+    @State private var periodEndsAt = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var memberUserID: UUID?
     @State private var memberUnitID: UUID?
     @State private var memberKind = MembershipKind.participant
+    @State private var memberPeriodID: UUID?
+    @State private var showsMembershipImporter = false
+    @State private var pendingMembershipRows: [MembershipImportRow] = []
+    @State private var membershipImportReport: MembershipImportView?
     @State private var assignmentUnitID: UUID?
     @State private var assignedContentType = AssignedContentType.journey
     @State private var assignedContentID: UUID?
@@ -43,6 +52,11 @@ struct AdministrationView: View {
         }
         .navigationTitle(state.copy("nav.administration", fallback: "Administration"))
         .task { await state.loadAdministration(); document = state.adminConfiguration?.document }
+        .fileImporter(isPresented: $showsMembershipImporter, allowedContentTypes: [.commaSeparatedText, .plainText]) { result in
+            guard case let .success(url) = result else { return }
+            do { pendingMembershipRows = try Self.parseMembershipCSV(url); membershipImportReport = nil }
+            catch { state.errorMessage = error.localizedDescription }
+        }
     }
 
     private var header: some View {
@@ -89,8 +103,21 @@ struct AdministrationView: View {
         adminPanel("Structures, membres & affectations", symbol: "building.2.crop.circle.fill") {
             if let front = state.organizationFront {
                 HStack { Label(front.name, systemImage: "building.2"); Spacer(); Text(front.isActive ? "Actif" : "Suspendu").foregroundStyle(front.isActive ? GenEngineTheme.verdigris : .red) }
-                Text("\(state.organizationUnits.count) unités · \(state.memberships.count) memberships · \(state.contentAssignments.count) affectations").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+                Text("\(state.organizationUnits.count) unités · \(state.operatingPeriods.count) périodes · \(state.memberships.count) memberships · \(state.contentAssignments.count) affectations").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             }
+
+            Text("Périodes métier").font(.headline).foregroundStyle(GenEngineTheme.ivory)
+            ForEach(state.operatingPeriods) { period in
+                HStack { Image(systemName: "calendar").foregroundStyle(GenEngineTheme.amber); VStack(alignment: .leading) { Text(period.name).foregroundStyle(GenEngineTheme.ivory); Text("\(period.code) · \(period.startsAt.formatted(date: .abbreviated, time: .omitted)) → \(period.endsAt.formatted(date: .abbreviated, time: .omitted))").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); if period.isActive { Text("Active").font(.caption).foregroundStyle(GenEngineTheme.verdigris) } }
+                    .padding(12).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 14))
+            }
+            TextField("Nom de la période", text: $periodName).textFieldStyle(.roundedBorder)
+            TextField("Code", text: $periodCode).textFieldStyle(.roundedBorder).textInputAutocapitalization(.characters)
+            DatePicker("Début", selection: $periodStartsAt, displayedComponents: .date)
+            DatePicker("Fin", selection: $periodEndsAt, displayedComponents: .date)
+            Button { Task { await state.createOperatingPeriod(name: periodName, code: periodCode, startsAt: periodStartsAt, endsAt: periodEndsAt); periodName = ""; periodCode = "" } } label: { Label("Ajouter la période", systemImage: "calendar.badge.plus") }.buttonStyle(PrimaryActionStyle()).disabled(periodName.isEmpty || periodCode.isEmpty || periodEndsAt <= periodStartsAt || state.isBusy)
+
+            Divider().overlay(.white.opacity(0.15))
 
             Text("Unités opérationnelles").font(.headline).foregroundStyle(GenEngineTheme.ivory)
             ForEach(state.organizationUnits) { unit in
@@ -105,13 +132,23 @@ struct AdministrationView: View {
             Divider().overlay(.white.opacity(0.15))
             Text("Participants & encadrants").font(.headline).foregroundStyle(GenEngineTheme.ivory)
             ForEach(state.memberships) { membership in
-                HStack { Image(systemName: membership.kind == .supervisor ? "person.badge.key.fill" : "person.fill").foregroundStyle(membership.kind == .supervisor ? GenEngineTheme.amber : GenEngineTheme.verdigris); VStack(alignment: .leading) { Text(state.adminUsers.first { $0.id == membership.userId }?.userName ?? membership.userId.uuidString).lineLimit(1); Text("\(membership.kind == .supervisor ? "Encadrant" : "Participant") · \(state.organizationUnits.first { $0.id == membership.unitId }?.name ?? "Unité")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Button(role: .destructive) { Task { await state.removeMembership(membership) } } label: { Image(systemName: "trash") } }
+                HStack { Image(systemName: membership.kind == .supervisor ? "person.badge.key.fill" : "person.fill").foregroundStyle(membership.kind == .supervisor ? GenEngineTheme.amber : GenEngineTheme.verdigris); VStack(alignment: .leading) { Text(state.adminUsers.first { $0.id == membership.userId }?.userName ?? membership.userId.uuidString).lineLimit(1); Text("\(membership.kind == .supervisor ? "Encadrant" : "Participant") · \(state.organizationUnits.first { $0.id == membership.unitId }?.name ?? "Unité")\(membership.periodId.flatMap { id in state.operatingPeriods.first { $0.id == id }?.name }.map { " · \($0)" } ?? "")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Button(role: .destructive) { Task { await state.removeMembership(membership) } } label: { Image(systemName: "trash") } }
                     .padding(12).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 14))
             }
             Picker("Utilisateur", selection: $memberUserID) { Text("Sélectionner…").tag(nil as UUID?); ForEach(state.adminUsers.filter(\.isActive)) { Text($0.userName).tag(Optional($0.id)) } }
             Picker("Unité", selection: $memberUnitID) { Text("Sélectionner…").tag(nil as UUID?); ForEach(state.organizationUnits.filter(\.isActive)) { Text($0.name).tag(Optional($0.id)) } }
             Picker("Lien", selection: $memberKind) { Text("Participant").tag(MembershipKind.participant); Text("Encadrant").tag(MembershipKind.supervisor) }.pickerStyle(.segmented)
-            Button { guard let memberUserID, let memberUnitID else { return }; Task { await state.createMembership(userId: memberUserID, unitId: memberUnitID, kind: memberKind); self.memberUserID = nil } } label: { Label("Ajouter le membership", systemImage: "person.badge.plus") }.buttonStyle(PrimaryActionStyle()).disabled(memberUserID == nil || memberUnitID == nil || state.isBusy)
+            Picker("Période", selection: $memberPeriodID) { Text("Sans période").tag(nil as UUID?); ForEach(state.operatingPeriods.filter(\.isActive)) { Text($0.name).tag(Optional($0.id)) } }
+            Button { guard let memberUserID, let memberUnitID else { return }; Task { await state.createMembership(userId: memberUserID, unitId: memberUnitID, periodId: memberPeriodID, kind: memberKind); self.memberUserID = nil } } label: { Label("Ajouter le membership", systemImage: "person.badge.plus") }.buttonStyle(PrimaryActionStyle()).disabled(memberUserID == nil || memberUnitID == nil || state.isBusy)
+            Button { showsMembershipImporter = true } label: { Label("Charger un CSV", systemImage: "doc.badge.plus") }.buttonStyle(.bordered)
+            if !pendingMembershipRows.isEmpty {
+                Text("\(pendingMembershipRows.count) ligne(s) prête(s). Colonnes : userId, unitId, periodId, kind, startsAt, endsAt.").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+                HStack {
+                    Button("Prévisualiser") { Task { membershipImportReport = await state.importMemberships(pendingMembershipRows, dryRun: true) } }.buttonStyle(.bordered)
+                    Button("Importer") { Task { membershipImportReport = await state.importMemberships(pendingMembershipRows, dryRun: false) } }.buttonStyle(PrimaryActionStyle()).disabled(membershipImportReport?.errors.isEmpty != true)
+                }
+            }
+            if let report = membershipImportReport { Text(report.errors.isEmpty ? "\(report.created) création(s), \(report.unchanged) inchangée(s)." : report.errors.map { "Ligne \($0.row) : \($0.message)" }.joined(separator: "\n")).font(.caption).foregroundStyle(report.errors.isEmpty ? GenEngineTheme.verdigris : .red) }
 
             Divider().overlay(.white.opacity(0.15))
             Text("Contenus affectés").font(.headline).foregroundStyle(GenEngineTheme.ivory)
@@ -133,6 +170,27 @@ struct AdministrationView: View {
         case .journey: document?.journeys?.map { ($0.id, $0.name) } ?? []
         case .category: document?.categories.map { ($0.id, $0.name) } ?? []
         case .scenario: (document?.categories ?? []).flatMap { category in (category.scenarioIds ?? []).map { ($0, "\(category.name) · \($0.uuidString.prefix(8))") } }
+        }
+    }
+
+    private static func parseMembershipCSV(_ url: URL) throws -> [MembershipImportRow] {
+        let granted = url.startAccessingSecurityScopedResource()
+        defer { if granted { url.stopAccessingSecurityScopedResource() } }
+        let lines = try String(contentsOf: url, encoding: .utf8).split(whereSeparator: \.isNewline).map(String.init)
+        guard let header = lines.first else { return [] }
+        let headers = header.split(separator: ",", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+        guard ["userId", "unitId", "kind", "startsAt"].allSatisfy(headers.contains) else { throw CSVImportError.invalidHeader }
+        let formatter = ISO8601DateFormatter()
+        return try lines.dropFirst().enumerated().map { index, line in
+            let values = line.split(separator: ",", omittingEmptySubsequences: false).map { String($0).trimmingCharacters(in: .whitespaces) }
+            let row = Dictionary(uniqueKeysWithValues: zip(headers, values))
+            guard let userId = UUID(uuidString: row["userId"] ?? ""), let unitId = UUID(uuidString: row["unitId"] ?? ""), let startsAt = formatter.date(from: row["startsAt"] ?? "") else { throw CSVImportError.invalidRow(index + 2) }
+            let rawKind = row["kind"] ?? ""
+            guard rawKind == "Participant" || rawKind == "Supervisor" else { throw CSVImportError.invalidRow(index + 2) }
+            let rawEndsAt = row["endsAt"] ?? ""
+            let endsAt = rawEndsAt.isEmpty ? nil : formatter.date(from: rawEndsAt)
+            if !rawEndsAt.isEmpty, endsAt == nil { throw CSVImportError.invalidRow(index + 2) }
+            return MembershipImportRow(id: UUID(uuidString: row["id"] ?? "") ?? UUID(), unitId: unitId, userId: userId, periodId: UUID(uuidString: row["periodId"] ?? ""), kind: rawKind == "Supervisor" ? .supervisor : .participant, startsAt: startsAt, endsAt: endsAt)
         }
     }
 
@@ -444,6 +502,11 @@ struct AdministrationView: View {
     private func bindingOnboardingStep<Value>(_ index: Int, _ value: WritableKeyPath<OnboardingStepDefinition, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?.onboarding.steps[index][keyPath: value] ?? fallback }, set: { document?.onboarding.steps[index][keyPath: value] = $0 }) }
     private func bindingHelpArticle<Value>(_ index: Int, _ value: WritableKeyPath<HelpArticleDefinition, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?.help.articles[index][keyPath: value] ?? fallback }, set: { document?.help.articles[index][keyPath: value] = $0 }) }
     private var defaultUnitType: String { switch document?.organizationType { case "School": "Class"; case "Company": "Team"; case "TrainingProvider": "Cohort"; default: "Group" } }
+}
+
+private enum CSVImportError: LocalizedError {
+    case invalidHeader, invalidRow(Int)
+    var errorDescription: String? { switch self { case .invalidHeader: "Le CSV doit contenir userId, unitId, kind et startsAt."; case let .invalidRow(row): "La ligne \(row) contient un identifiant, un type ou une date invalide." } }
 }
 
 private enum AdminSection: String, CaseIterable, Identifiable {

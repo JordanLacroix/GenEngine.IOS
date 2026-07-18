@@ -32,7 +32,7 @@ Dictionnaire extensible de copies publié par le moteur, éditeur natif de libel
 
 ## Jalon 4 — structures et exploitation avancées
 
-Les membres, encadrants, unités et affectations opérationnelles sont raccordés. Restent périodes, imports de masse, reporting collectif, édition économique avancée et cycle éditorial collaboratif.
+Les périodes métier, membres, encadrants, unités, import CSV prévalidé et affectations scénario/catégorie/parcours sont raccordés. Le catalogue natif d'un membre est filtré selon ces affectations. Restent l'export et les autres opérations en masse, le reporting collectif, l'édition économique avancée et le cycle éditorial collaboratif.
 
 **Statut : en cours.** Les règles restent autoritatives dans les services backend.
 
