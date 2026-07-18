@@ -24,6 +24,12 @@ Configuration publique, navigation pilotée par les permissions, familier person
 
 **Statut : terminé.**
 
+## Jalon 3.1 — vocabulaire du jeu
+
+Dictionnaire extensible de copies publié par le moteur, éditeur natif de libellés et consommation dans l’accueil, les onglets, la bibliothèque, le Studio et l’espace joueur.
+
+**Statut : terminé.**
+
 ## Jalon 4 — structures et exploitation avancées
 
 Relier membres et encadrants aux unités d’organisation, appliquer les scopes aux données, approfondir l’édition des règles économiques et le cycle éditorial collaboratif des scénarios.

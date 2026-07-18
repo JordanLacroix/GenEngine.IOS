@@ -9,9 +9,9 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 30) {
                     header
-                    HeroStoryCard(story: DemoStory.summary) { Task { await state.open(DemoStory.summary) } }
+                    HeroStoryCard(story: DemoStory.summary, startLabel: state.copy("action.start", fallback: "Commencer")) { Task { await state.open(DemoStory.summary) } }
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("À découvrir").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
+                        Text(state.copy("home.discover", fallback: "À découvrir")).font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 16)], spacing: 16) {
                             ForEach(state.stories.dropFirst()) { story in
                                 CompactStoryCard(story: story) { Task { await state.open(story) } }
@@ -27,14 +27,14 @@ struct HomeView: View {
                 }
             }
         }
-        .navigationTitle("Accueil")
+        .navigationTitle(state.copy("nav.home", fallback: "Accueil"))
         .navigationBarTitleDisplayMode(.inline)
         .task { await state.loadCatalog() }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            EyebrowText(text: "GenEngine")
+            EyebrowText(text: state.gameName)
             Text("Bonsoir, voyageur.").font(.system(.largeTitle, design: .serif, weight: .semibold)).foregroundStyle(GenEngineTheme.ivory)
             Text("Quelle histoire allez-vous changer ce soir ?").foregroundStyle(GenEngineTheme.secondaryText)
         }
@@ -43,6 +43,7 @@ struct HomeView: View {
 
 struct HeroStoryCard: View {
     let story: StorySummary
+    let startLabel: String
     let action: () -> Void
 
     var body: some View {
@@ -54,7 +55,7 @@ struct HeroStoryCard: View {
                 Text(story.title).font(.system(.largeTitle, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
                 Text(story.synopsis).font(.body).foregroundStyle(GenEngineTheme.ivory.opacity(0.8)).frame(maxWidth: 560, alignment: .leading)
                 HStack(spacing: 16) {
-                    Button(action: action) { Label("Commencer", systemImage: "play.fill") }.buttonStyle(PrimaryActionStyle())
+                    Button(action: action) { Label(startLabel, systemImage: "play.fill") }.buttonStyle(PrimaryActionStyle())
                     Label(story.duration, systemImage: "clock").font(.subheadline).foregroundStyle(GenEngineTheme.ivory.opacity(0.75))
                 }
             }

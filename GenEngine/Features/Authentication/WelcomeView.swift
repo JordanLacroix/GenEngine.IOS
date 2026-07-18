@@ -18,12 +18,12 @@ struct WelcomeView: View {
                         .foregroundStyle(GenEngineTheme.amber, GenEngineTheme.ember)
                         .accessibilityHidden(true)
                     VStack(spacing: 14) {
-                        EyebrowText(text: "Vos choix. Votre histoire.")
-                        Text("Entrez dans des mondes\nqui se souviennent de vous.")
+                        EyebrowText(text: state.copy("welcome.eyebrow", fallback: "Vos choix. Votre histoire."))
+                        Text(state.copy("welcome.title", fallback: "Entrez dans des mondes qui se souviennent de vous."))
                             .font(.system(.largeTitle, design: .serif, weight: .semibold))
                             .multilineTextAlignment(.center)
                             .foregroundStyle(GenEngineTheme.ivory)
-                        Text("Une nouvelle génération de récits interactifs, propulsée par GenEngine.")
+                        Text(state.copy("welcome.subtitle", fallback: "Une nouvelle génération de récits interactifs."))
                             .font(.body)
                             .multilineTextAlignment(.center)
                             .foregroundStyle(GenEngineTheme.secondaryText)
@@ -32,26 +32,26 @@ struct WelcomeView: View {
 
                     if showsLogin {
                         VStack(spacing: 14) {
-                            TextField("Identifiant", text: $state.userName)
+                            TextField(state.copy("auth.username", fallback: "Identifiant"), text: $state.userName)
                                 .textContentType(.username)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .textFieldStyle(.roundedBorder)
-                            SecureField("Mot de passe", text: $state.password)
+                            SecureField(state.copy("auth.password", fallback: "Mot de passe"), text: $state.password)
                                 .textContentType(.password)
                                 .textFieldStyle(.roundedBorder)
                             Button { Task { await state.login() } } label: {
-                                HStack { Text("Se connecter"); if state.isBusy { ProgressView() } }
+                                HStack { Text(state.copy("auth.login", fallback: "Se connecter")); if state.isBusy { ProgressView() } }
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(PrimaryActionStyle())
                             .disabled(state.isBusy)
-                            Button("Créer un compte") { Task { await state.register() } }
+                            Button(state.copy("auth.register", fallback: "Créer un compte")) { Task { await state.register() } }
                                 .disabled(state.isBusy)
                             HStack { Rectangle().frame(height: 1); Text("OU").font(.caption); Rectangle().frame(height: 1) }
                                 .foregroundStyle(GenEngineTheme.secondaryText.opacity(0.5))
                             Button { Task { await state.loginWithMicrosoft() } } label: {
-                                Label("Continuer avec Microsoft", systemImage: "building.2.fill")
+                                Label(state.copy("auth.microsoft", fallback: "Continuer avec Microsoft"), systemImage: "building.2.fill")
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
@@ -67,10 +67,10 @@ struct WelcomeView: View {
                             Button {
                                 withAnimation(reduceMotion ? nil : .snappy) { state.unlockDemo() }
                             } label: {
-                                Label("Explorer la démo", systemImage: "play.fill").frame(maxWidth: .infinity)
+                                Label(state.copy("demo.explore", fallback: "Explorer la démo"), systemImage: "play.fill").frame(maxWidth: .infinity)
                             }
                             .buttonStyle(PrimaryActionStyle())
-                            Button("J’ai déjà un compte") {
+                            Button(state.copy("auth.existingAccount", fallback: "J’ai déjà un compte")) {
                                 withAnimation(reduceMotion ? nil : .snappy) { showsLogin = true }
                             }
                             .font(.headline)

@@ -16,7 +16,7 @@ struct LibraryView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     if state.isAuthenticated && !state.savedSessions.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            EyebrowText(text: "Reprendre le fil", color: GenEngineTheme.amber)
+                            EyebrowText(text: state.copy("library.resume", fallback: "Reprendre le fil"), color: GenEngineTheme.amber)
                             ForEach(state.savedSessions) { saved in
                                 Button { Task { await state.resume(saved) } } label: {
                                     HStack(spacing: 14) {
@@ -47,13 +47,14 @@ struct LibraryView: View {
                 }
             }
         }
-        .navigationTitle("Bibliothèque")
-        .searchable(text: $query, prompt: "Rechercher une histoire")
+        .navigationTitle(state.copy("nav.library", fallback: "Bibliothèque"))
+        .searchable(text: $query, prompt: "Rechercher \(state.copy("entity.story.singular", fallback: "une histoire").lowercased())")
         .task { await state.loadCatalog() }
     }
 }
 
 private struct LibraryStoryCard: View {
+    @Environment(AppState.self) private var state
     let story: StorySummary
     let action: () -> Void
 
@@ -81,7 +82,7 @@ private struct LibraryStoryCard: View {
     }
 
     private var buttonLabel: String {
-        switch story.availability { case .comingSoon: "Aperçu"; default: "Jouer" }
+        switch story.availability { case .comingSoon: state.copy("status.soon", fallback: "Bientôt"); default: state.copy("action.start", fallback: "Commencer") }
     }
     private var buttonSymbol: String {
         switch story.availability { case .comingSoon: "hourglass"; default: "play.fill" }

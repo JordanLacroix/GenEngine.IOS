@@ -25,7 +25,7 @@ xcodebuild build -project GenEngine.xcodeproj -scheme GenEngine \
 
 ## Prochaine unité de travail
 
-La hiérarchie école/classes ou entreprise/équipes et l’affectation scoped des rôles sont disponibles. La prochaine tranche reliera membres et encadrants à ces unités et appliquera les scopes aux données. Les contrats backend doivent rester la source de vérité.
+La hiérarchie école/classes ou entreprise/équipes et l’affectation scoped des rôles sont disponibles. Les copies du jeu viennent du dictionnaire publié et sont éditables dans l’Administration native. La prochaine tranche reliera membres et encadrants à ces unités, puis ajoutera les vrais parcours et affectations. Les contrats backend doivent rester la source de vérité.
 
 ## Décisions à préserver
 

@@ -10,6 +10,8 @@ struct AdministrationView: View {
     @State private var assignmentUserID = ""
     @State private var assignmentRoleID: UUID?
     @State private var assignmentScope = ""
+    @State private var newLabelKey = ""
+    @State private var newLabelValue = ""
 
     var body: some View {
         ZStack {
@@ -26,15 +28,15 @@ struct AdministrationView: View {
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 1_000) }
             }
         }
-        .navigationTitle("Administration")
+        .navigationTitle(state.copy("nav.administration", fallback: "Administration"))
         .task { await state.loadAdministration(); document = state.adminConfiguration?.document }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 7) {
-            EyebrowText(text: "Control plane")
-            Text("Piloter l’expérience").font(.system(.title, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
-            Text("Le paramétrage du jeu et des accès reste séparé du Studio éditorial.").foregroundStyle(GenEngineTheme.secondaryText)
+            EyebrowText(text: state.copy("administration.eyebrow", fallback: "Centre de contrôle"))
+            Text(state.copy("administration.title", fallback: "Piloter l’expérience")).font(.system(.title, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
+            Text(state.copy("administration.subtitle", fallback: "Le paramétrage du jeu et des accès reste séparé du Studio éditorial.")).foregroundStyle(GenEngineTheme.secondaryText)
             HStack {
                 Label("Brouillon r\(state.adminConfiguration?.revision ?? 0)", systemImage: "pencil.circle")
                 Label("Publié v\(state.adminConfiguration?.publishedVersion ?? 0)", systemImage: "checkmark.seal")
@@ -56,12 +58,30 @@ struct AdministrationView: View {
     @ViewBuilder private var sectionContent: some View {
         switch section {
         case .game: gamePanel
+        case .language: languagePanel
         case .structure: structurePanel
         case .identity: identityPanel
         case .intelligence: intelligencePanel
         case .familiar: familiarPanel
         case .economy: economyPanel
         case .access: accessPanel
+        }
+    }
+
+    private var languagePanel: some View {
+        adminPanel("Libellés & vocabulaire", symbol: "character.book.closed.fill") {
+            Text("Tous les textes publiés avec le jeu sont modifiables. Les clés restent stables entre Web et iOS.").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+            ForEach(document?.language.labels.keys.sorted() ?? [], id: \.self) { key in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack { Text(key).font(.caption.monospaced()).foregroundStyle(GenEngineTheme.amber); Spacer(); Button(role: .destructive) { document?.language.labels.removeValue(forKey: key) } label: { Image(systemName: "trash") } }
+                    TextField("Texte affiché", text: bindingLanguageLabel(key), axis: .vertical).textFieldStyle(.roundedBorder)
+                }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
+            }
+            Divider().overlay(.white.opacity(0.15))
+            TextField("Nouvelle clé · ex. home.featured.title", text: $newLabelKey).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+            TextField("Texte affiché", text: $newLabelValue, axis: .vertical).textFieldStyle(.roundedBorder)
+            Button { let key = newLabelKey.trimmingCharacters(in: .whitespacesAndNewlines); let value = newLabelValue.trimmingCharacters(in: .whitespacesAndNewlines); document?.language.labels[key] = value; newLabelKey = ""; newLabelValue = "" } label: { Label("Ajouter le libellé", systemImage: "plus") }
+                .disabled(newLabelKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || newLabelValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || document?.language.labels[newLabelKey] != nil)
         }
     }
 
@@ -233,12 +253,13 @@ struct AdministrationView: View {
     private func optional(_ binding: Binding<String?>) -> Binding<String> { Binding(get: { binding.wrappedValue ?? "" }, set: { binding.wrappedValue = $0.isEmpty ? nil : $0 }) }
     private func optionalArray<Element>(_ path: WritableKeyPath<ExperienceDocument, [Element]>, _ index: Int, _ value: WritableKeyPath<Element, String?>) -> Binding<String> { Binding(get: { document?[keyPath: path][index][keyPath: value] ?? "" }, set: { document?[keyPath: path][index][keyPath: value] = $0.isEmpty ? nil : $0 }) }
     private func bindingOrganizationUnit<Value>(_ index: Int, _ value: WritableKeyPath<OrganizationUnitDefinition, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?.organization.units[index][keyPath: value] ?? fallback }, set: { document?.organization.units[index][keyPath: value] = $0 }) }
+    private func bindingLanguageLabel(_ key: String) -> Binding<String> { Binding(get: { document?.language.labels[key] ?? "" }, set: { document?.language.labels[key] = $0 }) }
     private var defaultUnitType: String { switch document?.organizationType { case "School": "Class"; case "Company": "Team"; case "TrainingProvider": "Cohort"; default: "Group" } }
 }
 
 private enum AdminSection: String, CaseIterable, Identifiable {
-    case game, structure, identity, intelligence, familiar, economy, access
+    case game, language, structure, identity, intelligence, familiar, economy, access
     var id: String { rawValue }
-    var title: String { switch self { case .game: "Jeu"; case .structure: "Structure"; case .identity: "Auth"; case .intelligence: "IA"; case .familiar: "Familier"; case .economy: "Économie"; case .access: "Accès" } }
-    var symbol: String { switch self { case .game: "globe"; case .structure: "square.grid.2x2"; case .identity: "key"; case .intelligence: "brain"; case .familiar: "wand.and.stars"; case .economy: "bag"; case .access: "person.3" } }
+    var title: String { switch self { case .game: "Jeu"; case .language: "Libellés"; case .structure: "Structure"; case .identity: "Auth"; case .intelligence: "IA"; case .familiar: "Familier"; case .economy: "Économie"; case .access: "Accès" } }
+    var symbol: String { switch self { case .game: "globe"; case .language: "character.book.closed"; case .structure: "square.grid.2x2"; case .identity: "key"; case .intelligence: "brain"; case .familiar: "wand.and.stars"; case .economy: "bag"; case .access: "person.3" } }
 }

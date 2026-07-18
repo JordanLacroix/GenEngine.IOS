@@ -19,11 +19,11 @@ struct RootView: View {
             }
         }
         .tint(GenEngineTheme.amber)
-        .alert("GenEngine", isPresented: Binding(
+        .alert(state.gameName, isPresented: Binding(
             get: { state.errorMessage != nil },
             set: { if !$0 { state.errorMessage = nil } }
         )) {
-            Button("Fermer", role: .cancel) { state.errorMessage = nil }
+            Button(state.copy("action.close", fallback: "Fermer"), role: .cancel) { state.errorMessage = nil }
         } message: {
             Text(state.errorMessage ?? "")
         }
@@ -37,24 +37,24 @@ private struct ProductShell: View {
         @Bindable var state = state
         TabView(selection: $state.selectedTab) {
             HomeView()
-                .tabItem { Label("Accueil", systemImage: "sparkles") }
+                .tabItem { Label(state.copy("nav.home", fallback: "Accueil"), systemImage: "sparkles") }
                 .tag(AppTab.home)
             LibraryView()
-                .tabItem { Label("Bibliothèque", systemImage: "books.vertical.fill") }
+                .tabItem { Label(state.copy("nav.library", fallback: "Bibliothèque"), systemImage: "books.vertical.fill") }
                 .tag(AppTab.library)
             if state.hasPermission("session.play") {
                 PlayerExperienceViewScreen()
-                    .tabItem { Label("Mon univers", systemImage: "wand.and.stars") }
+                    .tabItem { Label(state.copy("nav.experience", fallback: "Mon univers"), systemImage: "wand.and.stars") }
                     .tag(AppTab.experience)
             }
             if state.hasPermission("scenario.author") {
                 StudioView()
-                    .tabItem { Label("Studio", systemImage: "pencil.and.outline") }
+                    .tabItem { Label(state.copy("nav.studio", fallback: "Studio"), systemImage: "pencil.and.outline") }
                     .tag(AppTab.studio)
             }
             if state.hasPermission("config.read") {
                 AdministrationView()
-                    .tabItem { Label("Admin", systemImage: "slider.horizontal.3") }
+                    .tabItem { Label(state.copy("nav.administration", fallback: "Administration"), systemImage: "slider.horizontal.3") }
                     .tag(AppTab.administration)
             }
             #if DEBUG

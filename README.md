@@ -124,7 +124,7 @@ Swift Testing couvre la navigation déterministe de la démonstration et la comp
 
 ## Roadmap
 
-La première plateforme configurable est livrée de bout en bout : jeu global, catégories, structures hiérarchiques école/classes ou entreprise/équipes, génération assistée, RBAC, Entra ID, familier et économie. Les prochaines tranches relieront membres et encadrants à ces unités et approfondiront les workflows éditoriaux. Voir [`specs/roadmap.md`](specs/roadmap.md).
+La première plateforme configurable est livrée de bout en bout : jeu global, catégories, vocabulaire/copies éditables, structures hiérarchiques école/classes ou entreprise/équipes, génération assistée, RBAC, Entra ID, familier et économie. Les prochaines tranches relieront membres et encadrants à ces unités et approfondiront les workflows éditoriaux. Voir [`specs/roadmap.md`](specs/roadmap.md).
 
 ## Documentation
 
