@@ -80,7 +80,30 @@ struct AdministrationView: View {
     }
 
     private var structurePanel: some View {
-        adminPanel("Catégories de scénarios", symbol: "square.grid.2x2.fill") {
+        adminPanel("Organisation & catégories", symbol: "square.grid.2x2.fill") {
+            if let organization = binding(\.organization) {
+                Text("Structure de l’organisation").font(.headline).foregroundStyle(GenEngineTheme.ivory)
+                TextField("Nom de l’école, entreprise ou structure", text: organization.name).textFieldStyle(.roundedBorder)
+                TextField("Description", text: organization.description, axis: .vertical).textFieldStyle(.roundedBorder)
+            }
+            Text("Établissements, classes, départements et équipes peuvent être imbriqués librement.").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+            if let unitCount = document?.organization.units.count {
+                ForEach(0..<unitCount, id: \.self) { index in
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack { TextField("Type", text: bindingOrganizationUnit(index, \.type, fallback: "Group")); TextField("Code", text: bindingOrganizationUnit(index, \.code, fallback: "")) }.textFieldStyle(.roundedBorder)
+                        TextField("Nom de l’unité", text: bindingOrganizationUnit(index, \.name, fallback: "")).font(.headline)
+                        TextField("Description", text: bindingOrganizationUnit(index, \.description, fallback: ""), axis: .vertical)
+                        Picker("Parent", selection: bindingOrganizationUnit(index, \.parentId, fallback: nil)) {
+                            Text("Racine").tag(nil as UUID?)
+                            ForEach(document?.organization.units.filter { $0.id != document?.organization.units[index].id } ?? []) { unit in Text(unit.name).tag(Optional(unit.id)) }
+                        }
+                        Toggle("Active", isOn: bindingOrganizationUnit(index, \.enabled, fallback: true))
+                    }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
+                }
+            }
+            Button { document?.organization.units.append(.init(id: UUID(), parentId: nil, type: defaultUnitType, name: "Nouvelle unité", code: "", description: "", order: (document?.organization.units.count ?? 0) + 1, enabled: true)) } label: { Label("Ajouter une unité", systemImage: "plus") }
+            Divider().overlay(.white.opacity(0.15))
+            Text("Catégories de scénarios").font(.headline).foregroundStyle(GenEngineTheme.ivory)
             if let count = document?.categories.count {
                 ForEach(0..<count, id: \.self) { index in
                     VStack(alignment: .leading, spacing: 9) {
@@ -209,6 +232,8 @@ struct AdministrationView: View {
     private func bindingArray<Element, Value>(_ path: WritableKeyPath<ExperienceDocument, [Element]>, _ index: Int, _ value: WritableKeyPath<Element, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?[keyPath: path][index][keyPath: value] ?? fallback }, set: { document?[keyPath: path][index][keyPath: value] = $0 }) }
     private func optional(_ binding: Binding<String?>) -> Binding<String> { Binding(get: { binding.wrappedValue ?? "" }, set: { binding.wrappedValue = $0.isEmpty ? nil : $0 }) }
     private func optionalArray<Element>(_ path: WritableKeyPath<ExperienceDocument, [Element]>, _ index: Int, _ value: WritableKeyPath<Element, String?>) -> Binding<String> { Binding(get: { document?[keyPath: path][index][keyPath: value] ?? "" }, set: { document?[keyPath: path][index][keyPath: value] = $0.isEmpty ? nil : $0 }) }
+    private func bindingOrganizationUnit<Value>(_ index: Int, _ value: WritableKeyPath<OrganizationUnitDefinition, Value>, fallback: Value) -> Binding<Value> { Binding(get: { document?.organization.units[index][keyPath: value] ?? fallback }, set: { document?.organization.units[index][keyPath: value] = $0 }) }
+    private var defaultUnitType: String { switch document?.organizationType { case "School": "Class"; case "Company": "Team"; case "TrainingProvider": "Cohort"; default: "Group" } }
 }
 
 private enum AdminSection: String, CaseIterable, Identifiable {

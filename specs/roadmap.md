@@ -26,6 +26,6 @@ Configuration publique, navigation pilotée par les permissions, familier person
 
 ## Jalon 4 — structures et exploitation avancées
 
-Approfondir les structures d’organisation (écoles/classes et entreprises/équipes), l’affectation des rôles à des utilisateurs et scopes, l’édition visuelle complète des règles économiques et le cycle éditorial collaboratif des scénarios.
+Relier membres et encadrants aux unités d’organisation, appliquer les scopes aux données, approfondir l’édition des règles économiques et le cycle éditorial collaboratif des scénarios.
 
 **Statut : planifié.** Les règles restent autoritatives dans les services backend.

@@ -221,6 +221,21 @@ struct GameDefinition: Codable, Sendable {
     var locale: String
     var timeZone: String
 }
+struct OrganizationUnitDefinition: Codable, Identifiable, Hashable, Sendable {
+    let id: UUID
+    var parentId: UUID?
+    var type: String
+    var name: String
+    var code: String
+    var description: String
+    var order: Int
+    var enabled: Bool
+}
+struct OrganizationDefinition: Codable, Sendable {
+    var name: String
+    var description: String
+    var units: [OrganizationUnitDefinition]
+}
 struct AuthenticationDefinition: Codable, Sendable {
     var mode: String
     var localEnabled: Bool
@@ -294,6 +309,7 @@ struct ModuleDefinition: Codable, Identifiable, Sendable {
 struct ExperienceDocument: Codable, Sendable {
     var frontId: String
     var organizationType: String
+    var organization: OrganizationDefinition
     var game: GameDefinition
     var authentication: AuthenticationDefinition
     var aiProviders: [AIProviderDefinition]

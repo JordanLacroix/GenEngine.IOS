@@ -25,7 +25,7 @@ xcodebuild build -project GenEngine.xcodeproj -scheme GenEngine \
 
 ## Prochaine unité de travail
 
-La prochaine tranche fonctionnelle est la modélisation détaillée des structures d’organisation et de leurs scopes : école/classes ou entreprise/équipes, puis l’affectation des rôles custom à ces périmètres. Les contrats backend doivent rester la source de vérité.
+La hiérarchie école/classes ou entreprise/équipes et l’affectation scoped des rôles sont disponibles. La prochaine tranche reliera membres et encadrants à ces unités et appliquera les scopes aux données. Les contrats backend doivent rester la source de vérité.
 
 ## Décisions à préserver
 
