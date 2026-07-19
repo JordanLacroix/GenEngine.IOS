@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "attribution": "Signatures : Kenney (kenney.nl), Interface Sounds. Ambiance « world » : cynicmusic (The Cynic Project, cynicmusic.com). Ambiance « session » : TinyWorlds.",
+  "license": "CC0 1.0 Universal (domaine public) pour la totalité du pack.",
+  "ambiences": {
+    "world": { "resource": "world", "fileExtension": "m4a", "gain": 0.9 },
+    "session": { "resource": "session", "fileExtension": "m4a", "gain": 0.8 }
+  },
+  "cues": {
+    "choice": { "resource": "choice", "fileExtension": "caf" },
+    "error": { "resource": "error", "fileExtension": "caf", "gain": 0.9 },
+    "reward": { "resource": "reward", "fileExtension": "caf" }
+  }
+}

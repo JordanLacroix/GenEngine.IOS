@@ -36,6 +36,33 @@ struct GameAudioTests {
         #expect(try AudioManifest.bundled(in: Bundle(for: ProbeAnchor.self)) == nil)
     }
 
+    /// Le pack réellement embarqué doit se résoudre en fichiers présents.
+    ///
+    /// Le manifeste est du texte : une clé mal orthographiée ou un fichier renommé
+    /// laisse l'application compiler et se lancer, simplement muette. Seule une
+    /// vérification des URL attrape la régression.
+    @Test func shippedManifestResolvesEveryDeclaredFile() throws {
+        let bundle = Bundle.main
+        guard let manifest = try AudioManifest.bundled(in: bundle) else { return }
+
+        #expect(manifest.isEmpty == false)
+        #expect(manifest.license?.isEmpty == false, "un pack distribué doit porter sa licence")
+
+        for ambience in AudioAmbience.allCases {
+            guard let track = manifest.track(for: ambience) else { continue }
+            #expect(
+                bundle.url(forResource: track.resource, withExtension: track.fileExtension) != nil,
+                "ambiance \(ambience.rawValue) : \(track.resource).\(track.fileExtension) absent du bundle")
+        }
+
+        for cue in AudioCue.allCases {
+            guard let track = manifest.track(for: cue) else { continue }
+            #expect(
+                bundle.url(forResource: track.resource, withExtension: track.fileExtension) != nil,
+                "signature \(cue.rawValue) : \(track.resource).\(track.fileExtension) absent du bundle")
+        }
+    }
+
     @Test func disabledSettingsSilenceEveryLayer() {
         var settings = AudioSettings.default
         settings.setVolume(0.8, for: .ambience)
