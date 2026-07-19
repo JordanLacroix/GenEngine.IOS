@@ -31,7 +31,7 @@ struct AccountView: View {
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 620) }
             }
             if showsServerSettings {
-                HUDOverlayPanel(title: "Paramètres du serveur", symbol: "server.rack", onClose: { showsServerSettings = false }) {
+                HUDOverlayPanel(title: "Paramètres du serveur", symbol: "server.rack", dismissesOnBackgroundTap: false, onClose: { showsServerSettings = false }) {
                     ServerSettingsPanel(endpoints: state.endpoints)
                 }
             }

@@ -45,7 +45,10 @@ struct ServerSettingsPanel: View {
 
     private var modePicker: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Mode de configuration", selection: $draft.mode) {
+            // La sélection passe par `switchMode` : basculer ne doit pas effacer la saisie.
+            Picker("Mode de configuration", selection: Binding(
+                get: { draft.mode },
+                set: { draft.switchMode(to: $0) })) {
                 ForEach(EndpointDraft.Mode.allCases) { mode in Text(mode.title).tag(mode) }
             }
             .pickerStyle(.segmented)

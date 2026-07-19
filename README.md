@@ -246,7 +246,7 @@ Les vues dépendent de `AppState` et les I/O distantes passent par `GenEngineAPI
 
 Le client appelle les six services directement ; un point d’entrée public unique reste recommandé avant distribution.
 
-Du code mort subsiste et ne doit pas être pris pour l’état réel : `DeveloperView`, ainsi que `keyStatus`, `header` et `sectionPicker` dans `PlayerExperienceView`. Le retrait de `DeveloperView` a aussi rendu `AppState.importAndPublish` (Debug) inatteignable depuis l’interface.
+`DeveloperView`, ainsi que `keyStatus`, `header`, `sectionPicker` et `map` dans `PlayerExperienceView`, ont été supprimés. `AppState.importAndPublish` (Debug) reste compilée mais n’est plus atteignable depuis aucune interface : son appelant et sa fixture `forest-choice.json` ont disparu avec eux.
 
 Les frontières et compromis sont détaillés dans [`specs/architecture.md`](specs/architecture.md).
 

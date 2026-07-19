@@ -66,6 +66,57 @@ struct EndpointDraftTests {
         #expect(individual.validationMessage?.contains("Organization") == true)
     }
 
+    @Test("Basculer de mode ne perd jamais la saisie")
+    func switchingModeKeepsInput() throws {
+        // Six URLs saisies en unitaire disparaissaient au premier contact avec « Groupé »,
+        // et l'enregistrement repartait en silence sur les valeurs d'origine.
+        var draft = EndpointDraft(scatteredEndpoints)
+        #expect(draft.mode == .individual)
+        draft.switchMode(to: .grouped)
+        draft.switchMode(to: .individual)
+        #expect(draft.resolvedURL(for: .play) == "https://play.exemple.test")
+        #expect(draft.resolvedURL(for: .organization) == "https://org.exemple.test")
+
+        // Dans l'autre sens, l'hôte et les ports saisis en groupé deviennent le point de
+        // départ du mode unitaire, au lieu de laisser six champs périmés.
+        var grouped = EndpointDraft(groupedEndpoints)
+        grouped.host = "10.0.0.9"
+        grouped.switchMode(to: .individual)
+        #expect(grouped.resolvedURL(for: .identity) == "https://10.0.0.9:5203")
+
+        // Et six URLs qui partagent l'hôte sont adoptées, pas ignorées.
+        var adopted = EndpointDraft(scatteredEndpoints)
+        for service in ServiceKind.allCases {
+            adopted.urls[service] = "http://192.168.1.42:\(service.defaultPort)"
+        }
+        adopted.switchMode(to: .grouped)
+        #expect(adopted.host == "192.168.1.42")
+        #expect(adopted.scheme == "http")
+        #expect(adopted.resolvedURL(for: .play) == "http://192.168.1.42:5202")
+    }
+
+    @Test("Un hôte collé avec son port est refusé au lieu de produire une URL cassée")
+    func rejectsHostCarryingItsPort() {
+        var draft = EndpointDraft(groupedEndpoints)
+        draft.host = "192.168.1.10:5201"
+        // Sans ce contrôle : « https://192.168.1.10:5201:5201 », six services injoignables.
+        #expect(draft.validationMessage?.contains("port") == true)
+        #expect(draft.endpoints() == nil)
+    }
+
+    @Test("Des ports vides ou dupliqués sont refusés")
+    func rejectsEmptyOrDuplicatePorts() {
+        var draft = EndpointDraft(groupedEndpoints)
+        draft.ports[.play] = ""
+        #expect(draft.validationMessage?.contains("Play") == true)
+
+        var duplicated = EndpointDraft(groupedEndpoints)
+        duplicated.ports[.play] = duplicated.ports[.identity]
+        // Six services sur la même origine : l'application taperait à côté partout.
+        #expect(duplicated.validationMessage?.contains("5203") == true)
+        #expect(duplicated.endpoints() == nil)
+    }
+
     @Test("Les six services portent chacun un port de référence distinct")
     func defaultPortsAreDistinct() {
         let ports = ServiceKind.allCases.map(\.defaultPort)
@@ -74,32 +125,117 @@ struct EndpointDraftTests {
     }
 }
 
+/// Viewports réels. Un test posé en coordonnées monde ne peut structurellement pas
+/// détecter un chevauchement : celui-ci n'existe qu'après projection, et relativement à la
+/// taille écran des portes. Ces assertions sont donc toutes en points écran.
+private let viewports: [(name: String, size: CGSize)] = [
+    ("iPhone portrait", CGSize(width: 393, height: 852)),
+    ("iPhone paysage", CGSize(width: 852, height: 393)),
+    ("iPhone SE portrait", CGSize(width: 375, height: 667)),
+    ("iPad portrait", CGSize(width: 834, height: 1_194)),
+    ("iPad paysage", CGSize(width: 1_194, height: 834))
+]
+
+private func doorRects(_ placement: PlayerExperiencePresentation.DoorPlacement) -> [CGRect] {
+    placement.positions.map { center in
+        CGRect(
+            x: center.x - placement.size.width / 2,
+            y: center.y - placement.size.height / 2,
+            width: placement.size.width,
+            height: placement.size.height)
+    }
+}
+
 struct DoorLayoutTests {
-    private let landscape = CGSize(width: 1_200, height: 800)
-
-    @Test("Aucune catégorie n’est écartée, quel que soit leur nombre")
-    func placesEveryCategory() {
-        for count in [1, 5, 6, 9, 17, 40] {
-            let anchors = PlayerExperiencePresentation.doorAnchors(count: count, for: landscape)
-            #expect(anchors.count == count)
+    @Test("Aucune porte ne sort du cadre, sur aucun appareil")
+    func everyDoorStaysOnScreen() {
+        for (name, viewport) in viewports {
+            for total in [1, 3, 5, 6, 9, 15, 50] {
+                let placement = PlayerExperiencePresentation.doorPlacement(total: total, viewport: viewport)
+                for rect in doorRects(placement) {
+                    #expect(rect.minX >= 0, "\(name), \(total) portes : \(rect.minX) hors cadre à gauche")
+                    #expect(rect.maxX <= viewport.width, "\(name), \(total) portes : \(rect.maxX) dépasse \(viewport.width)")
+                    #expect(rect.minY >= 0, "\(name), \(total) portes : \(rect.minY) hors cadre en haut")
+                    #expect(rect.maxY <= viewport.height, "\(name), \(total) portes : \(rect.maxY) dépasse \(viewport.height)")
+                }
+            }
         }
     }
 
-    @Test("Les ancrages dessinés à la main restent utilisés tant qu’ils suffisent")
-    func keepsHandmadeAnchors() {
-        let anchors = PlayerExperiencePresentation.doorAnchors(count: 3, for: landscape)
-        #expect(anchors == Array(PlayerExperiencePresentation.doorAnchors.prefix(3)))
+    @Test("Deux portes ne se recouvrent jamais, donc aucune ne vole le tap d’une autre")
+    func doorsNeverOverlap() {
+        for (name, viewport) in viewports {
+            for total in [2, 5, 6, 9, 15, 50] {
+                let placement = PlayerExperiencePresentation.doorPlacement(total: total, viewport: viewport)
+                let rects = doorRects(placement)
+                for (index, rect) in rects.enumerated() {
+                    for other in rects.dropFirst(index + 1) {
+                        #expect(!rect.intersects(other), "\(name), \(total) portes : recouvrement \(rect) / \(other)")
+                    }
+                }
+            }
+        }
     }
 
-    @Test("Au-delà, les portes restent dans le cadre de la carte et distinctes")
-    func dispersesWithoutOverlap() {
-        let anchors = PlayerExperiencePresentation.doorAnchors(count: 12, for: landscape)
-        let size = PlayerExperiencePresentation.worldMapSize
-        for point in anchors {
-            #expect(point.x >= 0 && point.x <= size.width)
-            #expect(point.y >= 0 && point.y <= size.height)
+    @Test("Une porte reste au moins aussi grande que la cible tactile")
+    func doorsStayTappable() {
+        for (name, viewport) in viewports {
+            for total in [1, 6, 15, 50] {
+                let placement = PlayerExperiencePresentation.doorPlacement(total: total, viewport: viewport)
+                guard !placement.positions.isEmpty else { continue }
+                #expect(placement.size.width >= HUDMetrics.minimumTarget, "\(name), \(total) portes : largeur \(placement.size.width)")
+                #expect(placement.size.height >= HUDMetrics.minimumTarget, "\(name), \(total) portes : hauteur \(placement.size.height)")
+            }
         }
-        #expect(Set(anchors.map { "\($0.x)|\($0.y)" }).count == anchors.count)
+    }
+
+    @Test("Toute catégorie est atteignable : la somme des pages couvre le total")
+    func paginationCoversEveryCategory() {
+        for (name, viewport) in viewports {
+            for total in [1, 6, 15, 50] {
+                var seen: Set<Int> = []
+                let first = PlayerExperiencePresentation.doorPlacement(total: total, viewport: viewport)
+                for page in 0..<first.pageCount {
+                    let placement = PlayerExperiencePresentation.doorPlacement(total: total, page: page, viewport: viewport)
+                    #expect(placement.positions.count == placement.range.count)
+                    seen.formUnion(placement.range)
+                }
+                #expect(seen == Set(0..<total), "\(name), \(total) portes : \(total - seen.count) catégorie(s) inatteignable(s)")
+            }
+        }
+    }
+
+    @Test("Les ancrages de la carte ne servent que là où ils tiennent")
+    func handmadeAnchorsOnlyWhereTheyFit() {
+        // iPhone portrait : la carte est rognée par l'aspect-fill, les ancrages projetés
+        // sortaient du cadre. C'était le défaut — ils étaient posés sans aucun contrôle.
+        let phone = CGSize(width: 393, height: 852)
+        let portrait = PlayerExperiencePresentation.doorPlacement(total: 5, viewport: phone)
+        let projected = PlayerExperiencePresentation.doorAnchors(for: phone)
+            .prefix(5)
+            .map { PlayerExperiencePresentation.projectMapPoint($0, into: phone) }
+        #expect(portrait.positions != Array(projected))
+        for rect in doorRects(portrait) { #expect(rect.minX >= 0 && rect.maxX <= phone.width) }
+    }
+
+    @Test("Sur un grand écran, la carte garde ses ancrages dessinés")
+    func handmadeAnchorsSurviveOnLargeScreens() {
+        // Sans cette assertion, le chemin des ancrages pourrait devenir du code mort sans
+        // que rien ne le signale : la grille de repli satisfait toutes les autres règles.
+        let placement = PlayerExperiencePresentation.doorPlacement(total: 5, viewport: CGSize(width: 1_194, height: 834))
+        #expect(placement.usesMapAnchors)
+        #expect(placement.positions.count == 5)
+    }
+
+    @Test("Une page ne promet jamais plus de portes qu’elle n’en place")
+    func pageRangeMatchesPositions() {
+        for (_, viewport) in viewports {
+            for total in [1, 7, 23] {
+                let placement = PlayerExperiencePresentation.doorPlacement(total: total, viewport: viewport)
+                #expect(placement.range.count == placement.positions.count)
+                #expect(placement.range.upperBound <= total)
+            }
+        }
     }
 
     @Test("La progression d’une porte reprend la donnée déjà affichée ailleurs")

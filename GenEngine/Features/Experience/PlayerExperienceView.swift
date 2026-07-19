@@ -20,6 +20,7 @@ private enum UniverseSection: String, CaseIterable, Identifiable {
 struct PlayerExperienceViewScreen: View {
     @Environment(AppState.self) private var state
     @State private var section: UniverseSection = .map
+    @State private var doorPage = 0
     @State private var familiarID: UUID?
     @State private var form = "spark"
     @State private var tone = "Warm"
@@ -62,22 +63,62 @@ struct PlayerExperienceViewScreen: View {
         .background(Color.black)
     }
 
-    /// Portes de la carte. Toutes les catégories visibles sont posées, sans plafond :
-    /// une catégorie configurée et visible ne peut pas être absente de l'écran.
+    /// Portes de la carte. Toutes les catégories visibles sont atteignables, sans plafond.
+    ///
+    /// Le `GeometryReader` **ne** déborde **plus** la zone sûre : elle est déjà étendue par
+    /// `GameShellView` pour dégager le HUD global, et déborder revenait à poser des portes
+    /// sous les barres. Les positions viennent de `doorPlacement`, calculé en points écran.
     private var worldDoors: some View {
         GeometryReader { proxy in
             let categories = visibleCategories
-            let anchors = PlayerExperiencePresentation.doorAnchors(count: categories.count, for: proxy.size)
-            let isCompact = categories.count > 6
-            ForEach(Array(categories.enumerated()), id: \.element.id) { index, category in
-                let point = PlayerExperiencePresentation.projectMapPoint(anchors[min(index, anchors.count - 1)], into: proxy.size)
-                door(category, isSelected: selectedCategoryID == category.id, isCompact: isCompact)
-                    .position(point)
+            let placement = PlayerExperiencePresentation.doorPlacement(
+                total: categories.count, page: doorPage, viewport: proxy.size)
+            ZStack(alignment: .bottom) {
+                ForEach(Array(placement.range.enumerated()), id: \.element) { slot, index in
+                    let category = categories[index]
+                    door(category, isSelected: selectedCategoryID == category.id, size: placement.size)
+                        .position(placement.positions[slot])
+                }
+                if placement.isPaginated {
+                    doorPager(placement)
+                        .position(x: proxy.size.width / 2, y: placement.field.maxY + 22)
+                }
             }
-        }.ignoresSafeArea()
+            .onChange(of: placement.pageCount) { _, count in
+                if doorPage >= count { doorPage = max(0, count - 1) }
+            }
+        }
     }
 
-    private func door(_ category: CategoryDefinition, isSelected: Bool, isCompact: Bool) -> some View {
+    /// Pagination des portes. Elle n'apparaît que lorsque l'écran ne peut pas toutes les
+    /// porter lisiblement : mieux vaut une page suivante annoncée qu'un empilement muet.
+    private func doorPager(_ placement: PlayerExperiencePresentation.DoorPlacement) -> some View {
+        HStack(spacing: 14) {
+            Button { doorPage = max(0, doorPage - 1) } label: {
+                Image(systemName: "chevron.left").frame(width: HUDMetrics.minimumTarget, height: HUDMetrics.minimumTarget)
+            }
+            .disabled(placement.page == 0)
+            .accessibilityLabel("Portes précédentes")
+            Text("Portes \(placement.range.lowerBound + 1)–\(placement.range.upperBound) sur \(visibleCategories.count)")
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+            Button { doorPage = min(placement.pageCount - 1, doorPage + 1) } label: {
+                Image(systemName: "chevron.right").frame(width: HUDMetrics.minimumTarget, height: HUDMetrics.minimumTarget)
+            }
+            .disabled(placement.page >= placement.pageCount - 1)
+            .accessibilityLabel("Portes suivantes")
+        }
+        .padding(.horizontal, 10)
+        .foregroundStyle(GenEngineTheme.ivory)
+        .glassPanel()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Page \(placement.page + 1) sur \(placement.pageCount) de portes")
+    }
+
+    private func door(_ category: CategoryDefinition, isSelected: Bool, size: CGSize) -> some View {
+        // La densité décide de la mise en page, pas un seuil sur le nombre de catégories :
+        // c'est la taille réellement disponible qui dit ce qu'une porte peut afficher.
+        let isCompact = size.width < 170
         let progress = PlayerExperiencePresentation.doorProgress(
             category: category,
             stories: state.stories,
@@ -94,7 +135,6 @@ struct PlayerExperienceViewScreen: View {
                 // La progression existait déjà dans la bibliothèque ; la carte l'ignorait.
                 ProgressView(value: progress.fraction)
                     .tint(GenEngineTheme.verdigris)
-                    .frame(width: isCompact ? 90 : 130)
                 Text(progress.label)
                     .font(.caption2)
                     .foregroundStyle(GenEngineTheme.secondaryText)
@@ -102,7 +142,9 @@ struct PlayerExperienceViewScreen: View {
                     .minimumScaleFactor(0.7)
             }
             .padding(isCompact ? 9 : 12)
-            .frame(maxWidth: isCompact ? 150 : 210)
+            // La porte occupe exactement la place que la disposition lui a réservée :
+            // c'est ce qui garantit qu'elle ne mord ni sur ses voisines, ni sur le cadre.
+            .frame(width: size.width, height: size.height)
             .foregroundStyle(GenEngineTheme.ivory)
             .background(.black.opacity(isSelected ? 0.86 : 0.68), in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(isSelected ? GenEngineTheme.amber : .white.opacity(0.18)))
