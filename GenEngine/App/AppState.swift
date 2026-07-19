@@ -29,8 +29,12 @@ final class AppState {
     private(set) var session: SessionView?
     private(set) var step: CurrentStep?
     private(set) var tree: NarrativeTree?
+    private(set) var treeError: String?
     private(set) var isDemoSession = false
     private(set) var demoPath: [String] = []
+    private(set) var demoChoicePath: [String] = []
+    private(set) var demoDiscoveredNodeIDs: Set<String> = []
+    private(set) var demoDiscoveredChoiceIDs: Set<String> = []
     private(set) var scenarioVersionID: UUID?
     private(set) var publishedTitle: String?
     var seedText = "42"
@@ -456,9 +460,11 @@ final class AppState {
 
     func startDemo() {
         guard let node = DemoStory.node(id: DemoStory.openingNodeID) else { return }
+        archiveDemoRun()
         currentStory = DemoStory.summary
         isDemoSession = true
         demoPath = [node.id]
+        demoChoicePath = []
         session = SessionView(id: UUID(), scenarioId: UUID(), scenarioVersionId: UUID(), snapshotHash: "demo", status: .awaitingInput, revision: 0, turn: 0)
         step = makeStep(node, turn: 0)
     }
@@ -470,6 +476,7 @@ final class AppState {
                   let node = DemoStory.node(id: choice.target) else { return }
             let turn = session.turn + 1
             demoPath.append(node.id)
+            demoChoicePath.append(choice.id)
             self.session = SessionView(id: session.id, scenarioId: session.scenarioId, scenarioVersionId: session.scenarioVersionId, snapshotHash: session.snapshotHash, status: node.isEnding ? .completed : .awaitingInput, revision: session.revision + 1, turn: turn)
             step = makeStep(node, turn: turn)
             return
@@ -544,12 +551,60 @@ final class AppState {
     func loadTree() async { await refreshTree() }
 
     func endSession() {
+        archiveDemoRun()
         session = nil
         step = nil
         currentStory = nil
         isDemoSession = false
         demoPath = []
+        demoChoicePath = []
         tree = nil
+        treeError = nil
+    }
+
+    /// Mémoire cumulée de la démonstration, équivalente locale d'une `ScenarioMasteryView`.
+    private func archiveDemoRun() {
+        guard isDemoSession else { return }
+        demoDiscoveredNodeIDs.formUnion(demoPath)
+        demoDiscoveredChoiceIDs.formUnion(demoChoicePath)
+    }
+
+    /// Graphe de la session courante : contrat serveur pour une partie réelle,
+    /// projection de la fixture pour la démonstration.
+    var questGraph: QuestGraph? {
+        if isDemoSession {
+            return QuestGraphPresentation.build(
+                tree: DemoStory.narrativeTree(path: demoPath),
+                masteryNodeIds: demoDiscoveredNodeIDs,
+                masteryChoiceIds: demoDiscoveredChoiceIDs)
+        }
+        guard let tree else { return nil }
+        let mastery = currentMastery
+        return QuestGraphPresentation.build(
+            tree: tree,
+            masteryNodeIds: Set(mastery?.nodeIds ?? []),
+            masteryChoiceIds: Set(mastery?.choiceIds ?? []))
+    }
+
+    var currentMastery: ScenarioMasteryView? {
+        guard let versionID = session?.scenarioVersionId else { return nil }
+        return playerExperience?.masteries.first { $0.scenarioVersionId == versionID }
+    }
+
+    /// Graphe consultable hors partie. Le contrat ne fournit la structure qu'au travers d'une
+    /// session ; en dehors, seule la démonstration peut en produire un depuis sa fixture.
+    func questGraph(for mastery: ScenarioMasteryView) -> QuestGraph? {
+        guard let versionID = session?.scenarioVersionId, versionID == mastery.scenarioVersionId, !isDemoSession, let tree else { return nil }
+        return QuestGraphPresentation.build(tree: tree, masteryNodeIds: Set(mastery.nodeIds), masteryChoiceIds: Set(mastery.choiceIds))
+    }
+
+    /// Mémoire de la démonstration consultable en dehors d'une partie.
+    var demoQuestGraph: QuestGraph? {
+        guard !demoDiscoveredNodeIDs.isEmpty else { return nil }
+        return QuestGraphPresentation.build(
+            tree: DemoStory.narrativeTree(path: []),
+            masteryNodeIds: demoDiscoveredNodeIDs,
+            masteryChoiceIds: demoDiscoveredChoiceIDs)
     }
 
     #if DEBUG
@@ -623,10 +678,16 @@ final class AppState {
     }
 
     private func refreshTree() async {
-        guard let session, !isDemoSession else { tree = nil; return }
-        do { tree = try await api.sessionTree(sessionId: session.id) }
-        catch is CancellationError { }
-        catch { developerLog.insert("✗ Arbre: \(error.localizedDescription)", at: 0) }
+        guard let session, !isDemoSession else { tree = nil; treeError = nil; return }
+        do {
+            tree = try await api.sessionTree(sessionId: session.id)
+            treeError = nil
+        } catch is CancellationError {
+        } catch {
+            tree = nil
+            treeError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            developerLog.insert("✗ Arbre: \(error.localizedDescription)", at: 0)
+        }
     }
 
     private func refreshScenarios(query: String = "") async throws {
