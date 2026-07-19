@@ -65,10 +65,15 @@ struct WelcomeView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 24)
             }
-            // L'accueil anonyme porte sa propre barre haute : comme dans la coque, elle
-            // flotte au-dessus du contenu et ne doit pas lui voler de place, mais le
-            // contenu doit dégager sa hauteur pour rester atteignable en fin de course.
-            .safeAreaPadding(.top, HUDMetrics.topBarHeight)
+            // L'accueil anonyme porte sa propre barre haute : elle flotte au-dessus du
+            // contenu et ne lui vole pas de place, mais le contenu doit dégager sa hauteur
+            // pour ne pas venir se lire par-dessus l'horloge en fin de course.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Color.clear
+                    .frame(height: HUDMetrics.topBarHeight)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
             if shouldShowIntroduction { introduction(introScenes[introIndex]) }
             else { welcomeMenu }
             if showsMenu {

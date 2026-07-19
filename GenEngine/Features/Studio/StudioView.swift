@@ -29,7 +29,8 @@ struct StudioView: View {
                     if let result = state.generatedScenario { resultCard(result); graphCard(result); nodeInspector(result) }
                 }
                 .padding(.horizontal, 20).padding(.bottom, 24)
-                .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 900) }
+                .frame(maxWidth: 900)
+                .frame(maxWidth: .infinity)
             }
         }
         .confirmation($confirmation)

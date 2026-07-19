@@ -26,9 +26,18 @@ struct GameShellView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 // Le HUD ne réserve pas de place : il flotte. Le contenu défilant, lui,
                 // dégage la zone occupée pour rester atteignable en fin de course.
-                .safeAreaPadding(.top, HUDMetrics.topBarHeight)
-                .safeAreaPadding(.leading, usesRail ? HUDMetrics.railWidth : 0)
-                .safeAreaPadding(.bottom, usesRail ? 0 : HUDMetrics.bottomBarHeight)
+                //
+                // Ces marges passent par `safeAreaInset` et non par `safeAreaPadding` :
+                // `safeAreaPadding` agrandit réellement la vue de la marge demandée. La
+                // pile la mesurait alors plus large que l'écran et centrait tout le monde
+                // dedans — sur iPad, le HUD partait à moitié hors de l'écran par la gauche
+                // (rail réduit à quelques pixels, « Le Diapason » amputé de son article)
+                // pendant que le contenu débordait d'autant par la droite.
+                // `safeAreaInset` réserve la bande *à l'intérieur* des limites : la vue
+                // garde la taille de l'écran et le contenu défile bien sous le HUD.
+                .safeAreaInset(edge: .top, spacing: 0) { hudClearance(height: HUDMetrics.topBarHeight) }
+                .safeAreaInset(edge: .leading, spacing: 0) { hudClearance(width: usesRail ? HUDMetrics.railWidth : 0) }
+                .safeAreaInset(edge: .bottom, spacing: 0) { hudClearance(height: usesRail ? 0 : HUDMetrics.bottomBarHeight) }
             hud
             if showsAudioPanel {
                 HUDOverlayPanel(title: "Son", symbol: "waveform", onClose: { showsAudioPanel = false }) {
@@ -39,6 +48,16 @@ struct GameShellView: View {
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: showsAudioPanel)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: state.activeTab)
         .onChange(of: state.activeTab, initial: true) { _, tab in audio.enter(tab.ambience) }
+    }
+
+    /// Bande vide réservant la place du HUD dans la zone sûre du contenu.
+    /// Elle est décorative et transparente aux gestes : le HUD, lui, est une vue voisine
+    /// posée par-dessus, et c'est lui qui reçoit les touches.
+    private func hudClearance(width: CGFloat = 0, height: CGFloat = 0) -> some View {
+        Color.clear
+            .frame(width: width, height: height)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     @ViewBuilder

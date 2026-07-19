@@ -41,9 +41,12 @@ struct HomeView: View {
                 .padding(.horizontal, 22)
                 .padding(.top, 18)
                 .padding(.bottom, 24)
-                .containerRelativeFrame(.horizontal) { availableWidth, _ in
-                    min(availableWidth, 1_024)
-                }
+                // Colonne de lecture bornée, centrée dans la largeur *réellement*
+                // disponible. `containerRelativeFrame` mesurait le conteneur entier, sans
+                // retrancher la zone sûre : sur iPad, le rail de navigation lui volait ses
+                // 108 points et la dernière colonne de cartes sortait par la droite.
+                .frame(maxWidth: 1_024)
+                .frame(maxWidth: .infinity)
             }
         }
         .task { await state.loadCatalog() }

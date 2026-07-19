@@ -49,7 +49,8 @@ struct AdministrationView: View {
                     actionBar
                 }
                 .padding(.horizontal, 18).padding(.bottom, 24)
-                .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 1_000) }
+                .frame(maxWidth: 1_000)
+                .frame(maxWidth: .infinity)
             }
             if showsServerSettings {
                 HUDOverlayPanel(title: "Paramètres du serveur", symbol: "server.rack", dismissesOnBackgroundTap: false, onClose: { showsServerSettings = false }) {
