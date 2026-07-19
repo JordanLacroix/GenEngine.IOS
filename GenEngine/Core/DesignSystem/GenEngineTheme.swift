@@ -72,6 +72,47 @@ struct GlassPanelModifier: ViewModifier {
     }
 }
 
+/// Décor plein écran d'une scène immersive.
+///
+/// Une image `resizable().scaledToFill()` placée en frère de `ZStack` impose sa
+/// taille intrinsèque au conteneur : les assets carrés dépassent la hauteur utile
+/// et poussent le contenu hors écran. Le décor est donc rendu en arrière-plan
+/// clippé, où il ne participe plus au calcul de mise en page.
+struct SceneBackdropModifier<Backdrop: View>: ViewModifier {
+    let overlay: LinearGradient?
+    @ViewBuilder let backdrop: () -> Backdrop
+
+    func body(content: Content) -> some View {
+        content.background {
+            ZStack {
+                Color.black
+                Color.clear.overlay { backdrop() }.clipped()
+                if let overlay { overlay }
+            }
+            .ignoresSafeArea()
+        }
+    }
+}
+
 extension View {
     func glassPanel() -> some View { modifier(GlassPanelModifier()) }
+
+    /// Applique un décor immersif qui ne peut pas dicter la taille du contenu.
+    func sceneBackdrop<Backdrop: View>(
+        overlay: LinearGradient? = nil,
+        @ViewBuilder backdrop: @escaping () -> Backdrop
+    ) -> some View {
+        modifier(SceneBackdropModifier(overlay: overlay, backdrop: backdrop))
+    }
+
+    /// Variante pour un asset local, opacité appliquée à l'image seule.
+    func sceneBackdrop(
+        image name: String,
+        opacity: Double = 1,
+        overlay: LinearGradient? = nil
+    ) -> some View {
+        sceneBackdrop(overlay: overlay) {
+            Image(name).resizable().scaledToFill().opacity(opacity)
+        }
+    }
 }
