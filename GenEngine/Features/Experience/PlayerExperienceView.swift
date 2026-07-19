@@ -121,8 +121,18 @@ struct PlayerExperienceViewScreen: View {
             if let category = visibleCategories.first(where: { $0.id == selectedCategoryID }) {
                 VStack(alignment: .leading, spacing: 5) { EyebrowText(text: "PORTE \(category.order)", color: GenEngineTheme.amber); Text(category.name).font(.system(.title2, design: .serif, weight: .bold)); Text(category.description).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2) }.frame(width: 230, alignment: .leading)
             }
-            ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 10) { ForEach(filteredStories) { story in Button { Task { await state.open(story) } } label: { VStack(alignment: .leading, spacing: 7) { Text(story.eyebrow.uppercased()).font(.caption2).foregroundStyle(GenEngineTheme.amber); Text(story.title).font(.system(.headline, design: .serif)); Text(story.synopsis).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2); Label("Entrer", systemImage: "arrow.right").font(.caption.bold()) }.padding(14).frame(width: 240, alignment: .leading).glassPanel() }.buttonStyle(.plain) } } }
+            // `LazyHStack` : le dock ne construit plus tout le catalogue d'un coup pour n'en
+            // montrer que deux cartes, et il demande la page suivante quand le défilement
+            // horizontal atteint la dernière carte connue.
+            ScrollView(.horizontal, showsIndicators: false) { LazyHStack(spacing: 10) { ForEach(filteredStories) { story in Button { Task { await state.open(story) } } label: { VStack(alignment: .leading, spacing: 7) { Text(story.eyebrow.uppercased()).font(.caption2).foregroundStyle(GenEngineTheme.amber); Text(story.title).font(.system(.headline, design: .serif)); Text(story.synopsis).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2); Label("Entrer", systemImage: "arrow.right").font(.caption.bold()) }.padding(14).frame(width: 240, alignment: .leading).glassPanel() }.buttonStyle(.plain).onAppear { guard story.id == filteredStories.last?.id else { return }; Task { await state.loadMorePublishedStories() } } }; if state.isLoadingMoreCatalog { ProgressView().tint(GenEngineTheme.amber).frame(width: 80) } } }
         }.foregroundStyle(GenEngineTheme.ivory).padding(16).padding(.bottom, 64) }
+        // Une porte dont aucun récit n'est encore chargé afficherait un dock vide alors que
+        // le serveur en a : on avance dans les pages jusqu'à en trouver, ou jusqu'au bout.
+        .task(id: selectedCategoryID) {
+            while filteredStories.isEmpty, state.hasMorePublishedStories, !Task.isCancelled {
+                await state.loadMorePublishedStories()
+            }
+        }
     }
 
     private var familiarFirstRun: some View {

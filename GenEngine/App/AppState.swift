@@ -71,7 +71,19 @@ final class AppState {
     var errorMessage: String?
     private(set) var publishedStories: [StorySummary] = []
     private(set) var isLoadingCatalog = false
+    /// Chargement d'une page suivante, distinct du premier chargement : l'écran garde ses
+    /// cartes et n'affiche qu'un indicateur en bas de liste.
+    private(set) var isLoadingMoreCatalog = false
+    /// Nombre total de récits publiés correspondant à la recherche courante, tel que le
+    /// serveur le déclare — jamais le nombre de récits déjà chargés.
+    private(set) var catalogTotal = 0
+    /// Dernière page reçue du serveur, en base 1.
+    private(set) var catalogPage = 0
+    /// Recherche appliquée par le serveur. Un filtrage client sur une page de 25 éléments
+    /// donnerait des résultats faux dès que le catalogue dépasse une page.
+    private(set) var catalogQuery = ""
     private var hasLoadedCatalog = false
+    let catalogPageSize = 25
     private(set) var developerLog: [String] = []
     private(set) var savedSessions: [SavedSession] = SessionStore.load()
     private(set) var access: UserAccessView?
@@ -134,16 +146,30 @@ final class AppState {
     }
     func hasPermission(_ permission: String) -> Bool { access?.permissions.contains(permission) == true }
     var stories: [StorySummary] {
+        // `publishedStories` arrive déjà filtré par le serveur ; seules les entrées ajoutées
+        // localement (publication de session, fixtures hors ligne) sont filtrées ici.
         var items = publishedStories
         if let scenarioVersionID, let publishedTitle {
             let id = scenarioVersionID.uuidString.lowercased()
-            if !items.contains(where: { $0.id == id }) {
-                items.insert(StorySummary(id: id, title: publishedTitle, eyebrow: "Publié localement", synopsis: "Une histoire connectée à votre environnement GenEngine.", duration: "À découvrir", symbol: "network", accent: .verdigris, availability: .published(scenarioVersionID)), at: 0)
+            let local = StorySummary(id: id, title: publishedTitle, eyebrow: "Publié localement", synopsis: "Une histoire connectée à votre environnement GenEngine.", duration: "À découvrir", symbol: "network", accent: .verdigris, availability: .published(scenarioVersionID))
+            if !items.contains(where: { $0.id == id }), matchesCatalogQuery(local) {
+                items.insert(local, at: 0)
             }
         }
         // La fixture hors ligne ne rejoint le catalogue que pour un visiteur anonyme.
-        if isDemoAvailable { items.append(contentsOf: DemoStory.library) }
+        if isDemoAvailable { items.append(contentsOf: DemoStory.library.filter(matchesCatalogQuery)) }
         return StoryCatalog.unique(items)
+    }
+
+    /// Recherche locale des seules entrées non issues du catalogue serveur. Insensible à la
+    /// casse et aux diacritiques, là où le serveur ne normalise pas les accents : c'est un
+    /// écart assumé, il ne porte que sur une poignée de fixtures.
+    private func matchesCatalogQuery(_ story: StorySummary) -> Bool {
+        guard !catalogQuery.isEmpty else { return true }
+        let needle = catalogQuery.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        return [story.title, story.synopsis].contains { field in
+            field.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).contains(needle)
+        }
     }
 
     private let api: any GenEngineAPI
@@ -187,19 +213,67 @@ final class AppState {
         endSession()
     }
 
+    /// Reste-t-il des récits publiés à charger pour la recherche courante ?
+    var hasMorePublishedStories: Bool { publishedStories.count < catalogTotal }
+
+    /// Charge la **première page** du catalogue pour la recherche courante.
     func loadCatalog(force: Bool = false) async {
         guard !isLoadingCatalog, force || !hasLoadedCatalog else { return }
         isLoadingCatalog = true
         defer { isLoadingCatalog = false }
         do {
-            publishedStories = try await api.listPublishedStories().map(StorySummary.init(published:))
+            let page = try await api.listPublishedStories(page: 1, pageSize: catalogPageSize, query: catalogQuery)
+            publishedStories = page.items.map(StorySummary.init(published:))
+            catalogPage = page.page
+            catalogTotal = page.total
             hasLoadedCatalog = true
-            developerLog.insert("✓ Catalogue actualisé", at: 0)
+            developerLog.insert("✓ Catalogue actualisé — \(publishedStories.count)/\(catalogTotal)", at: 0)
         } catch is CancellationError {
             developerLog.insert("– Catalogue annulé", at: 0)
         } catch {
             developerLog.insert("✗ Catalogue: \(error.localizedDescription)", at: 0)
         }
+    }
+
+    /// Charge la page suivante et l'ajoute aux récits déjà affichés. Appelée quand le
+    /// défilement atteint la fin de la liste : l'objectif produit est de 200 récits par
+    /// parcours, un client qui s'arrêterait à la première page en masquerait 90 %.
+    func loadMorePublishedStories() async {
+        guard hasLoadedCatalog, !isLoadingCatalog, !isLoadingMoreCatalog, hasMorePublishedStories else { return }
+        isLoadingMoreCatalog = true
+        defer { isLoadingMoreCatalog = false }
+        let requested = catalogPage + 1
+        do {
+            let page = try await api.listPublishedStories(page: requested, pageSize: catalogPageSize, query: catalogQuery)
+            // Une page vide au-delà du dernier élément n'est pas une erreur : on aligne
+            // simplement le total sur ce que le serveur vient de déclarer.
+            catalogTotal = page.total
+            guard !page.items.isEmpty else {
+                catalogTotal = min(catalogTotal, publishedStories.count)
+                return
+            }
+            let known = Set(publishedStories.map(\.id))
+            let arrivals = page.items.map(StorySummary.init(published:)).filter { !known.contains($0.id) }
+            publishedStories.append(contentsOf: arrivals)
+            catalogPage = max(page.page, requested)
+            developerLog.insert("✓ Catalogue page \(catalogPage) — \(publishedStories.count)/\(catalogTotal)", at: 0)
+        } catch is CancellationError {
+            developerLog.insert("– Catalogue annulé", at: 0)
+        } catch {
+            developerLog.insert("✗ Catalogue page \(requested): \(error.localizedDescription)", at: 0)
+        }
+    }
+
+    /// Applique une recherche **serveur** et repart de la première page.
+    func searchCatalog(_ query: String) async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed != catalogQuery else { return }
+        catalogQuery = trimmed
+        publishedStories = []
+        catalogPage = 0
+        catalogTotal = 0
+        hasLoadedCatalog = false
+        await loadCatalog(force: true)
     }
 
     func login() async {
