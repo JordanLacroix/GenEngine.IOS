@@ -66,7 +66,7 @@ Ces obligations sont l'adaptation au client des règles du dépôt backend. Le c
 
 ## Vérifications minimales
 
-Ces trois commandes sont exactement celles qu'exécute la CI ([`.github/workflows/ios.yml`](.github/workflows/ios.yml)) :
+Ces trois commandes sont exactement celles qu'exécute le travail Xcode de la CI ([`.github/workflows/ios.yml`](.github/workflows/ios.yml)) :
 
 ```bash
 xcodegen generate
@@ -78,7 +78,24 @@ xcodebuild test -project GenEngine.xcodeproj -scheme GenEngine \
 
 Après validation, vérifie que le projet généré et les données utilisateur Xcode ne sont pas suivis par Git.
 
-La CI ne fait ni lint, ni analyse statique, ni test de rendu. Un build vert et des tests verts ne disent rien de l'apparence à l'écran.
+La CI applique en plus des contrôles de gouvernance, tous sur runner Linux — les runners macOS sont facturés plusieurs fois le tarif Linux et restent réservés à ce qui exige Xcode. Si tu touches à la documentation ou aux workflows, reproduis-les localement :
+
+```bash
+# Documentation (.github/workflows/docs.yml)
+npx markdownlint-cli2 "README.md" "AGENTS.md" "CLAUDE.md" "CONTRIBUTING.md" \
+  "SECURITY.md" "specs/**/*.md" ".github/**/*.md"
+lychee --config lychee.toml '**/*.md'
+
+# Workflows (.github/workflows/workflow-security.yml)
+actionlint .github/workflows/*.yml
+zizmor --persona pedantic --min-severity low --min-confidence medium .github/workflows/
+```
+
+Les autres contrôles ne se rejouent pas utilement en local : le titre de pull request (convention de commit), la revue de dépendances et OpenSSF Scorecard s'exécutent côté GitHub.
+
+Toute action tierce ajoutée à un workflow doit être épinglée par empreinte de commit complète, suivie d'un commentaire de version. Chaque travail déclare le `permissions:` minimal dont il a besoin.
+
+La CI ne fait toujours ni lint Swift, ni analyse statique du code applicatif, ni test de rendu. Un build vert et des tests verts ne disent rien de l'apparence à l'écran.
 
 ## Pièges connus
 

@@ -12,3 +12,6 @@ GenEngineTester.xcodeproj/
 # Local configuration and macOS
 *.local.xcconfig
 .DS_Store
+
+# Cache local du vérificateur de liens (lychee).
+.lycheecache

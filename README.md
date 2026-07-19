@@ -4,14 +4,12 @@
 
 **Client SwiftUI natif pour jouer, découvrir et tester les récits interactifs GenEngine sur iPhone et iPad.**
 
-
-
 [![iOS](https://github.com/JordanLacroix/GenEngine.IOS/actions/workflows/ios.yml/badge.svg)](https://github.com/JordanLacroix/GenEngine.IOS/actions/workflows/ios.yml)
 [![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](https://www.swift.org/)
 [![Status](https://img.shields.io/badge/statut-client%20connecté-2EA44F)](#état-du-projet)
 [![License](https://img.shields.io/badge/licence-non%20définie-lightgrey)](#licence)
 
-[Vision](#vision) · [Démarrage rapide](#démarrage-rapide) · [Architecture](#architecture) · [Roadmap](#roadmap) · [Documentation](#documentation) · [Contribuer](#contribuer)
+[Le produit](#le-produit) · [Démarrage rapide](#démarrage-rapide) · [Architecture](#architecture) · [Roadmap](#roadmap) · [Documentation](#documentation) · [Contribuer](#contribuer)
 
 </div>
 
@@ -253,11 +251,21 @@ xcodebuild test -project GenEngine.xcodeproj -scheme GenEngine \
   -destination 'platform=iOS Simulator,OS=latest,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO
 ```
 
-Ces trois commandes sont exactement celles qu’exécute la CI ([`.github/workflows/ios.yml`](.github/workflows/ios.yml)).
+Ces trois commandes sont exactement celles qu’exécute le travail Xcode de la CI ([`.github/workflows/ios.yml`](.github/workflows/ios.yml)).
 
 Swift Testing couvre la navigation déterministe de la démonstration, la fermeture de l’accès démo une fois authentifié, la projection du graphe de quête en partie (précédence des états, rangs, ordre stable, scènes inatteignables, entrées dégénérées), sa projection hors partie (mémoire seule, aucun état de monde, mise en page identique à la projection en partie), le pilotage audio et la compatibilité des enums API. GitHub Actions régénère le projet avant chaque build.
 
-La CI ne fait **ni lint, ni analyse statique, ni test de rendu**. Un build vert et des tests verts ne disent rien de l’apparence à l’écran.
+La CI applique par ailleurs des contrôles de gouvernance, tous sur runner Linux — les runners macOS restent réservés à ce qui exige Xcode :
+
+| Contrôle | Workflow | Portée |
+| --- | --- | --- |
+| Qualité de la documentation | `docs.yml` | markdownlint et vérification des liens (badges décoratifs exclus) |
+| Politique de pull request | `pr-policy.yml` | titre conforme à la convention de commit |
+| Sécurité des workflows | `workflow-security.yml` | actionlint et zizmor (persona `pedantic`) |
+| Revue de dépendances | `dependency-review.yml` | vulnérabilités et licences des dépendances ajoutées |
+| OpenSSF Scorecard | `scorecard.yml` | posture de sécurité du dépôt, hebdomadaire |
+
+La CI ne fait toujours **ni lint Swift, ni analyse statique du code applicatif, ni test de rendu**. Un build vert et des tests verts ne disent rien de l’apparence à l’écran.
 
 ## Roadmap
 
