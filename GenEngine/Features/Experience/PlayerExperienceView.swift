@@ -250,9 +250,18 @@ struct PlayerExperienceViewScreen: View {
             ForEach(masteries) { mastery in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack { Text("Histoire explorée").font(.headline); Spacer(); Text("\(mastery.masteryPercent)%").foregroundStyle(GenEngineTheme.amber) }
-                    Text("\(mastery.choiceIds.count) choix · \(mastery.endingIds.count) fin(s)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+                    Text("\(mastery.nodeIds.count) scène(s) · \(mastery.choiceIds.count) choix · \(mastery.endingIds.count) fin(s)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
                     ProgressView(value: Double(mastery.masteryPercent), total: 100).tint(GenEngineTheme.verdigris)
+                    if let graph = state.questGraph(for: mastery) {
+                        QuestGraphView(graph: graph, title: "Mémoire de quête", subtitle: "Cumul de toutes vos parties de ce scénario.")
+                    } else {
+                        Text("La carte complète de ce scénario se consulte pendant une partie : le moteur ne publie sa structure qu’au travers d’une session.")
+                            .font(.caption2).foregroundStyle(GenEngineTheme.secondaryText)
+                    }
                 }.padding(16).glassPanel()
+            }
+            if let graph = state.demoQuestGraph {
+                QuestGraphView(graph: graph, title: "Mémoire de la démonstration", subtitle: "Ce que vous avez découvert au fil de vos parties de démonstration.")
             }
             ForEach(entries) { entry in
                 HStack(alignment: .top, spacing: 14) {

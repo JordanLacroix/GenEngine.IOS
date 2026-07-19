@@ -55,3 +55,9 @@ La passe corrective `codex/fix-player-experience-polish` remplace le retour text
 Console utilisateurs recherchable avec activation/suppression, parcours et catégories, assets du familier, progression par catégorie, fusion des outils Developer dans Administration, bibliothèque de brouillons et édition visuelle de scène avec archivage. La démo native compte treize scènes pour une cible d'environ quinze minutes.
 
 **Statut : terminé sur `feat/product-operations-ui`, en attente de revue.**
+
+## Jalon 3.5 — graphe de quête et mémoire cumulée
+
+Le bilan de fin de quête montre le scénario entier, pas seulement le chemin emprunté : position actuelle, scènes parcourues pendant la partie, scènes découvertes lors des parties précédentes, scènes verrouillées et scènes jamais atteintes. La projection est pure et déterministe ; le serveur reste l'autorité sur les états et les conditions.
+
+**Statut : implémenté sur `feat/quest-graph-memory`.** Hors partie, la structure d'un scénario serveur n'est pas exposée par le contrat : l'espace joueur affiche alors la maîtrise chiffrée et le dit explicitement.

@@ -1,6 +1,6 @@
 # Passage de relais
 
-Dernière mise à jour : 18 juillet 2026.
+Dernière mise à jour : 19 juillet 2026.
 
 ## État vérifié
 
@@ -18,6 +18,7 @@ Dernière mise à jour : 18 juillet 2026.
 - Le prologue est illustré, matérialise les interactions configurées, remet une clé et ouvre une carte à portes.
 - Les packs visuels de familier sont importables depuis Fichiers avec licence et attribution, sans notion de propriété.
 - La démo s’arrête sur un bilan du chemin et des gains au lieu de boucler.
+- La fin de quête affiche le graphe complet du scénario et la mémoire cumulée des parties précédentes, en démonstration comme en session connectée.
 - La passe de stabilisation de l’univers joueur localise les valeurs moteur, déduplique journal et maîtrises, rend le configurateur du compagnon adaptatif et projette les portes sur les repères réels de l’illustration sur iPhone comme sur iPad.
 
 ## Démarrage rapide de reprise
@@ -45,6 +46,10 @@ Validation du seuil narratif : génération XcodeGen, build Swift 6 et 9 tests s
 Validation de la stabilisation joueur : projection de carte et localisation couvertes par Swift Testing, avec build universel iPhone/iPad le 18 juillet 2026.
 
 Correction de l'introduction publique : le décor de scène est passé en arrière-plan clippé afin qu'une image `scaledToFill` ne dicte plus la hauteur du conteneur, et les commandes sont sorties du défilement pour rester atteignables. Génération XcodeGen, build Swift 6 et 11 tests sur iPhone 17 Pro Simulator réussis sans signature le 19 juillet 2026.
+
+Graphe de fin de quête : `QuestGraphPresentation` projette `NarrativeTree` et les `ScenarioMasteryView` en graphe orienté (rangs BFS, ordre stable, convergences et cycles préservés) ; `QuestGraphView` le dessine avec un `Canvas` doublé d'une liste textuelle pour VoiceOver. `DemoStory.narrativeTree(path:)` projette la fixture hors ligne dans la même forme de contrat, de sorte qu'une seule vue serve les deux modes. `refreshTree()` remonte désormais un échec réel via `AppState.treeError` au lieu de l'avaler dans `developerLog`. Génération XcodeGen, build Swift 6 générique iOS Simulator et 23 tests sur iPhone 17 Pro Simulator réussis sans signature le 19 juillet 2026.
+
+Limite connue : le contrat ne publie la structure d'un scénario qu'au travers d'une session (`GET /sessions/{id}/tree`). Hors partie, seule la mémoire de démonstration produit un graphe ; pour un scénario serveur, l'espace joueur affiche les compteurs de maîtrise et indique explicitement que la carte se consulte pendant une partie. Aucun endpoint n'a été inventé.
 
 ## Décisions à préserver
 

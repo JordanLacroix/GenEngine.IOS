@@ -68,6 +68,49 @@ enum DemoStory {
     static let openingNodeID = "shore"
     static func node(id: String) -> DemoNode? { nodes[id] }
 
+    /// Parcours déterministe de la fixture, dans l'ordre de découverte depuis la scène d'ouverture.
+    static var orderedNodes: [DemoNode] {
+        var visited = Set<String>()
+        var queue = [openingNodeID]
+        var head = 0
+        var result: [DemoNode] = []
+        while head < queue.count {
+            let id = queue[head]
+            head += 1
+            guard visited.insert(id).inserted, let node = nodes[id] else { continue }
+            result.append(node)
+            queue.append(contentsOf: node.choices.map(\.target))
+        }
+        return result
+    }
+
+    /// Projette la fixture hors ligne dans la forme de contrat `NarrativeTree` afin que la
+    /// démonstration et une session serveur partagent la même vue de graphe.
+    /// Cette projection reste dans la frontière de démonstration et ne sert jamais de repli silencieux.
+    static func narrativeTree(path: [String]) -> NarrativeTree {
+        let visited = Set(path)
+        let current = path.last ?? ""
+        let nodes = orderedNodes.map { node in
+            NarrativeTreeNode(
+                id: node.id,
+                text: node.text,
+                isEnding: node.isEnding,
+                state: node.id == current ? "Current" : (visited.contains(node.id) ? "Visited" : "Unexplored"))
+        }
+        let edges = orderedNodes.flatMap { node in
+            node.choices.map { choice in
+                NarrativeTreeEdge(
+                    sourceNodeId: node.id,
+                    targetNodeId: choice.target,
+                    inputId: choice.id,
+                    text: choice.text,
+                    isAvailable: true,
+                    evaluation: ConditionEvaluation(operator: "None", result: true, explanation: "Aucune condition dans la démonstration.", children: []))
+            }
+        }
+        return NarrativeTree(initialNodeId: openingNodeID, currentNodeId: current, nodes: nodes, edges: edges)
+    }
+
     private static let nodes: [String: DemoNode] = [
         "shore": DemoNode(id: "shore", text: "La brume glisse sur les marches de basalte. Sous l’eau noire, une braise pulse au rythme de votre souffle. Lueur, votre familier, murmure que la cité vient de prononcer votre nom.", choices: [DemoChoice(id: "descend", text: "Descendre vers la lumière", target: "stairs"), DemoChoice(id: "listen", text: "Écouter le chant de la brume", target: "echo")], interaction: .init(label: "Accorder la lanterne", hint: "Touchez la lueur jusqu’à ce que le phare vous réponde.", symbol: "hand.tap.fill")),
         "stairs": DemoNode(id: "stairs", text: "Chaque marche rallume un souvenir qui n’est pas le vôtre : une fête, une trahison, une enfant cachant une clé d’ambre. Plus bas, deux portes portent les emblèmes du Phare et des Archives.", choices: [DemoChoice(id: "archives", text: "Suivre l’emblème des Archives", target: "archives"), DemoChoice(id: "beacon", text: "Chercher le Phare englouti", target: "beacon")]),

@@ -49,6 +49,7 @@ Le dépôt conserve deux parcours explicitement séparés :
 | Carte illustrée à portes et interactions d’écran | ✅ Matérialisées nativement |
 | Packs visuels de familier importables | ✅ Assets locaux, sans propriété |
 | Bilan de fin avec chemin et gains | ✅ Démo et sessions connectées |
+| Graphe de fin de quête et mémoire cumulée | ✅ Projeté depuis `GET /sessions/{id}/tree` et les maîtrises |
 | Journal francisé et sans projections dupliquées | ✅ Normalisé côté présentation |
 | Portes ancrées aux repères de la carte | ✅ Adaptées à `scaledToFill` |
 | Périodes métier et import CSV de memberships | ✅ Prévalidation, rapport d’erreurs et application idempotente |
@@ -141,11 +142,11 @@ xcodebuild test -project GenEngine.xcodeproj -scheme GenEngine \
   -destination 'platform=iOS Simulator,OS=latest,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO
 ```
 
-Swift Testing couvre la navigation déterministe de la démonstration et la compatibilité des enums API. GitHub Actions régénère le projet avant chaque build.
+Swift Testing couvre la navigation déterministe de la démonstration, la projection du graphe de quête (précédence des états, rangs, ordre stable, scènes inatteignables, entrées dégénérées) et la compatibilité des enums API. GitHub Actions régénère le projet avant chaque build.
 
 ## Roadmap
 
-La plateforme configurable inclut le flux immersif complet et une administration native distincte du Studio. Sur iPhone et iPad, l’univers joueur occupe tout l’écran : la carte sert de scène, les portes y sont matérialisées et la navigation native disparaît au profit d’une HUD et de panneaux superposés. L’espace Structures gère désormais périodes, unités école/entreprise/formation, participants, encadrants, import CSV prévalidé et affectations de scénarios/catégories/parcours. La carte connectée filtre les catégories d’un membre selon ses affectations effectives. Voir [`specs/roadmap.md`](specs/roadmap.md).
+La plateforme configurable inclut le flux immersif complet et une administration native distincte du Studio. Sur iPhone et iPad, l’univers joueur occupe tout l’écran : la carte sert de scène, les portes y sont matérialisées et la navigation native disparaît au profit d’une HUD et de panneaux superposés. L’espace Structures gère désormais périodes, unités école/entreprise/formation, participants, encadrants, import CSV prévalidé et affectations de scénarios/catégories/parcours. La carte connectée filtre les catégories d’un membre selon ses affectations effectives. La fin de quête affiche le graphe complet du scénario — pas seulement le chemin emprunté — avec la mémoire de toutes les parties précédentes. Voir [`specs/roadmap.md`](specs/roadmap.md).
 
 ## Documentation
 

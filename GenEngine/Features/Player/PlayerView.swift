@@ -37,7 +37,7 @@ struct PlayerView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showsTree) { SessionTreeView(tree: state.tree) }
+        .sheet(isPresented: $showsTree) { SessionTreeView(graph: state.questGraph, failure: state.treeError) }
         .onChange(of: state.step?.nodeId) { _, _ in interactionCompleted = false }
     }
 
@@ -50,12 +50,10 @@ struct PlayerView: View {
                 Text("Choix \(session.turn + 1)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             }
             Spacer()
-            if !state.isDemoSession {
-                Button { showsTree = true; Task { await state.loadTree() } } label: {
-                    Image(systemName: "point.3.connected.trianglepath.dotted").frame(width: 44, height: 44)
-                }
-                .accessibilityLabel("Explorer l’arbre de l’histoire")
+            Button { showsTree = true; if !state.isDemoSession { Task { await state.loadTree() } } } label: {
+                Image(systemName: "point.3.connected.trianglepath.dotted").frame(width: 44, height: 44)
             }
+            .accessibilityLabel("Explorer la carte de l’histoire")
             if !state.isDemoSession && [.paused, .awaitingInput, .awaitingExternalInput, .awaitingValidation].contains(session.status) {
                 Button { Task { await state.pauseOrResume() } } label: {
                     Image(systemName: session.status == .paused ? "play.fill" : "pause.fill").frame(width: 44, height: 44)
@@ -166,53 +164,56 @@ struct PlayerView: View {
             if state.isDemoSession {
                 VStack(alignment: .leading, spacing: 8) { Label("\(state.demoPath.count) étapes traversées", systemImage: "point.3.connected.trianglepath.dotted").font(.headline); ForEach(Array(state.demoPath.enumerated()), id: \.offset) { index, node in Text("\(index + 1). \(node.capitalized)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Divider(); Label("Sceau du Dernier Phare", systemImage: "seal.fill"); Label("Une page de journal", systemImage: "book.closed.fill"); Label("La confiance de Lueur", systemImage: "sparkles") }.padding(18).frame(maxWidth: 660, alignment: .leading).glassPanel()
             }
+            if let graph = state.questGraph {
+                QuestGraphView(
+                    graph: graph,
+                    title: "Mémoire de quête",
+                    subtitle: state.isDemoSession
+                        ? "Ce que vous avez traversé, ici et lors de vos parties de démonstration précédentes."
+                        : "Ce que vous avez traversé, ici et lors de vos parties précédentes.")
+            } else if let treeError = state.treeError {
+                VStack(spacing: 8) {
+                    Label("Carte du scénario indisponible", systemImage: "exclamationmark.triangle.fill")
+                        .font(.headline)
+                        .foregroundStyle(GenEngineTheme.amber)
+                    Text(treeError).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).multilineTextAlignment(.center)
+                    Button("Réessayer") { Task { await state.loadTree() } }.buttonStyle(.bordered).tint(GenEngineTheme.ivory)
+                }
+                .padding(18)
+                .frame(maxWidth: 660)
+                .glassPanel()
+            }
             HStack { if state.isDemoSession { Button("Explorer un autre chemin") { state.startDemo() }.buttonStyle(.bordered).tint(GenEngineTheme.ivory) }; Button(state.isDemoSession ? "Créer mon aventure" : "Voir mon univers") { state.endSession(); state.selectedTab = state.isAuthenticated ? .experience : .account }.buttonStyle(PrimaryActionStyle()) }
         }.padding(.top, 18)
     }
 }
 
 private struct SessionTreeView: View {
-    let tree: NarrativeTree?
+    let graph: QuestGraph?
+    let failure: String?
 
     var body: some View {
         NavigationStack {
-            Group {
-                if let tree {
-                    List {
-                        Section("Scènes") {
-                            ForEach(tree.nodes) { node in
-                                HStack(alignment: .top) {
-                                    Image(systemName: symbol(for: node.state)).foregroundStyle(color(for: node.state))
-                                    VStack(alignment: .leading) {
-                                        Text(node.id).font(.caption.monospaced()).foregroundStyle(.secondary)
-                                        Text(node.text).lineLimit(2)
-                                    }
-                                }
-                            }
+            ZStack {
+                StoryCanvas(accent: GenEngineTheme.violet)
+                ScrollView {
+                    if let graph {
+                        QuestGraphView(graph: graph, title: "Carte du scénario", subtitle: "Tout le scénario, pas seulement le chemin emprunté.")
+                            .padding(18)
+                    } else if let failure {
+                        VStack(spacing: 10) {
+                            Label("Carte indisponible", systemImage: "exclamationmark.triangle.fill").font(.headline).foregroundStyle(GenEngineTheme.amber)
+                            Text(failure).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).multilineTextAlignment(.center)
                         }
-                        Section("Chemins et conditions") {
-                            ForEach(Array(tree.edges.enumerated()), id: \.offset) { _, edge in
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Label(edge.text, systemImage: edge.isAvailable ? "arrow.right.circle.fill" : "lock.circle")
-                                    Text("\(edge.sourceNodeId) → \(edge.targetNodeId)").font(.caption.monospaced()).foregroundStyle(.secondary)
-                                    Text(edge.evaluation.explanation).font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
+                        .padding(24)
+                    } else {
+                        ProgressView("Chargement de la carte…").tint(GenEngineTheme.amber).padding(40)
                     }
-                } else { ProgressView("Chargement de l’arbre…") }
+                }
             }
             .navigationTitle("Exploration")
             .navigationBarTitleDisplayMode(.inline)
         }
-    }
-
-    private func symbol(for state: String) -> String {
-        switch state.lowercased() { case "current": "location.fill"; case "visited": "checkmark.circle.fill"; case "locked": "lock.fill"; default: "circle.dotted" }
-    }
-
-    private func color(for state: String) -> Color {
-        switch state.lowercased() { case "current": GenEngineTheme.ember; case "visited": GenEngineTheme.verdigris; case "locked": .secondary; default: GenEngineTheme.amber }
     }
 }
 
