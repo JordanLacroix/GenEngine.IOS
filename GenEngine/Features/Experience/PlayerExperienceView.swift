@@ -150,7 +150,7 @@ struct PlayerExperienceViewScreen: View {
             Spacer()
             VStack(alignment: .trailing) {
                 Text("\(state.playerExperience?.balance ?? 0)").font(.system(size: 32, weight: .bold, design: .rounded))
-                Text("\(state.playerExperience?.currencyIcon ?? "✦") \(state.playerExperience?.currencyName ?? "Braises")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+                Text("\(state.playerExperience?.currencyIcon ?? "♪") \(state.playerExperience?.currencyName ?? "Accords")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             }.foregroundStyle(GenEngineTheme.amber)
         }
     }
