@@ -40,7 +40,9 @@ Le dépôt conserve deux parcours explicitement séparés :
 | Catalogue public Authoring | ✅ Connecté |
 | Choix, quiz et texte libre confirmé | ✅ Connecté à Play |
 | Pause, reprise et arbre explicable | ✅ Connecté à Play |
-| Outils Authoring | ✅ Disponibles en Debug uniquement |
+| Outils Authoring et journal brut | ✅ Disponibles en Debug uniquement |
+| Paramètres serveur avant connexion | ✅ Disponible en Release |
+| Confirmations avant action conséquente | ✅ Disponibles |
 | Support universel iPhone/iPad | ✅ Configuré |
 | Navigation pilotée par les permissions RBAC | ✅ Connectée |
 | Familier personnalisable, portefeuille et magasin | ✅ Connectés |
@@ -96,7 +98,14 @@ Depuis le dépôt backend :
 docker compose up --build --detach --wait
 ```
 
-Dans une compilation Debug, les endpoints se modifient depuis **Administration → Environnement & diagnostic**. Il n’existe plus de destination « Developer » dans le HUD ; en build Release, ce panneau affiche uniquement un message d’indisponibilité. Le simulateur utilise `localhost` ; un appareil physique exige des endpoints HTTPS joignables. App Transport Security n’est pas désactivé globalement.
+Les adresses des six services se règlent depuis **Paramètres du serveur**, disponible en Release et **avant toute connexion** : depuis le menu de l’écran d’accueil, depuis **Compte**, ou depuis **Administration → Environnement & diagnostic**. Deux modes sont proposés :
+
+- **groupé** — un hôte et un schéma communs, un port par service (5201 Authoring, 5202 Play, 5203 Identity, 5204 Configuration, 5205 Player Experience, 5206 Organization) ;
+- **unitaire** — une URL complète par service, pour un déploiement réparti sur plusieurs machines.
+
+Chaque service dispose d’un contrôle de connectivité. Une réponse HTTP prouve seulement que l’adresse répond : elle ne valide ni la version, ni les permissions, qui restent décidées par le service. Le réglage est local à l’appareil et ne contient aucun secret ; les journaux bruts et les outils Authoring restent, eux, réservés aux builds Debug.
+
+Le simulateur utilise `localhost` ; un appareil physique exige des endpoints HTTPS joignables. App Transport Security n’est pas désactivé globalement.
 
 | Service | URL locale |
 |---|---|
@@ -225,7 +234,7 @@ GenEngine/
 └── Features/
     ├── Authentication/
     ├── Administration/ # Control plane, providers, RBAC et diagnostics Debug
-    ├── Developer/       # Code mort : remplacé par le panneau diagnostic d'Administration
+    ├── Settings/        # Adressage des six services, accessible avant connexion
     ├── Home/
     ├── Library/
     ├── Experience/     # Bootstrap, carte, journal, familier, magasin et aide

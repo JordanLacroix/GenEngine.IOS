@@ -62,6 +62,72 @@ enum PlayerExperiencePresentation {
         viewport.width < viewport.height ? compactDoorAnchors : doorAnchors
     }
 
+    /// Ancrages pour un nombre **quelconque** de catégories.
+    ///
+    /// Les cinq ancrages dessinés à la main restent utilisés tant qu'ils suffisent, parce
+    /// qu'ils sont placés sur des reliefs lisibles de la carte. Au-delà, une grille décalée
+    /// couvre la zone utile : aucune porte configurée ne peut plus disparaître en silence,
+    /// ce que faisait le `prefix(5)` précédent.
+    static func doorAnchors(count: Int, for viewport: CGSize) -> [CGPoint] {
+        guard count > 0 else { return [] }
+        let handmade = doorAnchors(for: viewport)
+        if count <= handmade.count { return Array(handmade.prefix(count)) }
+        return dispersedAnchors(count: count, isPortrait: viewport.width < viewport.height)
+    }
+
+    /// Grille décalée d'une rangée sur deux, calculée dans le repère de la carte.
+    /// Déterministe : deux rendus successifs placent les mêmes portes au même endroit.
+    static func dispersedAnchors(count: Int, isPortrait: Bool) -> [CGPoint] {
+        guard count > 0 else { return [] }
+        let insetX: CGFloat = isPortrait ? 300 : 190
+        let insetY: CGFloat = 170
+        let usableWidth = worldMapSize.width - insetX * 2
+        let usableHeight = worldMapSize.height - insetY * 2
+        let ratio = isPortrait ? 0.55 : 1.7
+        let columns = max(1, Int(ceil((Double(count) * ratio).squareRoot())))
+        let rows = max(1, Int(ceil(Double(count) / Double(columns))))
+        let stepX = usableWidth / CGFloat(max(columns, 1))
+        let stepY = usableHeight / CGFloat(max(rows, 1))
+        return (0..<count).map { index in
+            let row = index / columns
+            let column = index % columns
+            let stagger = row.isMultiple(of: 2) ? 0 : stepX / 2
+            let x = insetX + stepX * (CGFloat(column) + 0.5) + stagger
+            let y = insetY + stepY * (CGFloat(row) + 0.5)
+            return CGPoint(x: min(x, worldMapSize.width - insetX / 2), y: y)
+        }
+    }
+
+    /// Progression affichée sur une porte. La donnée existe déjà et est présentée
+    /// à l'identique dans la bibliothèque ; la carte ne l'inventait simplement pas.
+    struct DoorProgress: Equatable, Sendable {
+        var total: Int
+        var started: Int
+
+        var percent: Int { total == 0 ? 0 : Int((Double(started) / Double(total) * 100).rounded()) }
+        var fraction: Double { total == 0 ? 0 : Double(started) / Double(total) }
+
+        var label: String {
+            guard total > 0 else { return "Aucun récit configuré" }
+            return "\(started)/\(total) récit\(total > 1 ? "s" : "") commencé\(started > 1 ? "s" : "") · \(percent) %"
+        }
+    }
+
+    static func doorProgress(
+        category: CategoryDefinition,
+        stories: [StorySummary],
+        savedSessions: [SavedSession]
+    ) -> DoorProgress {
+        let scenarioIds = Set(category.scenarioIds ?? [])
+        let categoryStories = stories.filter { story in story.scenarioID.map(scenarioIds.contains) == true }
+        let startedVersions = Set(savedSessions.map(\.scenarioVersionId))
+        let started = categoryStories.filter { story in
+            if case let .published(versionID) = story.availability { return startedVersions.contains(versionID) }
+            return false
+        }.count
+        return DoorProgress(total: categoryStories.count, started: started)
+    }
+
     static func projectMapPoint(_ point: CGPoint, into viewport: CGSize) -> CGPoint {
         let scale = max(viewport.width / worldMapSize.width, viewport.height / worldMapSize.height)
         return CGPoint(

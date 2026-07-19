@@ -7,6 +7,7 @@ struct PlayerView: View {
     @State private var textInput = ""
     @State private var showsTree = false
     @State private var interactionCompleted = false
+    @State private var confirmation: ConfirmationAction?
 
     var body: some View {
         ZStack {
@@ -46,6 +47,7 @@ struct PlayerView: View {
             }
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: showsTree)
+        .confirmation($confirmation)
         .task { audio.enter(.session) }
         .onChange(of: state.step?.nodeId) { _, _ in interactionCompleted = false }
         // Le son ne fait que doubler un état déjà écrit à l'écran (« Chemin accompli »).
@@ -57,8 +59,11 @@ struct PlayerView: View {
 
     private func playerHeader(session: SessionView) -> some View {
         HStack(spacing: 14) {
-            Button { state.endSession() } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }
-                .accessibilityLabel("Quitter l’histoire")
+            Button { confirmation = SessionExit.confirmation(state: state) } label: {
+                Image(systemName: "xmark").frame(width: HUDMetrics.minimumTarget, height: HUDMetrics.minimumTarget)
+            }
+            .accessibilityLabel("Quitter l’histoire")
+            .accessibilityHint("Une confirmation est demandée avant d’abandonner la session")
             VStack(alignment: .leading, spacing: 2) {
                 Text(state.currentStory?.title ?? "GenEngine").font(.subheadline.weight(.semibold)).foregroundStyle(GenEngineTheme.ivory)
                 Text("Choix \(session.turn + 1)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)

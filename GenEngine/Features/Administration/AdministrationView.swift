@@ -34,6 +34,8 @@ struct AdministrationView: View {
     @State private var assignedContentID: UUID?
     @State private var assignmentName = ""
     @State private var assignmentRequired = true
+    @State private var confirmation: ConfirmationAction?
+    @State private var showsServerSettings = false
 
     var body: some View {
         ZStack {
@@ -49,7 +51,13 @@ struct AdministrationView: View {
                 .padding(.horizontal, 18).padding(.bottom, 24)
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 1_000) }
             }
+            if showsServerSettings {
+                HUDOverlayPanel(title: "Paramètres du serveur", symbol: "server.rack", onClose: { showsServerSettings = false }) {
+                    ServerSettingsPanel(endpoints: state.endpoints)
+                }
+            }
         }
+        .confirmation($confirmation)
         .task { await state.loadAdministration(); document = state.adminConfiguration?.document }
         .fileImporter(isPresented: $showsMembershipImporter, allowedContentTypes: [.commaSeparatedText, .plainText]) { result in
             guard case let .success(url) = result else { return }
@@ -131,7 +139,7 @@ struct AdministrationView: View {
             Divider().overlay(.white.opacity(0.15))
             Text("Participants & encadrants").font(.headline).foregroundStyle(GenEngineTheme.ivory)
             ForEach(state.memberships) { membership in
-                HStack { Image(systemName: membership.kind == .supervisor ? "person.badge.key.fill" : "person.fill").foregroundStyle(membership.kind == .supervisor ? GenEngineTheme.amber : GenEngineTheme.verdigris); VStack(alignment: .leading) { Text(state.adminUsers.first { $0.id == membership.userId }?.userName ?? membership.userId.uuidString).lineLimit(1); Text("\(membership.kind == .supervisor ? "Encadrant" : "Participant") · \(state.organizationUnits.first { $0.id == membership.unitId }?.name ?? "Unité")\(membership.periodId.flatMap { id in state.operatingPeriods.first { $0.id == id }?.name }.map { " · \($0)" } ?? "")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Button(role: .destructive) { Task { await state.removeMembership(membership) } } label: { Image(systemName: "trash") } }
+                HStack { Image(systemName: membership.kind == .supervisor ? "person.badge.key.fill" : "person.fill").foregroundStyle(membership.kind == .supervisor ? GenEngineTheme.amber : GenEngineTheme.verdigris); VStack(alignment: .leading) { Text(state.adminUsers.first { $0.id == membership.userId }?.userName ?? membership.userId.uuidString).lineLimit(1); Text("\(membership.kind == .supervisor ? "Encadrant" : "Participant") · \(state.organizationUnits.first { $0.id == membership.unitId }?.name ?? "Unité")\(membership.periodId.flatMap { id in state.operatingPeriods.first { $0.id == id }?.name }.map { " · \($0)" } ?? "")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Button(role: .destructive) { confirmation = confirmRemoveMembership(membership) } label: { Image(systemName: "trash") }.accessibilityLabel("Supprimer ce membership") }
                     .padding(12).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 14))
             }
             Picker("Utilisateur", selection: $memberUserID) { Text("Sélectionner…").tag(nil as UUID?); ForEach(state.adminUsers.filter(\.isActive)) { Text($0.userName).tag(Optional($0.id)) } }
@@ -152,7 +160,7 @@ struct AdministrationView: View {
             Divider().overlay(.white.opacity(0.15))
             Text("Contenus affectés").font(.headline).foregroundStyle(GenEngineTheme.ivory)
             ForEach(state.contentAssignments) { assignment in
-                HStack { VStack(alignment: .leading) { Text(assignment.name).foregroundStyle(GenEngineTheme.ivory); Text("\(assignment.contentType.rawValue) · \(state.organizationUnits.first { $0.id == assignment.unitId }?.name ?? "Unité")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); if assignment.required { Text("Obligatoire").font(.caption).foregroundStyle(GenEngineTheme.verdigris) }; Button(role: .destructive) { Task { await state.removeContentAssignment(assignment) } } label: { Image(systemName: "trash") } }
+                HStack { VStack(alignment: .leading) { Text(assignment.name).foregroundStyle(GenEngineTheme.ivory); Text("\(assignment.contentType.rawValue) · \(state.organizationUnits.first { $0.id == assignment.unitId }?.name ?? "Unité")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); if assignment.required { Text("Obligatoire").font(.caption).foregroundStyle(GenEngineTheme.verdigris) }; Button(role: .destructive) { confirmation = ConfirmationAction(title: "Retirer l’affectation « \(assignment.name) » ?", message: "L’unité concernée perd l’accès à ce contenu. La règle est appliquée par le service Organization.", confirmLabel: "Retirer") { Task { await state.removeContentAssignment(assignment) } } } label: { Image(systemName: "trash") }.accessibilityLabel("Retirer l’affectation \(assignment.name)") }
                     .padding(12).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 14))
             }
             Picker("Unité cible", selection: $assignmentUnitID) { Text("Sélectionner…").tag(nil as UUID?); ForEach(state.organizationUnits.filter(\.isActive)) { Text($0.name).tag(Optional($0.id)) } }
@@ -162,6 +170,15 @@ struct AdministrationView: View {
             Toggle("Affectation obligatoire", isOn: $assignmentRequired)
             Button { guard let assignmentUnitID, let assignedContentID else { return }; Task { await state.createContentAssignment(unitId: assignmentUnitID, contentType: assignedContentType, contentId: assignedContentID, name: assignmentName, required: assignmentRequired, availableFrom: nil, dueAt: nil); self.assignedContentID = nil; assignmentName = "" } } label: { Label("Affecter le contenu", systemImage: "calendar.badge.plus") }.buttonStyle(PrimaryActionStyle()).disabled(assignmentUnitID == nil || assignedContentID == nil || assignmentName.isEmpty || state.isBusy)
         }
+    }
+
+    private func confirmRemoveMembership(_ membership: MembershipView) -> ConfirmationAction {
+        let name = state.adminUsers.first { $0.id == membership.userId }?.userName ?? membership.userId.uuidString
+        let unit = state.organizationUnits.first { $0.id == membership.unitId }?.name ?? "l’unité"
+        return ConfirmationAction(
+            title: "Retirer \(name) de \(unit) ?",
+            message: "Le membre perd l’accès aux contenus affectés à cette unité. La règle reste appliquée par le service Organization.",
+            confirmLabel: "Retirer") { Task { await state.removeMembership(membership) } }
     }
 
     private var availableContent: [(UUID, String)] {
@@ -198,7 +215,7 @@ struct AdministrationView: View {
             Text("Tous les textes publiés avec le jeu sont modifiables. Les clés restent stables entre Web et iOS.").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             ForEach(document?.language.labels.keys.sorted() ?? [], id: \.self) { key in
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack { Text(key).font(.caption.monospaced()).foregroundStyle(GenEngineTheme.amber); Spacer(); Button(role: .destructive) { document?.language.labels.removeValue(forKey: key) } label: { Image(systemName: "trash") } }
+                    HStack { Text(key).font(.caption.monospaced()).foregroundStyle(GenEngineTheme.amber); Spacer(); Button(role: .destructive) { confirmation = ConfirmationAction(title: "Supprimer le libellé « \(key) » ?", message: "Le client reviendra au texte de repli codé en dur pour cette clé.", confirmLabel: "Supprimer") { document?.language.labels.removeValue(forKey: key) } } label: { Image(systemName: "trash") }.accessibilityLabel("Supprimer le libellé \(key)") }
                     TextField("Texte affiché", text: bindingLanguageLabel(key), axis: .vertical).textFieldStyle(.roundedBorder)
                 }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
             }
@@ -243,7 +260,16 @@ struct AdministrationView: View {
                             ForEach(document?.organization.units.filter { $0.id != document?.organization.units[index].id } ?? []) { unit in Text(unit.name).tag(Optional(unit.id)) }
                         }
                         Toggle("Active", isOn: bindingOrganizationUnit(index, \.enabled, fallback: true))
-                        Button("Supprimer l’unité", role: .destructive) { let id = document?.organization.units[index].id; document?.organization.units.remove(at: index); document?.assignments?.removeAll { $0.organizationUnitId == id } }
+                        Button("Supprimer l’unité", role: .destructive) {
+                            guard let unit = document?.organization.units[index] else { return }
+                            confirmation = ConfirmationAction(
+                                title: "Supprimer l’unité « \(unit.name) » ?",
+                                message: "Ses affectations de contenu sont retirées du brouillon. La suppression ne prend effet qu’après enregistrement.",
+                                confirmLabel: "Supprimer") {
+                                    document?.organization.units.removeAll { $0.id == unit.id }
+                                    document?.assignments?.removeAll { $0.organizationUnitId == unit.id }
+                                }
+                        }
                     }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
                 }
             }
@@ -257,7 +283,16 @@ struct AdministrationView: View {
                         TextField("Description", text: bindingArray(\.categories, index, \.description, fallback: ""), axis: .vertical)
                         Toggle("Visible dans les clients", isOn: bindingArray(\.categories, index, \.isVisible, fallback: true))
                         TextField("Image HTTPS", text: optionalArray(\.categories, index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-                        Button("Supprimer la catégorie", role: .destructive) { let id = document?.categories[index].id; document?.categories.remove(at: index); document?.journeys?.indices.forEach { document?.journeys?[$0].categoryIds.removeAll { $0 == id } } }
+                        Button("Supprimer la catégorie", role: .destructive) {
+                            guard let category = document?.categories[index] else { return }
+                            confirmation = ConfirmationAction(
+                                title: "Supprimer la catégorie « \(category.name) » ?",
+                                message: "Elle disparaît de la carte et des parcours qui la référencent. La suppression ne prend effet qu’après enregistrement.",
+                                confirmLabel: "Supprimer") {
+                                    document?.categories.removeAll { $0.id == category.id }
+                                    document?.journeys?.indices.forEach { document?.journeys?[$0].categoryIds.removeAll { $0 == category.id } }
+                                }
+                        }
                     }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
                 }
             }
@@ -270,7 +305,13 @@ struct AdministrationView: View {
                     TextField("Description", text: bindingJourney(index, \.description, fallback: ""), axis: .vertical)
                     TextField("Image HTTPS", text: optionalJourney(index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
                     ForEach(document?.categories ?? []) { category in Toggle(category.name, isOn: Binding(get: { document?.journeys?[index].categoryIds.contains(category.id) == true }, set: { enabled in if enabled { document?.journeys?[index].categoryIds.append(category.id) } else { document?.journeys?[index].categoryIds.removeAll { $0 == category.id } } })) }
-                    Button("Supprimer le parcours", role: .destructive) { document?.journeys?.remove(at: index) }
+                    Button("Supprimer le parcours", role: .destructive) {
+                        guard let journey = document?.journeys?[index] else { return }
+                        confirmation = ConfirmationAction(
+                            title: "Supprimer le parcours « \(journey.name) » ?",
+                            message: "Les catégories qu’il regroupe ne sont pas supprimées. La suppression ne prend effet qu’après enregistrement.",
+                            confirmLabel: "Supprimer") { document?.journeys?.removeAll { $0.id == journey.id } }
+                    }
                 }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
             }
             Button { if document?.journeys == nil { document?.journeys = [] }; document?.journeys?.append(.init(id: UUID(), name: "Nouveau parcours", description: "", accent: "ember", imageUrl: nil, order: (document?.journeys?.count ?? 0) + 1, isVisible: true, categoryIds: [], prerequisiteJourneyIds: [], tags: [])) } label: { Label("Ajouter un parcours", systemImage: "point.3.connected.trianglepath.dotted") }
@@ -344,7 +385,7 @@ struct AdministrationView: View {
                             }
                         }
                     }
-                    HStack { Button(user.isActive ? "Désactiver" : "Réactiver") { Task { await state.setUserActive(user, isActive: !user.isActive) } }; Button("Supprimer", role: .destructive) { Task { await state.deleteUser(user) } } }
+                    HStack { Button(user.isActive ? "Désactiver" : "Réactiver") { Task { await state.setUserActive(user, isActive: !user.isActive) } }; Button("Supprimer", role: .destructive) { confirmation = ConfirmationAction(title: "Supprimer le compte « \(user.userName) » ?", message: "La suppression est appliquée par Identity et n’est pas réversible depuis le client. Une désactivation suffit souvent.", confirmLabel: "Supprimer définitivement") { Task { await state.deleteUser(user) } } }.accessibilityLabel("Supprimer le compte \(user.userName)") }
                 }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
             }
         }
@@ -396,7 +437,13 @@ struct AdministrationView: View {
                         TextField("Arrière-plan HTTPS", text: optionalArray(\.familiars, index, \.backgroundUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
                         TextField("Licence", text: optionalArray(\.familiars, index, \.license)).textFieldStyle(.roundedBorder)
                         if let urlString = document?.familiars[index].portraitUrl, let url = URL(string: urlString) { AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { ProgressView() }.frame(height: 180).clipShape(RoundedRectangle(cornerRadius: 16)) }
-                        Button("Supprimer le familier", role: .destructive) { document?.familiars.remove(at: index) }
+                        Button("Supprimer le familier", role: .destructive) {
+                            guard let familiar = document?.familiars[index] else { return }
+                            confirmation = ConfirmationAction(
+                                title: "Supprimer le familier « \(familiar.name) » ?",
+                                message: "Les joueurs qui l’ont choisi devront en configurer un autre. La suppression ne prend effet qu’après enregistrement.",
+                                confirmLabel: "Supprimer") { document?.familiars.removeAll { $0.id == familiar.id } }
+                        }
                     }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
                 }
             }
@@ -426,7 +473,14 @@ struct AdministrationView: View {
             ForEach(state.roles) { role in
                 VStack(alignment: .leading, spacing: 4) { HStack { Text(role.name).font(.headline); if role.isSystem { Text("SYSTÈME").font(.caption2).foregroundStyle(GenEngineTheme.amber) } }; Text(role.description).font(.subheadline); Text(role.permissions.joined(separator: " · ")).font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }
                     .padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
-                if !role.isSystem { Button("Supprimer \(role.name)", role: .destructive) { Task { await state.deleteRole(role) } } }
+                if !role.isSystem {
+                    Button("Supprimer \(role.name)", role: .destructive) {
+                        confirmation = ConfirmationAction(
+                            title: "Supprimer le rôle « \(role.name) » ?",
+                            message: "Les comptes qui le portent perdent les permissions associées. La suppression est appliquée par Identity.",
+                            confirmLabel: "Supprimer") { Task { await state.deleteRole(role) } }
+                    }
+                }
             }
             if state.hasPermission("rbac.manage") {
                 TextField("Nom du rôle", text: $roleName).textFieldStyle(.roundedBorder)
@@ -453,20 +507,24 @@ struct AdministrationView: View {
 
     private var technicalPanel: some View {
         adminPanel("Environnement & diagnostic", symbol: "wrench.and.screwdriver.fill") {
+            // L'adressage des six services n'est plus un outil de développement : il se règle
+            // depuis un écran utilisateur, atteignable en Release et même avant connexion.
+            Text("L’adresse des six services se règle depuis l’écran de paramètres, disponible aussi avant connexion.")
+                .font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+            ForEach(ServiceKind.allCases) { service in
+                HStack {
+                    Label(service.title, systemImage: service.symbol).font(.caption)
+                    Spacer()
+                    Text(state.endpoints[keyPath: service.keyPath]).font(.caption2.monospaced()).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(1)
+                }
+            }
+            Button { showsServerSettings = true } label: { Label("Ouvrir les paramètres du serveur", systemImage: "server.rack") }
+                .buttonStyle(PrimaryActionStyle())
             #if DEBUG
-            @Bindable var state = state
-            TextField("Identity URL", text: $state.endpoints.identity).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-            TextField("Authoring URL", text: $state.endpoints.authoring).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-            TextField("Play URL", text: $state.endpoints.play).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-            TextField("Configuration URL", text: $state.endpoints.configuration).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-            TextField("Player Experience URL", text: $state.endpoints.playerExperience).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-            TextField("Organization URL", text: $state.endpoints.organization).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-            Button("Réinitialiser sur localhost") { state.endpoints = .local }
+            // Le journal brut reste réservé aux builds Debug.
             Divider().overlay(.white.opacity(0.15))
             Text("Journal technique").font(.headline).foregroundStyle(GenEngineTheme.ivory)
             ForEach(Array(state.developerLog.prefix(12).enumerated()), id: \.offset) { _, line in Text(line).font(.caption.monospaced()).foregroundStyle(GenEngineTheme.secondaryText) }
-            #else
-            Text("Les outils d’environnement sont disponibles uniquement dans les builds Debug.").foregroundStyle(GenEngineTheme.secondaryText)
             #endif
         }
     }

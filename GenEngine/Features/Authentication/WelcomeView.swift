@@ -7,10 +7,11 @@ struct WelcomeView: View {
     @State private var introIndex = 0
     @State private var introDismissed = false
     @State private var forcesIntroduction = false
+    @State private var showsServerSettings = false
+    @State private var showsMenu = false
     @AppStorage("genengine.intro.last-version") private var lastIntroVersion = 0
 
     var body: some View {
-        @Bindable var state = state
         ZStack {
             StoryCanvas()
             ScrollView {
@@ -38,37 +39,10 @@ struct WelcomeView: View {
                         .buttonStyle(.bordered).tint(GenEngineTheme.ivory)
                     }
 
-                    VStack(spacing: 14) {
-                            TextField(state.copy("auth.username", fallback: "Identifiant"), text: $state.userName)
-                                .textContentType(.username)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .textFieldStyle(.roundedBorder)
-                            SecureField(state.copy("auth.password", fallback: "Mot de passe"), text: $state.password)
-                                .textContentType(.password)
-                                .textFieldStyle(.roundedBorder)
-                            Button { Task { await state.login() } } label: {
-                                HStack { Text(state.copy("auth.login", fallback: "Se connecter")); if state.isBusy { ProgressView() } }
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(PrimaryActionStyle())
-                            .disabled(state.isBusy)
-                            Button(state.copy("auth.register", fallback: "Créer un compte")) { Task { await state.register() } }
-                                .disabled(state.isBusy)
-                            HStack { Rectangle().frame(height: 1); Text("OU").font(.caption); Rectangle().frame(height: 1) }
-                                .foregroundStyle(GenEngineTheme.secondaryText.opacity(0.5))
-                            Button { Task { await state.loginWithMicrosoft() } } label: {
-                                Label(state.copy("auth.microsoft", fallback: "Continuer avec Microsoft"), systemImage: "building.2.fill")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(GenEngineTheme.ivory)
-                            .disabled(state.isBusy)
-                    }
-                    .padding(22)
-                    .frame(maxWidth: 440)
-                    .glassPanel()
-                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    // Formulaire unique, partagé avec `AccountView`.
+                    SignInPanel()
+                        .frame(maxWidth: 440)
+                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                     // La démonstration hors ligne n'existe que dans l'état anonyme.
                     if state.isDemoAvailable {
                         VStack(spacing: 9) {
@@ -85,23 +59,87 @@ struct WelcomeView: View {
                 .padding(.horizontal, 24)
             }
             if shouldShowIntroduction { introduction(introScenes[introIndex]) }
-            else { audioToggle }
+            else { welcomeMenu }
+            if showsMenu {
+                HUDOverlayPanel(title: "Menu", symbol: "line.3.horizontal", onClose: { showsMenu = false }) {
+                    menuEntries
+                }
+            }
+            if showsServerSettings {
+                HUDOverlayPanel(title: "Paramètres du serveur", symbol: "server.rack", onClose: { showsServerSettings = false }) {
+                    ServerSettingsPanel(endpoints: state.endpoints)
+                }
+            }
         }
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: showsMenu)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: showsServerSettings)
     }
 
-    private var audioToggle: some View {
+    /// Barre de commandes de l'état anonyme.
+    ///
+    /// Avant connexion il n'existait aucun menu : ni entrée de démonstration, ni accès aux
+    /// réglages. Sur un appareil neuf, l'application ne pouvait donc viser que l'adresse
+    /// compilée par défaut, sans aucun recours.
+    private var welcomeMenu: some View {
         VStack {
-            HStack {
+            HStack(spacing: 8) {
                 Spacer()
                 HUDButton(
                     symbol: audio.isEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill",
                     title: audio.isEnabled ? "Couper le son" : "Activer le son") { audio.isEnabled.toggle() }
-                    .padding(8)
-                    .hudSurface(cornerRadius: 18)
+                HUDButton(symbol: "line.3.horizontal", title: "Ouvrir le menu") { showsMenu = true }
             }
+            .padding(8)
+            .hudSurface(cornerRadius: 18)
             Spacer()
         }
         .padding(12)
+    }
+
+    private var menuEntries: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // La démonstration est déjà proposée sous le formulaire ; elle est aussi ici,
+            // parce qu'un menu est l'endroit où l'on cherche une entrée d'application.
+            if state.isDemoAvailable {
+                Button {
+                    showsMenu = false
+                    withAnimation(reduceMotion ? nil : .snappy) { state.unlockDemo() }
+                } label: {
+                    Label(state.copy("demo.explore", fallback: "Lancer la démo"), systemImage: "play.fill")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(GenEngineTheme.verdigris)
+                .frame(minHeight: HUDMetrics.minimumTarget)
+                Text("Une histoire complète, hors ligne, sans compte et sans appel réseau.")
+                    .font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+            }
+            Button {
+                showsMenu = false
+                showsServerSettings = true
+            } label: {
+                Label("Paramètres du serveur", systemImage: "server.rack")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.bordered)
+            .tint(GenEngineTheme.ivory)
+            .frame(minHeight: HUDMetrics.minimumTarget)
+            Text("Indiquez où sont installés les six services GenEngine, ensemble ou séparément.")
+                .font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+            Button {
+                showsMenu = false
+                introIndex = 0
+                introDismissed = false
+                forcesIntroduction = true
+            } label: {
+                Label("Revoir l’introduction", systemImage: "play.rectangle.on.rectangle")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.bordered)
+            .tint(GenEngineTheme.ivory)
+            .frame(minHeight: HUDMetrics.minimumTarget)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var introScenes: [IntroSceneDefinition] {

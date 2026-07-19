@@ -2,9 +2,11 @@ import SwiftUI
 
 struct AccountView: View {
     @Environment(AppState.self) private var state
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var confirmation: ConfirmationAction?
+    @State private var showsServerSettings = false
 
     var body: some View {
-        @Bindable var state = state
         ZStack {
             StoryCanvas(accent: GenEngineTheme.verdigris)
             ScrollView {
@@ -22,12 +24,20 @@ struct AccountView: View {
 
                     if state.isAuthenticated { connectedCard }
                     else { loginCard }
+                    serverSettingsEntry
                 }
                 .padding(22)
                 .padding(.bottom, 24)
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 620) }
             }
+            if showsServerSettings {
+                HUDOverlayPanel(title: "Paramètres du serveur", symbol: "server.rack", onClose: { showsServerSettings = false }) {
+                    ServerSettingsPanel(endpoints: state.endpoints)
+                }
+            }
         }
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: showsServerSettings)
+        .confirmation($confirmation)
     }
 
     private var connectedCard: some View {
@@ -38,10 +48,21 @@ struct AccountView: View {
                 Text(roles.map(\.name).joined(separator: " · "))
                     .font(.subheadline).foregroundStyle(GenEngineTheme.secondaryText)
             }
-            Button { Task { await state.resetOnboarding() } } label: {
+            Button {
+                confirmation = ConfirmationAction(
+                    title: "Rejouer le prologue ?",
+                    message: "Votre progression de tutoriel repart à zéro. Les histoires déjà jouées ne sont pas touchées.",
+                    confirmLabel: "Rejouer",
+                    isDestructive: false) { Task { await state.resetOnboarding() } }
+            } label: {
                 Label("Rejouer le prologue", systemImage: "arrow.counterclockwise.circle.fill").frame(maxWidth: .infinity)
             }.buttonStyle(.bordered).tint(GenEngineTheme.amber)
-            Button(role: .destructive) { state.signOut() } label: {
+            Button(role: .destructive) {
+                confirmation = ConfirmationAction(
+                    title: "Se déconnecter ?",
+                    message: "Votre jeton est effacé du trousseau et une partie en cours est abandonnée. Le serveur conserve votre progression.",
+                    confirmLabel: "Se déconnecter") { state.signOut() }
+            } label: {
                 Label("Se déconnecter", systemImage: "rectangle.portrait.and.arrow.right")
                     .frame(maxWidth: .infinity)
             }
@@ -51,39 +72,36 @@ struct AccountView: View {
     }
 
     private var loginCard: some View {
-        VStack(spacing: 14) {
-            TextField(state.copy("auth.username", fallback: "Identifiant"), text: Binding(get: { state.userName }, set: { state.userName = $0 }))
-                .textContentType(.username)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .textFieldStyle(.roundedBorder)
-            SecureField(state.copy("auth.password", fallback: "Mot de passe"), text: Binding(get: { state.password }, set: { state.password = $0 }))
-                .textContentType(.password)
-                .textFieldStyle(.roundedBorder)
-            Button { Task { await state.login() } } label: {
-                HStack {
-                    Label("Se connecter", systemImage: "person.badge.key.fill")
-                    if state.isBusy { ProgressView() }
-                }.frame(maxWidth: .infinity)
-            }
-            .buttonStyle(PrimaryActionStyle())
-            .disabled(state.isBusy || state.userName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.password.isEmpty)
-            Button("Créer un compte") { Task { await state.register() } }
-                .disabled(state.isBusy)
-            HStack { Rectangle().frame(height: 1); Text("OU").font(.caption); Rectangle().frame(height: 1) }
-                .foregroundStyle(GenEngineTheme.secondaryText.opacity(0.5))
-            Button { Task { await state.loginWithMicrosoft() } } label: {
-                Label("Continuer avec Microsoft", systemImage: "building.2.fill").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .tint(GenEngineTheme.ivory)
-            .disabled(state.isBusy)
+        SignInPanel(loginSymbol: "person.badge.key.fill") {
             if state.isDemoAccess {
-                Button { state.leaveDemo() } label: { Label("Revoir l’introduction", systemImage: "play.rectangle.on.rectangle") }
-                Button(role: .destructive) { state.leaveDemo() } label: { Text("Quitter la démonstration") }
-                    .disabled(state.isBusy)
+                Button(role: .destructive) {
+                    confirmation = ConfirmationAction(
+                        title: "Quitter la démonstration ?",
+                        message: "La partie de démonstration en cours est abandonnée et vous revenez à l’accueil.",
+                        confirmLabel: "Quitter") { state.leaveDemo() }
+                } label: {
+                    Label("Quitter la démonstration", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+                .disabled(state.isBusy)
             }
         }
-        .padding(22).glassPanel()
+    }
+
+    /// Les réglages d'adressage restent atteignables une fois connecté, y compris pour un
+    /// profil sans permission d'administration : c'est un réglage d'appareil, pas un droit.
+    private var serverSettingsEntry: some View {
+        Button { showsServerSettings = true } label: {
+            HStack {
+                Label("Paramètres du serveur", systemImage: "server.rack")
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(GenEngineTheme.secondaryText)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, minHeight: HUDMetrics.minimumTarget)
+            .glassPanel()
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(GenEngineTheme.ivory)
+        .accessibilityHint("Configurer l’adresse des six services GenEngine")
     }
 }
