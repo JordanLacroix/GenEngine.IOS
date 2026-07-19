@@ -252,13 +252,11 @@ struct PlayerExperienceViewScreen: View {
                     HStack { Text("Histoire explorée").font(.headline); Spacer(); Text("\(mastery.masteryPercent)%").foregroundStyle(GenEngineTheme.amber) }
                     Text("\(mastery.nodeIds.count) scène(s) · \(mastery.choiceIds.count) choix · \(mastery.endingIds.count) fin(s)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
                     ProgressView(value: Double(mastery.masteryPercent), total: 100).tint(GenEngineTheme.verdigris)
-                    if let graph = state.questGraph(for: mastery) {
-                        QuestGraphView(graph: graph, title: "Mémoire de quête", subtitle: "Cumul de toutes vos parties de ce scénario.")
-                    } else {
-                        Text("La carte complète de ce scénario se consulte pendant une partie : le moteur ne publie sa structure qu’au travers d’une session.")
-                            .font(.caption2).foregroundStyle(GenEngineTheme.secondaryText)
-                    }
-                }.padding(16).glassPanel()
+                    scenarioMap(for: mastery)
+                }
+                .padding(16)
+                .glassPanel()
+                .task(id: mastery.scenarioVersionId) { await state.loadScenarioStructure(for: mastery.scenarioVersionId) }
             }
             if let graph = state.demoQuestGraph {
                 QuestGraphView(graph: graph, title: "Mémoire de la démonstration", subtitle: "Ce que vous avez découvert au fil de vos parties de démonstration.")
@@ -274,6 +272,35 @@ struct PlayerExperienceViewScreen: View {
                     }
                 }.padding(.vertical, 8)
             }
+        }
+    }
+
+    /// Carte réelle d'un scénario serveur, hors partie : topologie publiée par Play, couleurs
+    /// issues de la seule mémoire cumulée. Un refus reste visible et n'est jamais remplacé
+    /// par la fixture de démonstration.
+    @ViewBuilder
+    private func scenarioMap(for mastery: ScenarioMasteryView) -> some View {
+        if let graph = state.questGraph(for: mastery) {
+            QuestGraphView(
+                graph: graph,
+                title: "Carte du scénario",
+                subtitle: "Structure complète du scénario, colorée par le cumul de vos parties.",
+                showsCurrentRun: false)
+        } else if let failure = state.scenarioStructureErrors[mastery.scenarioVersionId] {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Carte indisponible", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(GenEngineTheme.ember)
+                Text(failure).font(.caption2).foregroundStyle(GenEngineTheme.secondaryText)
+                Button("Réessayer") { Task { await state.retryScenarioStructure(for: mastery.scenarioVersionId) } }
+                    .buttonStyle(.bordered)
+                    .tint(GenEngineTheme.amber)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .contain)
+        } else if state.isLoadingScenarioStructure(mastery.scenarioVersionId) {
+            ProgressView().tint(GenEngineTheme.amber).accessibilityLabel("Chargement de la carte du scénario")
         }
     }
 

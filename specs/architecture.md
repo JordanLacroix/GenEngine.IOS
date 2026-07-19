@@ -26,7 +26,7 @@ flowchart LR
 
 ## Contrats backend
 
-Identity authentifie, Authoring publie et expose le catalogue, Play exécute les sessions. Le client ne lit aucune base et ne partage aucun modèle de domaine interne avec ces services. Toute évolution incompatible d’un contrat doit produire une erreur explicite, une migration client ou une stratégie de compatibilité documentée.
+Identity authentifie, Authoring publie et expose le catalogue, Play exécute les sessions et publie la topologie des versions publiées. Deux contrats de graphe coexistent et ne sont jamais confondus : `NarrativeTree` (`GET /sessions/{id}/tree`) porte les états de scène et l'évaluation des conditions d'une partie ; `ScenarioStructure` (`GET /scenario-versions/{id}/tree`) ne porte que la topologie, faute d'état de monde hors session. Le client les adapte vers une projection de présentation unique plutôt que de prêter des états à celui qui n'en publie pas. Le client ne lit aucune base et ne partage aucun modèle de domaine interne avec ces services. Toute évolution incompatible d’un contrat doit produire une erreur explicite, une migration client ou une stratégie de compatibilité documentée.
 
 ## Accessibilité et plateformes
 

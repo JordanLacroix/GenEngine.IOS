@@ -174,6 +174,86 @@ struct QuestGraphPresentationTests {
         #expect(graph.nodes.count == 13)
     }
 
+    // MARK: - Structure publiée, hors partie
+
+    /// Même topologie que `convergingTree`, mais sans aucun état de monde.
+    private let convergingStructure = ScenarioStructure(
+        initialNodeId: "a",
+        nodes: [
+            ScenarioStructureNode(id: "a", text: "Scène a", isEnding: false),
+            ScenarioStructureNode(id: "b", text: "Scène b", isEnding: false),
+            ScenarioStructureNode(id: "c", text: "Scène c", isEnding: false),
+            ScenarioStructureNode(id: "d", text: "Scène d", isEnding: true)
+        ],
+        edges: [
+            ScenarioStructureEdge(sourceNodeId: "a", targetNodeId: "b", inputId: "left", text: "a vers b"),
+            ScenarioStructureEdge(sourceNodeId: "a", targetNodeId: "c", inputId: "right", text: "a vers c"),
+            ScenarioStructureEdge(sourceNodeId: "b", targetNodeId: "d", inputId: "down", text: "b vers d"),
+            ScenarioStructureEdge(sourceNodeId: "c", targetNodeId: "d", inputId: "up", text: "c vers d")
+        ])
+
+    @Test func statelessStructureSplitsNodesBetweenMemoryAndUnknown() {
+        let graph = QuestGraphPresentation.build(structure: convergingStructure, masteryNodeIds: ["a", "c"], masteryChoiceIds: ["right"])
+        let states = Dictionary(uniqueKeysWithValues: graph.nodes.map { ($0.id, $0.state) })
+
+        #expect(states["a"] == .discoveredBefore, "la mémoire cumulée est la seule source de couleur hors partie")
+        #expect(states["c"] == .discoveredBefore)
+        #expect(states["b"] == .unseen)
+        #expect(states["d"] == .unseen)
+        #expect(graph.count(of: .current) == 0, "hors partie, aucune scène n’est courante")
+        #expect(graph.count(of: .takenThisRun) == 0, "hors partie, aucun passage n’appartient à la partie en cours")
+        #expect(graph.count(of: .locked) == 0, "sans état de monde, aucune condition n’est évaluable")
+        #expect(graph.knownRatio == 0.5)
+    }
+
+    @Test func statelessEdgesFollowMemoryAndCarryNoEvaluation() {
+        let graph = QuestGraphPresentation.build(structure: convergingStructure, masteryNodeIds: ["a", "c"], masteryChoiceIds: ["right"])
+        let states = Dictionary(uniqueKeysWithValues: graph.edges.map { ($0.id, $0.state) })
+
+        #expect(states["a→c#right"] == .discoveredBefore, "les deux extrémités sont mémorisées")
+        #expect(states["a→b#left"] == .unavailable, "une extrémité inconnue ne peut pas être déclarée connue")
+        let explanations = Set(graph.edges.map(\.explanation))
+        let availabilities = Set(graph.edges.map(\.isAvailable))
+        #expect(explanations == [""], "la structure ne publie aucune évaluation de condition")
+        #expect(availabilities == [true], "aucun chemin n’est déclaré verrouillé hors partie")
+        #expect(graph.edges.first { $0.inputId == "right" }?.isRemembered == true)
+        #expect(graph.edges.first { $0.inputId == "up" }?.isRemembered == false)
+    }
+
+    /// La carte hors partie et la carte en partie doivent se superposer scène pour scène.
+    @Test func statelessLayoutIsIdenticalToTheInRunLayout() {
+        let inRun = QuestGraphPresentation.build(tree: convergingTree)
+        let outOfRun = QuestGraphPresentation.build(structure: convergingStructure)
+
+        #expect(outOfRun.nodes.map(\.id) == inRun.nodes.map(\.id))
+        #expect(outOfRun.nodes.map(\.rank) == inRun.nodes.map(\.rank))
+        #expect(outOfRun.nodes.map(\.x) == inRun.nodes.map(\.x))
+        #expect(outOfRun.nodes.map(\.y) == inRun.nodes.map(\.y))
+        #expect(outOfRun.nodes.map(\.isEnding) == inRun.nodes.map(\.isEnding))
+        #expect(outOfRun.edges.map(\.id) == inRun.edges.map(\.id))
+        #expect(outOfRun.edges.map(\.sourceX) == inRun.edges.map(\.sourceX))
+        #expect(outOfRun.edges.map(\.sourceY) == inRun.edges.map(\.sourceY))
+        #expect(outOfRun.edges.map(\.targetX) == inRun.edges.map(\.targetX))
+        #expect(outOfRun.edges.map(\.targetY) == inRun.edges.map(\.targetY))
+        #expect(outOfRun.minX == inRun.minX)
+        #expect(outOfRun.maxX == inRun.maxX)
+        #expect(outOfRun.minY == inRun.minY)
+        #expect(outOfRun.maxY == inRun.maxY)
+    }
+
+    @Test func statelessProjectionKeepsDegenerateCasesAndIsDeterministic() {
+        let empty = QuestGraphPresentation.build(structure: ScenarioStructure(initialNodeId: "a", nodes: [], edges: []))
+        #expect(empty.isEmpty)
+
+        let dangling = QuestGraphPresentation.build(structure: ScenarioStructure(
+            initialNodeId: "a",
+            nodes: [ScenarioStructureNode(id: "a", text: "Scène a", isEnding: false)],
+            edges: [ScenarioStructureEdge(sourceNodeId: "a", targetNodeId: "nowhere", inputId: "go", text: "vers nulle part")]))
+        #expect(dangling.edges.isEmpty, "une arête vers une scène absente est ignorée")
+
+        #expect(QuestGraphPresentation.build(structure: convergingStructure) == QuestGraphPresentation.build(structure: convergingStructure))
+    }
+
     @Test func demoProjectionIsDeterministic() {
         #expect(DemoStory.narrativeTree(path: ["shore"]) == DemoStory.narrativeTree(path: ["shore"]))
         #expect(DemoStory.orderedNodes.first?.id == DemoStory.openingNodeID)
