@@ -194,6 +194,25 @@ struct NarrativeTree: Decodable, Equatable, Sendable {
     let edges: [NarrativeTreeEdge]
 }
 
+// MARK: - Structure d'une version publiée, hors session
+
+/// Topologie d'une version publiée (`GET /scenario-versions/{id}/tree`).
+/// Ce contrat ne porte volontairement ni état de scène ni évaluation de condition :
+/// les deux dépendent d'un état de monde qui n'existe pas en dehors d'une session.
+/// Ce type reste donc distinct de `NarrativeTree` et ne prétend porter aucun état.
+struct ScenarioStructureNode: Decodable, Identifiable, Equatable, Sendable { let id: String; let text: String; let isEnding: Bool }
+struct ScenarioStructureEdge: Decodable, Equatable, Sendable {
+    let sourceNodeId: String
+    let targetNodeId: String
+    let inputId: String
+    let text: String
+}
+struct ScenarioStructure: Decodable, Equatable, Sendable {
+    let initialNodeId: String
+    let nodes: [ScenarioStructureNode]
+    let edges: [ScenarioStructureEdge]
+}
+
 struct SavedSession: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     let scenarioVersionId: UUID

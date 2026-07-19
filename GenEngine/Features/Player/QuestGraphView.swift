@@ -8,6 +8,9 @@ struct QuestGraphView: View {
     let graph: QuestGraph
     var title = "Mémoire de quête"
     var subtitle: String?
+    /// Hors partie, la structure ne porte aucun état de monde : ni scène courante, ni passage
+    /// de la partie en cours, ni verrou. La légende et le résumé ne les annoncent alors pas.
+    var showsCurrentRun = true
     @State private var showsDetails = false
 
     private var isDrawable: Bool {
@@ -63,7 +66,10 @@ struct QuestGraphView: View {
     }
 
     private var summary: String {
-        "\(graph.count(of: .takenThisRun) + graph.count(of: .current)) scène(s) parcourue(s) cette fois · \(graph.count(of: .discoveredBefore)) déjà connue(s) · \(graph.count(of: .unseen) + graph.count(of: .locked)) à découvrir"
+        guard showsCurrentRun else {
+            return "\(graph.count(of: .discoveredBefore)) scène(s) déjà découverte(s) · \(graph.count(of: .unseen)) encore inconnue(s) · \(graph.nodes.count) au total"
+        }
+        return "\(graph.count(of: .takenThisRun) + graph.count(of: .current)) scène(s) parcourue(s) cette fois · \(graph.count(of: .discoveredBefore)) déjà connue(s) · \(graph.count(of: .unseen) + graph.count(of: .locked)) à découvrir"
     }
 
     // MARK: - Tracé
@@ -149,9 +155,13 @@ struct QuestGraphView: View {
         }
     }
 
+    private var legendStates: [QuestNodeState] {
+        showsCurrentRun ? QuestNodeState.allCases : [.discoveredBefore, .unseen]
+    }
+
     @ViewBuilder
     private var legendItems: some View {
-        ForEach(QuestNodeState.allCases, id: \.self) { state in
+        ForEach(legendStates, id: \.self) { state in
             Label {
                 Text(label(for: state)).font(.caption)
             } icon: {

@@ -56,6 +56,7 @@ protocol GenEngineAPI: Sendable {
     func session(sessionId: UUID) async throws -> SessionView
     func currentStep(sessionId: UUID) async throws -> CurrentStep
     func sessionTree(sessionId: UUID) async throws -> NarrativeTree
+    func scenarioStructure(scenarioVersionId: UUID) async throws -> ScenarioStructure
     func submitChoice(sessionId: UUID, commandId: UUID, expectedRevision: Int, choiceId: String) async throws -> InputResult
     func continueInteraction(sessionId: UUID, commandId: UUID, expectedRevision: Int) async throws -> InputResult
     func submitAnswer(sessionId: UUID, commandId: UUID, expectedRevision: Int, answerId: String) async throws -> InputResult
@@ -107,6 +108,7 @@ extension GenEngineAPI {
     func updateScenario(scenarioId _: UUID, expectedRevision _: Int, document _: Data) async throws -> ScenarioView { throw APIError.invalidScenario("Fonction indisponible.") }
     func archiveScenario(scenarioId _: UUID, expectedRevision _: Int) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
     func generateScenario(request _: ScenarioGenerationRequest) async throws -> ScenarioView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func scenarioStructure(scenarioVersionId _: UUID) async throws -> ScenarioStructure { throw APIError.invalidScenario("Fonction indisponible.") }
 }
 
 enum APIError: LocalizedError {
@@ -372,6 +374,12 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await perform(method: "GET", base: endpoints.play, path: sessionPath(sessionId) + "/tree", body: nil, authenticated: true)
     }
 
+    /// Topologie d'une version publiée, sans session. Même autorisation qu'un démarrage de session :
+    /// un joueur non affecté reçoit 422 et un appel sans jeton reçoit 401.
+    func scenarioStructure(scenarioVersionId: UUID) async throws -> ScenarioStructure {
+        try await perform(method: "GET", base: endpoints.play, path: scenarioVersionPath(scenarioVersionId) + "/tree", body: nil, authenticated: true)
+    }
+
     func submitChoice(sessionId: UUID, commandId: UUID, expectedRevision: Int, choiceId: String) async throws -> InputResult {
         try await send(method: "POST", base: endpoints.play, path: sessionPath(sessionId) + "/inputs", body: SubmitChoiceRequest(commandId: commandId, expectedRevision: expectedRevision, choiceId: choiceId))
     }
@@ -479,5 +487,6 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     private func sessionPath(_ id: UUID) -> String { "/sessions/\(id.uuidString.lowercased())" }
     private func scenarioPath(_ id: UUID) -> String { "/scenarios/\(id.uuidString.lowercased())" }
+    private func scenarioVersionPath(_ id: UUID) -> String { "/scenario-versions/\(id.uuidString.lowercased())" }
     private func escaped(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value }
 }

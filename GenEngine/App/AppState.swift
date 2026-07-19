@@ -30,6 +30,11 @@ final class AppState {
     private(set) var step: CurrentStep?
     private(set) var tree: NarrativeTree?
     private(set) var treeError: String?
+    /// Topologies de versions publiées consultables hors partie, indexées par version.
+    private(set) var scenarioStructures: [UUID: ScenarioStructure] = [:]
+    /// Refus ou panne rencontrés en chargeant une topologie : jamais avalés, jamais remplacés par une fixture.
+    private(set) var scenarioStructureErrors: [UUID: String] = [:]
+    private var loadingScenarioStructures: Set<UUID> = []
     private(set) var isDemoSession = false
     private(set) var demoPath: [String] = []
     private(set) var demoChoicePath: [String] = []
@@ -591,11 +596,58 @@ final class AppState {
         return playerExperience?.masteries.first { $0.scenarioVersionId == versionID }
     }
 
-    /// Graphe consultable hors partie. Le contrat ne fournit la structure qu'au travers d'une
-    /// session ; en dehors, seule la démonstration peut en produire un depuis sa fixture.
+    /// Graphe consultable hors partie : la topologie vient de `GET /scenario-versions/{id}/tree`
+    /// et la couleur vient de la seule mémoire cumulée. Hors session, aucune scène n'est courante
+    /// et aucune condition n'est évaluable.
     func questGraph(for mastery: ScenarioMasteryView) -> QuestGraph? {
-        guard let versionID = session?.scenarioVersionId, versionID == mastery.scenarioVersionId, !isDemoSession, let tree else { return nil }
-        return QuestGraphPresentation.build(tree: tree, masteryNodeIds: Set(mastery.nodeIds), masteryChoiceIds: Set(mastery.choiceIds))
+        guard let structure = scenarioStructures[mastery.scenarioVersionId] else { return nil }
+        return QuestGraphPresentation.build(
+            structure: structure,
+            masteryNodeIds: Set(mastery.nodeIds),
+            masteryChoiceIds: Set(mastery.choiceIds))
+    }
+
+    /// Charge la topologie d'une version publiée. Un refus reste visible : il n'est ni avalé,
+    /// ni remplacé par la fixture de démonstration.
+    func loadScenarioStructure(for versionID: UUID) async {
+        guard isAuthenticated, !isDemoAccess else { return }
+        guard scenarioStructures[versionID] == nil,
+              scenarioStructureErrors[versionID] == nil,
+              !loadingScenarioStructures.contains(versionID)
+        else { return }
+        loadingScenarioStructures.insert(versionID)
+        defer { loadingScenarioStructures.remove(versionID) }
+        do {
+            scenarioStructures[versionID] = try await api.scenarioStructure(scenarioVersionId: versionID)
+            scenarioStructureErrors[versionID] = nil
+        } catch is CancellationError {
+        } catch {
+            scenarioStructureErrors[versionID] = Self.structureFailureMessage(error)
+            developerLog.insert("✗ Structure \(versionID.uuidString.lowercased()): \(error.localizedDescription)", at: 0)
+        }
+    }
+
+    func retryScenarioStructure(for versionID: UUID) async {
+        scenarioStructureErrors[versionID] = nil
+        await loadScenarioStructure(for: versionID)
+    }
+
+    func isLoadingScenarioStructure(_ versionID: UUID) -> Bool { loadingScenarioStructures.contains(versionID) }
+
+    /// Traduit un refus du service Play en message lisible sans masquer sa cause.
+    private static func structureFailureMessage(_ error: Error) -> String {
+        guard case let APIError.http(code, problem) = error else {
+            return (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+        let detail = [problem?.title, problem?.detail].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " — ")
+        let reason: String
+        switch code {
+        case 401: reason = "Votre session a expiré : reconnectez-vous pour consulter cette carte."
+        case 403: reason = "Vous n’avez pas la permission de consulter cette carte."
+        case 422: reason = "Ce scénario ne vous est pas affecté : sa carte reste indisponible tant que l’affectation n’est pas faite."
+        default: reason = "Le service a répondu \(code)."
+        }
+        return detail.isEmpty ? reason : "\(reason) (\(detail))"
     }
 
     /// Mémoire de la démonstration consultable en dehors d'une partie.
