@@ -17,7 +17,7 @@ GenEngine est un moteur narratif paramétrable vendu aux écoles d’ingénieurs
 brew install xcodegen
 ```
 
-Les trois commandes suivantes sont exactement celles qu’exécute la CI ([`.github/workflows/ios.yml`](.github/workflows/ios.yml)). Exécutez-les avant d’ouvrir une PR :
+Les trois commandes suivantes sont exactement celles qu’exécute le travail Xcode de la CI ([`.github/workflows/ios.yml`](.github/workflows/ios.yml)). Exécutez-les avant d’ouvrir une PR :
 
 ```bash
 xcodegen generate
@@ -27,7 +27,30 @@ xcodebuild test -project GenEngine.xcodeproj -scheme GenEngine \
   -destination 'platform=iOS Simulator,OS=latest,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO
 ```
 
-La CI ne fait ni lint, ni analyse statique, ni test de rendu : un build vert ne dit rien de l’apparence à l’écran. Toute modification visuelle doit être regardée dans Xcode.
+La CI ne fait ni lint Swift, ni analyse statique du code applicatif, ni test de rendu : un build vert ne dit rien de l’apparence à l’écran. Toute modification visuelle doit être regardée dans Xcode.
+
+### Contrôles de gouvernance
+
+La CI applique aussi des contrôles de documentation et de sécurité des workflows, tous sur runner Linux. Rejouez-les si votre changement touche la documentation ou `.github/` :
+
+```bash
+brew install lychee actionlint zizmor
+
+# Documentation (.github/workflows/docs.yml)
+npx markdownlint-cli2 "README.md" "AGENTS.md" "CLAUDE.md" "CONTRIBUTING.md" \
+  "SECURITY.md" "specs/**/*.md" ".github/**/*.md"
+lychee --config lychee.toml '**/*.md'
+
+# Workflows (.github/workflows/workflow-security.yml)
+actionlint .github/workflows/*.yml
+zizmor --persona pedantic --min-severity low --min-confidence medium .github/workflows/
+```
+
+Le vérificateur de liens exclut délibérément les badges décoratifs ([`lychee.toml`](lychee.toml)) : leur disponibilité ne dit rien de la justesse de la documentation, et leurs délais d’attente rendaient la CI non déterministe. N’ajoutez pas d’hôte de badge à la vérification.
+
+**Le titre de votre pull request doit suivre la convention de commit** (`type(scope): description`) : un contrôle automatique le vérifie. Les types acceptés sont `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert` et `test`.
+
+Si vous ajoutez une action tierce à un workflow, épinglez-la par empreinte de commit complète suivie d’un commentaire de version, et déclarez le `permissions:` minimal du travail. Réservez les runners macOS à ce qui exige Xcode : ils sont facturés plusieurs fois le tarif Linux.
 
 `GenEngine/Core/Configuration/ServiceEndpoints.swift` porte souvent une modification locale non committée (adresse privée pour un test sur appareil). Ne la committez pas et ne la révoquez pas.
 

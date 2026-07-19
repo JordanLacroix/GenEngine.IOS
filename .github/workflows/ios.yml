@@ -14,12 +14,19 @@ concurrency:
 
 jobs:
   build-and-test:
+    name: Build and test
+    # Seul travail qui exige réellement Xcode, donc le seul sur runner macOS.
+    # `step-security/harden-runner` n'est pas utilisé ici : il ne prend en
+    # charge que les runners Linux.
     runs-on: macos-15
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
       - name: Select latest stable Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: latest-stable
       - name: Install XcodeGen

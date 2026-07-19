@@ -1,0 +1,21 @@
+cache = true
+max_cache_age = "1d"
+max_retries = 3
+retry_wait_time = 2
+timeout = 20
+accept = [200, 204, 206, 429]
+exclude = [
+  '^http://localhost',
+  '^http://127\.0\.0\.1',
+  # Badges décoratifs : leur disponibilité ne dit rien de la justesse de la
+  # documentation, et leurs délais d'attente rendaient la CI non déterministe.
+  '^https://img\.shields\.io',
+  '^https://github\.com/JordanLacroix/GenEngine\.IOS/actions/workflows/.*/badge\.svg',
+  '^https://github\.com/JordanLacroix/GenEngine/actions/workflows/.*/badge\.svg',
+  # Formulaire d'avis de sécurité : exige une session authentifiée, répond 404
+  # à un client anonyme alors que l'URL est correcte.
+  '^https://github\.com/JordanLacroix/GenEngine\.IOS/security/advisories/new',
+  '^https://github\.com/JordanLacroix/GenEngine/security/advisories/new',
+  # Documentation Apple : filtrage agressif des clients non navigateurs.
+  '^https://developer\.apple\.com',
+]
