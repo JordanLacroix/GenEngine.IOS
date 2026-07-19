@@ -91,6 +91,8 @@ final class AppState {
     private(set) var savedSessions: [SavedSession] = SessionStore.load()
     private(set) var access: UserAccessView?
     private(set) var experience: PublishedExperienceView?
+    /// Amorce anonyme du front : identité, charte et libellés disponibles avant connexion.
+    private(set) var bootstrap: ClientBootstrapView?
     private(set) var playerExperience: PlayerExperienceView?
     private(set) var playerBootstrap: PlayerBootstrapView?
     private(set) var playerJournal: JournalView?
@@ -115,7 +117,7 @@ final class AppState {
 
     /// La démonstration appartient au seul état anonyme : une fois authentifié, le joueur
     /// dispose du catalogue réel et plus aucun point d'entrée vers la fixture n'est proposé.
-    var isDemoAvailable: Bool { !isAuthenticated }
+    var isDemoAvailable: Bool { !isAuthenticated && isDemoEnabledByServer }
 
     /// Destinations exposées par le HUD. La liste dépend de l'état d'authentification puis
     /// des permissions ; masquer une entrée ne remplace jamais le contrôle serveur.
@@ -142,10 +144,29 @@ final class AppState {
     var featuredStory: StorySummary? {
         isDemoAvailable ? DemoStory.summary : stories.first
     }
-    var gameName: String { experience?.document.game.name ?? "GenEngine" }
+    /// Nom affiché de l'application. L'amorce cliente prime : c'est le seul contrat servi
+    /// avant authentification, et c'est celui que lit aussi le client Web.
+    var gameName: String {
+        bootstrap?.applicationName?.nonEmpty
+            ?? bootstrap?.branding?.applicationName?.nonEmpty
+            ?? experience?.document.game.name.nonEmpty
+            ?? "GenEngine"
+    }
+
+    /// Accroche de la configuration, si le moteur en publie une.
+    var tagline: String? {
+        bootstrap?.tagline?.nonEmpty ?? bootstrap?.branding?.tagline?.nonEmpty
+    }
+
+    /// La démonstration reste offerte par défaut : un moteur injoignable ne doit pas
+    /// fermer la seule porte d'entrée hors ligne de l'application.
+    var isDemoEnabledByServer: Bool { bootstrap?.demoEnabled ?? true }
+    /// Libellé configurable. Les copies publiées priment, puis celles de l'amorce anonyme,
+    /// et seulement ensuite le défaut compilé.
     func copy(_ key: String, fallback: String) -> String {
-        guard let value = experience?.document.language.labels[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return fallback }
-        return value
+        experience?.document.language.labels[key]?.nonEmpty
+            ?? bootstrap?.labels?[key]?.nonEmpty
+            ?? fallback
     }
     func hasPermission(_ permission: String) -> Bool { access?.permissions.contains(permission) == true }
     var stories: [StorySummary] {
@@ -186,8 +207,23 @@ final class AppState {
         self.vault = vault
         self.api = api ?? LiveGenEngineAPI(endpoints: endpoints, token: token)
         self.isAuthenticated = token != nil
+        // L'amorce cliente est anonyme et conditionne l'identité affichée : elle part
+        // toujours, connecté ou non, avant le reste.
+        Task { await self.loadClientBootstrap() }
         if token != nil { Task { await self.loadPlatformContext() } }
         else { Task { await self.loadPublicExperience() } }
+    }
+
+    /// Charge `GET /client-bootstrap/{frontId}` et applique la charte servie.
+    /// Un échec laisse en place le repli compilé et est journalisé, jamais masqué.
+    func loadClientBootstrap() async {
+        do {
+            let value = try await api.clientBootstrap(frontId: frontId)
+            bootstrap = value
+            BrandTheme.shared.apply(value.branding)
+        }
+        catch is CancellationError { }
+        catch { developerLog.insert("✗ Amorce cliente: \(error.localizedDescription)", at: 0) }
     }
 
     func loadPublicExperience() async {

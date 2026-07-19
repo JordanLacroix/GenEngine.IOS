@@ -402,6 +402,50 @@ struct PublishedExperienceView: Decodable, Sendable {
     let publishedAt: Date
     let document: ExperienceDocument
 }
+
+/// Amorce cliente servie par `GET /client-bootstrap/{frontId}`, **route anonyme**.
+///
+/// C'est le seul contrat qui donne au client son identité (nom, accroche, charte) *avant*
+/// toute authentification. Tous les champs au-delà de `frontId` sont optionnels : une
+/// instance qui n'en publierait qu'une partie ne doit pas empêcher le démarrage, le client
+/// retombant alors sur ses valeurs de repli documentées.
+///
+/// `publishedAt` n'est délibérément pas décodé : le champ n'est pas utilisé et son format
+/// de date ne doit pas pouvoir faire échouer l'amorce entière.
+struct ClientBootstrapView: Decodable, Sendable {
+    let frontId: String
+    let version: Int?
+    let applicationName: String?
+    let shortName: String?
+    let tagline: String?
+    let branding: ClientBrandingView?
+    let locale: String?
+    let timeZone: String?
+    let labels: [String: String]?
+    let authenticationMode: String?
+    let demoEnabled: Bool?
+    let intro: IntroDefinition?
+}
+
+struct ClientBrandingView: Decodable, Sendable {
+    let applicationName: String?
+    let shortName: String?
+    let tagline: String?
+    let brandIconUrl: String?
+    let clientIconUrl: String?
+    let logoUrl: String?
+    let faviconUrl: String?
+    let theme: ClientThemeView?
+    /// Jetons d'accent nommés, tels que les portent catégories, parcours et familiers.
+    let accentPalette: [String: String]?
+}
+
+struct ClientThemeView: Decodable, Sendable {
+    let colors: [String: String]?
+    let colorScheme: String?
+    let cornerRadius: Double?
+    let fontFamily: String?
+}
 struct ExperienceConfigurationView: Codable, Sendable {
     let id: UUID
     var revision: Int

@@ -85,6 +85,12 @@ struct HUDBadge: View {
         Label(text, systemImage: symbol)
             .font(.caption.weight(.semibold))
             .foregroundStyle(tint)
+            // La barre haute est étroite : une étiquette qui se replie sur trois lignes
+            // écrase le nom de l'application à côté d'elle. Elle tient sur une ligne et
+            // conserve sa largeur naturelle — c'est le nom de l'application, plus long et
+            // déjà limité à une ligne, qui cède en premier.
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 12)
             .frame(minHeight: 32)
             .background(tint.opacity(0.14), in: Capsule())

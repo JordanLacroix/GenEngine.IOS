@@ -72,7 +72,11 @@ struct GameShellView: View {
                 .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
             if state.isDemoAccess {
-                HUDBadge(symbol: "play.rectangle.on.rectangle", text: "Démonstration hors ligne", tint: GenEngineTheme.verdigris)
+                // La barre haute doit loger le nom de l'application, l'étiquette d'état et
+                // deux commandes. L'étiquette porte donc la forme courte ; VoiceOver, lui,
+                // continue d'annoncer l'état complet.
+                HUDBadge(symbol: "play.rectangle.on.rectangle", text: "Démo", tint: GenEngineTheme.verdigris)
+                    .accessibilityLabel("Démonstration hors ligne")
             }
             Spacer(minLength: 0)
             if state.isBusy { ProgressView().tint(GenEngineTheme.amber).accessibilityLabel("Chargement en cours") }
@@ -101,6 +105,11 @@ struct GameShellView: View {
             .padding(6)
         }
         .scrollBounceBehavior(.basedOnSize)
+        // Un `ScrollView` horizontal reste gourmand sur son axe transverse : sans cette
+        // contrainte il prenait toute la hauteur restante sous la barre haute. Son fond
+        // `.ultraThinMaterial` recouvrait alors l'écran entier — le contenu apparaissait
+        // flouté et illisible, et les onglets flottaient au milieu de l'écran.
+        .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: 620)
         .hudSurface(cornerRadius: 24)
         .padding(.horizontal, 12)

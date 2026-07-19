@@ -102,6 +102,6 @@ struct AccountView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(GenEngineTheme.ivory)
-        .accessibilityHint("Configurer l’adresse des six services GenEngine")
+        .accessibilityHint("Configurer l’adresse des six services qui servent \(state.gameName)")
     }
 }
