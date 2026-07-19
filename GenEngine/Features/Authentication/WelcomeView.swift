@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WelcomeView: View {
     @Environment(AppState.self) private var state
+    @Environment(GameAudioDirector.self) private var audio
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var introIndex = 0
     @State private var introDismissed = false
@@ -68,21 +69,39 @@ struct WelcomeView: View {
                     .frame(maxWidth: 440)
                     .glassPanel()
                     .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                    VStack(spacing: 9) {
-                        Text("Pas encore prêt à créer un compte ? Essayez une histoire complète, puis consultez le chemin parcouru.")
-                            .font(.caption).multilineTextAlignment(.center).foregroundStyle(GenEngineTheme.secondaryText)
-                        Button { withAnimation(reduceMotion ? nil : .snappy) { state.unlockDemo() } } label: {
-                            Label(state.copy("demo.explore", fallback: "Lancer la démo"), systemImage: "play.fill").frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent).tint(GenEngineTheme.verdigris)
-                    }.frame(maxWidth: 440)
+                    // La démonstration hors ligne n'existe que dans l'état anonyme.
+                    if state.isDemoAvailable {
+                        VStack(spacing: 9) {
+                            Text("Pas encore prêt à créer un compte ? Essayez une histoire complète, puis consultez le chemin parcouru.")
+                                .font(.caption).multilineTextAlignment(.center).foregroundStyle(GenEngineTheme.secondaryText)
+                            Button { withAnimation(reduceMotion ? nil : .snappy) { state.unlockDemo() } } label: {
+                                Label(state.copy("demo.explore", fallback: "Lancer la démo"), systemImage: "play.fill").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent).tint(GenEngineTheme.verdigris)
+                        }.frame(maxWidth: 440)
+                    }
                     Spacer(minLength: 44)
                 }
                 .padding(.horizontal, 24)
             }
             if shouldShowIntroduction { introduction(introScenes[introIndex]) }
+            else { audioToggle }
         }
-        .navigationBarHidden(true)
+    }
+
+    private var audioToggle: some View {
+        VStack {
+            HStack {
+                Spacer()
+                HUDButton(
+                    symbol: audio.isEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                    title: audio.isEnabled ? "Couper le son" : "Activer le son") { audio.isEnabled.toggle() }
+                    .padding(8)
+                    .hudSurface(cornerRadius: 18)
+            }
+            Spacer()
+        }
+        .padding(12)
     }
 
     private var introScenes: [IntroSceneDefinition] {

@@ -27,11 +27,10 @@ struct StudioView: View {
                     creationForm
                     if let result = state.generatedScenario { resultCard(result); graphCard(result); nodeInspector(result) }
                 }
-                .padding(.horizontal, 20).padding(.bottom, 110)
+                .padding(.horizontal, 20).padding(.bottom, 24)
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 900) }
             }
         }
-        .navigationTitle(state.copy("nav.studio", fallback: "Studio"))
         .task {
             await state.loadPlatformContext()
             await state.searchScenarios()

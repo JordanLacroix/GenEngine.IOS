@@ -46,11 +46,10 @@ struct AdministrationView: View {
                     else { sectionContent }
                     actionBar
                 }
-                .padding(.horizontal, 18).padding(.bottom, 120)
+                .padding(.horizontal, 18).padding(.bottom, 24)
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 1_000) }
             }
         }
-        .navigationTitle(state.copy("nav.administration", fallback: "Administration"))
         .task { await state.loadAdministration(); document = state.adminConfiguration?.document }
         .fileImporter(isPresented: $showsMembershipImporter, allowedContentTypes: [.commaSeparatedText, .plainText]) { result in
             guard case let .success(url) = result else { return }

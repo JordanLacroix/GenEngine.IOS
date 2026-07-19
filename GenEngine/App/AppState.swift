@@ -1,13 +1,37 @@
 import Foundation
 import Observation
 
-enum AppTab: Hashable {
+enum AppTab: Hashable, CaseIterable {
     case home
     case library
     case experience
     case studio
     case administration
     case account
+
+    /// Symbole du HUD. Le libellé, lui, reste configurable côté serveur via `copy(_:fallback:)`.
+    var symbol: String {
+        switch self {
+        case .home: "sparkles"
+        case .library: "books.vertical.fill"
+        case .experience: "globe.europe.africa.fill"
+        case .studio: "pencil.and.outline"
+        case .administration: "slider.horizontal.3"
+        case .account: "person.crop.circle.fill"
+        }
+    }
+
+    /// Ambiance sonore du lieu. Le son suit le lieu de l'application, pas l'écran technique.
+    var ambience: AudioAmbience {
+        switch self {
+        case .home: .home
+        case .library: .library
+        case .experience: .world
+        case .studio: .studio
+        case .administration: .administration
+        case .account: .account
+        }
+    }
 }
 
 @MainActor
@@ -73,6 +97,36 @@ final class AppState {
     private let microsoftSignIn = MicrosoftSignInCoordinator()
 
     var hasProductAccess: Bool { isAuthenticated || isDemoAccess }
+
+    /// La démonstration appartient au seul état anonyme : une fois authentifié, le joueur
+    /// dispose du catalogue réel et plus aucun point d'entrée vers la fixture n'est proposé.
+    var isDemoAvailable: Bool { !isAuthenticated }
+
+    /// Destinations exposées par le HUD. La liste dépend de l'état d'authentification puis
+    /// des permissions ; masquer une entrée ne remplace jamais le contrôle serveur.
+    var destinations: [AppTab] {
+        guard isAuthenticated else { return [.home, .account] }
+        var items: [AppTab] = []
+        if hasPermission("session.play") { items.append(.experience) }
+        items.append(.library)
+        if hasPermission("scenario.author") { items.append(.studio) }
+        if hasPermission("config.read") { items.append(.administration) }
+        items.append(.account)
+        return items
+    }
+
+    /// Destination réellement affichée : `selectedTab` ramené dans les destinations valides,
+    /// de sorte qu'un changement d'état ne laisse jamais le HUD sur un onglet disparu.
+    var activeTab: AppTab {
+        let items = destinations
+        return items.contains(selectedTab) ? selectedTab : (items.first ?? .account)
+    }
+
+    /// Histoire mise en avant : la démonstration hors ligne pour un visiteur anonyme,
+    /// la première histoire publiée du catalogue pour un joueur authentifié.
+    var featuredStory: StorySummary? {
+        isDemoAvailable ? DemoStory.summary : stories.first
+    }
     var gameName: String { experience?.document.game.name ?? "GenEngine" }
     func copy(_ key: String, fallback: String) -> String {
         guard let value = experience?.document.language.labels[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return fallback }
@@ -87,7 +141,8 @@ final class AppState {
                 items.insert(StorySummary(id: id, title: publishedTitle, eyebrow: "Publié localement", synopsis: "Une histoire connectée à votre environnement GenEngine.", duration: "À découvrir", symbol: "network", accent: .verdigris, availability: .published(scenarioVersionID)), at: 0)
             }
         }
-        items.append(contentsOf: DemoStory.library)
+        // La fixture hors ligne ne rejoint le catalogue que pour un visiteur anonyme.
+        if isDemoAvailable { items.append(contentsOf: DemoStory.library) }
         return StoryCatalog.unique(items)
     }
 
@@ -113,8 +168,17 @@ final class AppState {
     }
 
     func unlockDemo() {
+        guard isDemoAvailable else { return }
         isDemoAccess = true
+        selectedTab = .home
         errorMessage = nil
+    }
+
+    /// Referme tout ce qui relève de la démonstration, y compris une partie hors ligne
+    /// en cours, sans toucher à la mémoire cumulée locale.
+    private func discardDemoAccess() {
+        isDemoAccess = false
+        if isDemoSession { endSession() }
     }
 
     func leaveDemo() {
@@ -148,6 +212,8 @@ final class AppState {
             try self.vault.save(access.token)
             self.password = ""
             self.isAuthenticated = true
+            // L'authentification referme la démonstration : elle n'a de sens qu'anonyme.
+            self.discardDemoAccess()
             try await self.refreshPlatformContext()
             self.selectedTab = .experience
         }
@@ -159,6 +225,8 @@ final class AppState {
             try self.vault.save(access.token)
             self.password = ""
             self.isAuthenticated = true
+            // L'authentification referme la démonstration : elle n'a de sens qu'anonyme.
+            self.discardDemoAccess()
             try await self.refreshPlatformContext()
             self.selectedTab = .experience
         }
@@ -174,6 +242,8 @@ final class AppState {
             let access = try await self.api.exchangeEntra(accessToken: externalToken)
             try self.vault.save(access.token)
             self.isAuthenticated = true
+            // L'authentification referme la démonstration : elle n'a de sens qu'anonyme.
+            self.discardDemoAccess()
             try await self.refreshPlatformContext()
             self.selectedTab = .experience
         }
@@ -457,14 +527,19 @@ final class AppState {
 
     func open(_ story: StorySummary) async {
         switch story.availability {
-        case .demo: startDemo()
+        case .demo:
+            guard isDemoAvailable else {
+                errorMessage = "La démonstration est réservée à la visite anonyme : votre compte donne accès au catalogue réel."
+                return
+            }
+            startDemo()
         case let .published(versionID): await startRemote(versionID: versionID, story: story)
         case .comingSoon: errorMessage = "Cette histoire est encore en cours d’écriture."
         }
     }
 
     func startDemo() {
-        guard let node = DemoStory.node(id: DemoStory.openingNodeID) else { return }
+        guard isDemoAvailable, let node = DemoStory.node(id: DemoStory.openingNodeID) else { return }
         archiveDemoRun()
         currentStory = DemoStory.summary
         isDemoSession = true
@@ -652,7 +727,7 @@ final class AppState {
 
     /// Mémoire de la démonstration consultable en dehors d'une partie.
     var demoQuestGraph: QuestGraph? {
-        guard !demoDiscoveredNodeIDs.isEmpty else { return nil }
+        guard isDemoAvailable, !demoDiscoveredNodeIDs.isEmpty else { return nil }
         return QuestGraphPresentation.build(
             tree: DemoStory.narrativeTree(path: []),
             masteryNodeIds: demoDiscoveredNodeIDs,

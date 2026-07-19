@@ -24,11 +24,10 @@ struct AccountView: View {
                     else { loginCard }
                 }
                 .padding(22)
-                .padding(.bottom, 110)
+                .padding(.bottom, 24)
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 620) }
             }
         }
-        .navigationTitle(state.copy("nav.account", fallback: "Compte"))
     }
 
     private var connectedCard: some View {
