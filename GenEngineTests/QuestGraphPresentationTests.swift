@@ -154,24 +154,24 @@ struct QuestGraphPresentationTests {
     }
 
     @Test func demoFixtureProjectsIntoTheSameNarrativeTreeShape() {
-        let tree = DemoStory.narrativeTree(path: ["shore", "stairs"])
+        let tree = DemoStory.narrativeTree(path: ["accueil", "note-arrivee"])
 
         #expect(tree.initialNodeId == DemoStory.openingNodeID)
-        #expect(tree.currentNodeId == "stairs")
-        #expect(tree.nodes.count == 13)
-        #expect(tree.nodes.first { $0.id == "shore" }?.state == "Visited")
-        #expect(tree.nodes.first { $0.id == "stairs" }?.state == "Current")
-        #expect(tree.nodes.first { $0.id == "dawn" }?.state == "Unexplored")
-        #expect(tree.nodes.first { $0.id == "dawn" }?.isEnding == true)
+        #expect(tree.currentNodeId == "note-arrivee")
+        #expect(tree.nodes.count == 23)
+        #expect(tree.nodes.first { $0.id == "accueil" }?.state == "Visited")
+        #expect(tree.nodes.first { $0.id == "note-arrivee" }?.state == "Current")
+        #expect(tree.nodes.first { $0.id == "fin-accord-provenance" }?.state == "Unexplored")
+        #expect(tree.nodes.first { $0.id == "fin-accord-provenance" }?.isEnding == true)
         #expect(tree.edges.filter { !$0.isAvailable }.isEmpty)
-        #expect(Set(tree.nodes.map(\.id)).count == 13, "la projection ne duplique aucune scène")
+        #expect(Set(tree.nodes.map(\.id)).count == 23, "la projection ne duplique aucune scène")
 
-        let graph = QuestGraphPresentation.build(tree: tree, masteryNodeIds: ["echo"], masteryChoiceIds: ["listen"])
-        #expect(graph.nodes.first { $0.id == "stairs" }?.rank == 1)
-        #expect(graph.nodes.first { $0.id == "convergence" }?.rank == 4, "shore → stairs → archives → truth → convergence")
-        #expect(graph.nodes.first { $0.id == "dawn" }?.rank == 5)
-        #expect(graph.nodes.first { $0.id == "echo" }?.state == .discoveredBefore)
-        #expect(graph.nodes.count == 13)
+        let graph = QuestGraphPresentation.build(tree: tree, masteryNodeIds: ["reunion-table"], masteryChoiceIds: ["situation-reunion"])
+        #expect(graph.nodes.first { $0.id == "note-arrivee" }?.rank == 1)
+        #expect(graph.nodes.first { $0.id == "note-provenance" }?.rank == 2, "accueil → note-arrivee → note-provenance")
+        #expect(graph.nodes.first { $0.id == "fin-accord-provenance" }?.rank == 4, "… → note-reunion → fin-accord-provenance")
+        #expect(graph.nodes.first { $0.id == "reunion-table" }?.state == .discoveredBefore)
+        #expect(graph.nodes.count == 23)
     }
 
     // MARK: - Structure publiée, hors partie

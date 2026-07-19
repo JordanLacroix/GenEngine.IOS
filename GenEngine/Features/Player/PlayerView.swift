@@ -171,13 +171,33 @@ struct PlayerView: View {
         switch step.kind { case .quiz: "Question matérialisée par le scénario"; case .freeText: "Expression libre analysée par le moteur"; case .characteristicGate: "Dialogue conditionnel débloqué par votre parcours"; default: "Interaction narrative · \(step.nodeId)" }
     }
 
+    /// Nature de la fin atteinte en démonstration. Le moteur n'exposant aucun
+    /// drapeau d'échec, une rupture est portée par le texte et par cette interface.
+    private var demoOutcome: DemoOutcome? {
+        guard state.isDemoSession, let id = state.demoPath.last else { return nil }
+        return DemoStory.node(id: id)?.outcome
+    }
+
     private var completionSummary: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "trophy.fill").font(.system(size: 42)).foregroundStyle(GenEngineTheme.amber)
-            Text("Chemin accompli").font(.system(.largeTitle, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
-            Text("La démo s’arrête ici : votre histoire ne repart pas en boucle.").foregroundStyle(GenEngineTheme.secondaryText)
+        let outcome = demoOutcome
+        let isRupture = outcome == .rupture
+        return VStack(spacing: 18) {
+            Image(systemName: isRupture ? "exclamationmark.triangle.fill" : "trophy.fill").font(.system(size: 42)).foregroundStyle(GenEngineTheme.amber)
+            Text(PlayerExperiencePresentation.demoOutcomeTitle(outcome)).font(.system(.largeTitle, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory).multilineTextAlignment(.center)
+            Text(PlayerExperiencePresentation.demoOutcomeNote(outcome)).foregroundStyle(GenEngineTheme.secondaryText).multilineTextAlignment(.center)
             if state.isDemoSession {
-                VStack(alignment: .leading, spacing: 8) { Label("\(state.demoPath.count) étapes traversées", systemImage: "point.3.connected.trianglepath.dotted").font(.headline); ForEach(Array(state.demoPath.enumerated()), id: \.offset) { index, node in Text("\(index + 1). \(node.capitalized)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Divider(); Label("Sceau du Dernier Phare", systemImage: "seal.fill"); Label("Une page de journal", systemImage: "book.closed.fill"); Label("La confiance de Lueur", systemImage: "sparkles") }.padding(18).frame(maxWidth: 660, alignment: .leading).glassPanel()
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("\(state.demoPath.count) étapes traversées", systemImage: "point.3.connected.trianglepath.dotted").font(.headline)
+                    ForEach(Array(state.demoPath.enumerated()), id: \.offset) { index, node in
+                        Text("\(index + 1). \(DemoStory.node(id: node)?.title ?? node)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+                    }
+                    Divider()
+                    ForEach(PlayerExperiencePresentation.demoPostures(state.demoPath), id: \.self) { posture in
+                        Label("Posture exercée : \(posture)", systemImage: "tuningfork")
+                    }
+                    Label(PlayerExperiencePresentation.demoFrequencyLabel(outcome), systemImage: isRupture ? "xmark.circle" : "waveform")
+                    Label("Une page de journal", systemImage: "book.closed.fill")
+                }.padding(18).frame(maxWidth: 660, alignment: .leading).glassPanel()
             }
             if let graph = state.questGraph {
                 QuestGraphView(
@@ -198,7 +218,17 @@ struct PlayerView: View {
                 .frame(maxWidth: 660)
                 .glassPanel()
             }
-            HStack { if state.isDemoSession { Button("Explorer un autre chemin") { state.startDemo() }.buttonStyle(.bordered).tint(GenEngineTheme.ivory) }; Button(state.isDemoSession ? "Créer mon aventure" : "Voir mon univers") { state.endSession(); state.selectedTab = state.isAuthenticated ? .experience : .account }.buttonStyle(PrimaryActionStyle()) }
+            // Sur une rupture, reprendre depuis le début devient l'action principale :
+            // la situation ne peut plus être rattrapée en cours de route.
+            HStack {
+                if isRupture {
+                    Button("Reprendre depuis le début") { state.startDemo() }.buttonStyle(PrimaryActionStyle())
+                    Button("Créer mon aventure") { state.endSession(); state.selectedTab = state.isAuthenticated ? .experience : .account }.buttonStyle(.bordered).tint(GenEngineTheme.ivory)
+                } else {
+                    if state.isDemoSession { Button("Essayer une autre situation") { state.startDemo() }.buttonStyle(.bordered).tint(GenEngineTheme.ivory) }
+                    Button(state.isDemoSession ? "Créer mon aventure" : "Voir mon univers") { state.endSession(); state.selectedTab = state.isAuthenticated ? .experience : .account }.buttonStyle(PrimaryActionStyle())
+                }
+            }
         }.padding(.top, 18)
     }
 }

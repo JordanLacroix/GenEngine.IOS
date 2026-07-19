@@ -12,13 +12,87 @@ struct DemoStoryTests {
             #expect(node != nil)
             pending.append(contentsOf: node?.choices.map(\.target) ?? [])
         }
-        #expect(visited.count == 13)
+        #expect(visited.count == 23)
+        #expect(DemoStory.orderedNodes.count == 23)
+    }
+
+    @Test func openingHubSamplesThreeUseCases() {
+        let hub = DemoStory.node(id: DemoStory.openingNodeID)
+        #expect(hub?.choices.map(\.posture) == ["Lucidité", "Courage", "Transmission"])
+        #expect(hub?.choices.map(\.target) == ["note-arrivee", "reunion-table", "spec-demande"])
     }
 
     @Test func demoEndingsStopInsteadOfLooping() {
-        #expect(DemoStory.node(id: "dawn")?.choices.isEmpty == true)
-        #expect(DemoStory.node(id: "watch")?.choices.isEmpty == true)
-        #expect(DemoStory.node(id: "shore")?.interaction != nil)
+        let endings = DemoStory.orderedNodes.filter(\.isEnding)
+        #expect(endings.count == 12)
+        #expect(endings.allSatisfy { $0.choices.isEmpty })
+        #expect(DemoStory.node(id: "note-arrivee")?.interaction != nil)
+        #expect(DemoStory.node(id: "reunion-table")?.interaction != nil)
+        #expect(DemoStory.node(id: "spec-affirmations")?.interaction != nil)
+    }
+
+    @Test func everyEndingDeclaresItsOutcomeFollowingTheCanonicalNaming() {
+        for node in DemoStory.orderedNodes {
+            if node.isEnding {
+                let outcome = try? #require(node.outcome)
+                #expect(outcome != nil, "ending \(node.id) has no outcome")
+                if let outcome { #expect(node.id.hasPrefix("fin-\(outcome.rawValue)")) }
+            } else {
+                #expect(node.outcome == nil, "non-ending \(node.id) declares an outcome")
+            }
+        }
+    }
+
+    @Test func eachSituationReachesAFailureEnding() {
+        for prefix in ["note", "reunion", "spec"] {
+            let reaches = DemoStory.orderedNodes.contains { node in
+                node.id.hasPrefix(prefix) && node.choices.contains { DemoStory.node(id: $0.target)?.outcome == .rupture }
+            }
+            #expect(reaches, "situation \(prefix) has no failure ending")
+        }
+        #expect(DemoStory.orderedNodes.filter { $0.outcome == .rupture }.count == 6)
+    }
+
+    @Test func choiceTonesOnlyUseDiapasonPostures() {
+        for node in DemoStory.orderedNodes {
+            for choice in node.choices {
+                #expect(PlayerExperiencePresentation.diapasonPostures.contains(choice.posture), "unknown posture \(choice.posture)")
+            }
+        }
+    }
+
+    @Test func demoCarriesNoWordingFromTheStoryDiapasonReplaced() {
+        let corpus = DemoStory.orderedNodes
+            .map { "\($0.title) \($0.text) \($0.choices.map(\.text).joined(separator: " "))" }
+            .joined(separator: " ")
+            .lowercased()
+        for word in ["phare", "brume", "lueur", "beacon", "maritime", "oiseaux", "braises"] {
+            #expect(!corpus.contains(word), "legacy wording \"\(word)\" is still present")
+        }
+        #expect(!DemoStory.summary.title.lowercased().contains("brume"))
+    }
+
+    @Test func ruptureEndingIsAnnouncedAsUnrecoverable() {
+        #expect(PlayerExperiencePresentation.demoOutcomeTitle(.rupture) == "La situation ne peut plus être rattrapée.")
+        #expect(PlayerExperiencePresentation.demoOutcomeNote(.rupture).contains("depuis le début"))
+        #expect(PlayerExperiencePresentation.demoFrequencyLabel(.rupture).hasPrefix("Aucune fréquence"))
+        #expect(PlayerExperiencePresentation.demoFrequencyLabel(.accord).hasPrefix("Fréquence du doute :"))
+    }
+
+    @Test func demoPosturesFollowTheTraversedPath() {
+        #expect(PlayerExperiencePresentation.demoPostures(["accueil"]).isEmpty)
+        #expect(PlayerExperiencePresentation.demoPostures(["accueil", "spec-demande", "spec-affirmations"]) == ["Transmission"])
+        #expect(PlayerExperiencePresentation.demoPostures(["accueil", "note-arrivee", "note-provenance"]) == ["Lucidité"])
+    }
+
+    @Test func narrativeTreeProjectionUsesSceneTitles() {
+        let tree = DemoStory.narrativeTree(path: ["accueil", "spec-demande"])
+        #expect(tree.initialNodeId == "accueil")
+        #expect(tree.currentNodeId == "spec-demande")
+        #expect(tree.nodes.count == 23)
+        #expect(tree.nodes.first { $0.id == "spec-demande" }?.text == "La spécification avant le code")
+        #expect(tree.nodes.first { $0.id == "fin-rupture-relais" }?.isEnding == true)
+        #expect(tree.nodes.first { $0.id == "accueil" }?.state == "Visited")
     }
 
     @Test func familiarAssetPackRequiresHTTPSOrBundledAsset() throws {
@@ -92,9 +166,9 @@ struct DemoStoryTests {
 
     @Test func catalogRemovesDuplicateScenarioVersionsAndDemoTitles() {
         let scenarioID = UUID()
-        let first = StorySummary(id: "v2", title: "Les braises sous la brume", eyebrow: "Publié", synopsis: "A", duration: "15 min", symbol: "book", accent: .ember, availability: .published(UUID()), scenarioID: scenarioID)
+        let first = StorySummary(id: "v2", title: "Le Diapason — trois situations", eyebrow: "Publié", synopsis: "A", duration: "15 min", symbol: "book", accent: .ember, availability: .published(UUID()), scenarioID: scenarioID)
         let older = StorySummary(id: "v1", title: "Ancien titre", eyebrow: "Publié", synopsis: "B", duration: "15 min", symbol: "book", accent: .ember, availability: .published(UUID()), scenarioID: scenarioID)
-        let demo = StorySummary(id: "demo", title: "LES BRAISES SOUS LA BRUME", eyebrow: "Démo", synopsis: "C", duration: "15 min", symbol: "book", accent: .ember, availability: .demo)
+        let demo = StorySummary(id: "demo", title: "LE DIAPASON — TROIS SITUATIONS", eyebrow: "Démo", synopsis: "C", duration: "15 min", symbol: "book", accent: .ember, availability: .demo)
 
         let result = StoryCatalog.unique([first, older, demo])
 
