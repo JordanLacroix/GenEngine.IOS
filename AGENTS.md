@@ -1,39 +1,60 @@
 # Instructions agents — GenEngine iOS
 
+GenEngine est un moteur narratif entièrement paramétrable, vendu avec son interface de configuration aux écoles d'ingénieurs, aux entreprises et aux organismes de formation professionnelle. Ce dépôt porte le **client iOS** : il joue les projections calculées par le backend, il n'embarque pas le moteur.
+
+« Le Diapason » est la configuration de référence, jouée à la première initialisation et industrialisable par instance client : 2026, notre monde, l'IA partout, le joueur apprenti en école d'ingénieurs. Six postures — **Lucidité, Discernement, Arbitrage, Courage, Transmission, Autonomie** — remplacent les catégories par matière, pour dix scénarios.
+
+Ce fichier est la source de vérité unique des instructions agent de ce dépôt. [`CLAUDE.md`](CLAUDE.md) n'est qu'un pointeur vers lui et ne doit jamais dupliquer une instruction : deux fichiers substantiels finissent toujours par diverger.
+
+## Ordre de lecture
+
 Lis ce fichier avant toute modification, puis consulte dans cet ordre :
 
-1. [`specs/handoff.md`](specs/handoff.md) pour l’état courant et la prochaine tâche ;
+1. [`specs/handoff.md`](specs/handoff.md) pour l'état réellement vérifié et la prochaine tâche ;
 2. [`specs/invariants.md`](specs/invariants.md) pour les règles non négociables ;
 3. [`specs/architecture.md`](specs/architecture.md) pour les frontières du client ;
 4. [`specs/roadmap.md`](specs/roadmap.md) pour les priorités ;
-5. [`README.md`](README.md) et [`project.yml`](project.yml) pour l’usage et la configuration du projet.
+5. [`README.md`](README.md) et [`project.yml`](project.yml) pour l'usage et la configuration du projet.
 
-Les contrats du backend et les invariants narratifs de référence vivent dans le dépôt [`GenEngine`](https://github.com/JordanLacroix/GenEngine). Le client ne les redéfinit pas.
+Les contrats du backend et les invariants narratifs de référence vivent dans le dépôt [`GenEngine`](https://github.com/JordanLacroix/GenEngine), dont la bible d'univers Diapason (`specs/domain/diapason`). Le client ne les redéfinit pas.
 
 ## Langue et communication
 
 - Écris les échanges utilisateur et la documentation en français.
-- Garde les noms de code, messages d’erreur techniques et commits en anglais.
+- Garde les noms de code, messages d'erreur techniques et commits en anglais.
 - Annonce toute hypothèse qui modifie le périmètre.
 - Ne déclare jamais une tâche terminée avant implémentation et vérification réelles.
+- N'écris jamais une intention comme un fait livré. Si une capacité est souhaitée mais absente, dis-le explicitement.
 
 ## Règles non négociables
 
 - Le backend reste autoritatif sur les histoires, sessions, transitions, permissions et états narratifs.
-- N’implémente aucune règle de `GenEngine.Narrative` dans l’application.
+- N'implémente aucune règle de `GenEngine.Narrative` dans l'application.
 - Conserve les fixtures dans la frontière de démonstration ; une erreur de production ne doit jamais être remplacée silencieusement par une fixture.
-- Garde les imports Authoring, logs bruts et réglages d’endpoints derrière `#if DEBUG`.
+- Garde les imports Authoring, logs bruts et réglages d'endpoints derrière `#if DEBUG`.
 - Traite [`project.yml`](project.yml) comme source de vérité ; ne modifie jamais `project.pbxproj` à la main.
 - Préserve une application universelle iPhone/iPad, Dynamic Type, VoiceOver, les contrastes, Reduce Motion et les cibles tactiles minimales.
 - Préfère SwiftUI, Observation, la concurrence structurée, les types valeur et les dépendances derrière protocoles.
+- La présentation reste plein écran et pilotée par le HUD ; ne réintroduis ni `TabView`, ni `NavigationStack` racine, ni barre de navigation système.
+
+## Configuration et autorisation obligatoires
+
+Ces obligations sont l'adaptation au client des règles du dépôt backend. Le client en est le consommateur, jamais l'autorité.
+
+- **Une permission masquée dans l'interface n'est pas un contrôle d'accès.** Retirer une destination du HUD est une commodité de présentation ; le serveur doit toujours appliquer la règle, et le client doit rester correct lorsque le serveur refuse.
+- Le code client teste des permissions et des scopes, jamais un nom de rôle : les rôles sont personnalisables côté produit.
+- Toute nouvelle fonctionnalité documente dans la même PR ses paramètres, leur défaut, leur portée, leur validation et leur comportement lorsqu'elle est désactivée.
+- Un refus serveur (401, 403, 422 `content_not_assigned`) produit un message explicite et une action de reprise, jamais un repli silencieux sur la démonstration.
+- Les libellés visibles restent configurables par le serveur via le dictionnaire de copies ; ne code en dur qu'un défaut de repli, et documente-le.
+- L'isolation par organisation et par front est appliquée côté service propriétaire ; le client ne la simule pas.
+- Le fonctionnement hors ligne reste possible : la démonstration anonyme ne déclenche aucun appel réseau.
 
 ## Sécurité et configuration
 
 - Ne committe jamais credential, token, IP privée, équipe de signature ou donnée utilisateur générée.
 - Stocke les jetons dans Keychain et uniquement les préférences non sensibles dans `UserDefaults`.
 - Ne désactive jamais App Transport Security globalement.
-- Une permission masquée dans l’interface n’est pas un contrôle d’accès ; le serveur doit toujours l’appliquer.
-- Toute nouvelle configuration documente son défaut, sa portée, sa validation et son comportement désactivé.
+- `GenEngine/Core/Configuration/ServiceEndpoints.swift` porte régulièrement une modification locale non committée (adresse privée pour un test sur appareil). Ne la committe pas et ne la révoque pas.
 
 ## Méthode de travail
 
@@ -41,9 +62,11 @@ Les contrats du backend et les invariants narratifs de référence vivent dans l
 2. Implémente une seule préoccupation cohérente.
 3. Mets à jour code, tests, README, specs et état de handoff dans la même PR.
 4. Utilise des commits conventionnels et le modèle de pull request.
-5. Ne fusionne qu’après réussite des contrôles GitHub requis.
+5. Ne fusionne qu'après réussite des contrôles GitHub requis.
 
 ## Vérifications minimales
+
+Ces trois commandes sont exactement celles qu'exécute la CI ([`.github/workflows/ios.yml`](.github/workflows/ios.yml)) :
 
 ```bash
 xcodegen generate
@@ -55,13 +78,26 @@ xcodebuild test -project GenEngine.xcodeproj -scheme GenEngine \
 
 Après validation, vérifie que le projet généré et les données utilisateur Xcode ne sont pas suivis par Git.
 
+La CI ne fait ni lint, ni analyse statique, ni test de rendu. Un build vert et des tests verts ne disent rien de l'apparence à l'écran.
+
 ## Pièges connus
 
 - Le simulateur utilise `localhost`, mais un appareil physique exige des endpoints HTTPS joignables.
 - Le projet Xcode est généré et volontairement ignoré.
 - Le mode démonstration doit rester navigable sans backend, tout en étant visuellement explicite.
-- L’application appelle actuellement les trois services directement ; un point d’entrée public unique reste recommandé avant distribution.
+- L'application appelle les six services directement ; un point d'entrée public unique reste recommandé avant distribution.
+- **Aucun rendu n'a été observé en simulateur ni sur appareil** pour la coque HUD et la démonstration Diapason : seuls le build et les tests ont été exécutés, sur instruction du propriétaire du dépôt. Ne présente aucune capacité visuelle comme vérifiée.
+- Les valeurs de `HUDMetrics` (`GenEngine/Core/DesignSystem/HUD.swift`) sont des estimations non calibrées à l'écran.
+- `PlayerExperienceView` conserve son propre HUD de sections sous le HUD de la coque. Cette cohabitation n'a jamais été vue à l'écran et reste à arbitrer.
+- Plusieurs vues sont mortes et ne doivent pas être prises pour l'état réel : `DeveloperView` (ses diagnostics ont été réimplémentés dans `AdministrationView`), ainsi que `keyStatus`, `header` et `sectionPicker` dans `PlayerExperienceView`.
+- Les réglages d'endpoints se modifient depuis **Administration**, pas depuis une destination « Developer » : celle-ci n'existe plus dans le HUD.
+- Aucun pack audio n'est livré : l'application est silencieuse par conception, ce n'est pas une panne.
+- Le dépôt est public mais ne possède pas encore de licence ; n'affirme aucune permission de réutilisation.
 
 ## Prochaine tâche
 
-Le parcours client actuel couvre catalogue, authentification, Authoring et Play. La prochaine tranche fonctionnelle dépend des contrats du jalon 4 du backend. N’anticipe ni configuration, ni RBAC, ni organisation, ni assistant sans contrat publié et besoin produit validé.
+Rien n'est cadré. Le client couvre catalogue, Identity, Play, Configuration, PlayerExperience, Organization, la coque HUD plein écran, le graphe de quête avec mémoire cumulée, la carte hors partie et la démonstration Diapason. Les manques honnêtes sont listés dans [`specs/handoff.md`](specs/handoff.md).
+
+La priorité raisonnable, avant toute nouvelle fonctionnalité, est de **regarder l'application tourner** : la coque HUD et la démonstration Diapason n'ont jamais été observées sur simulateur ni sur appareil. Calibrer `HUDMetrics`, trancher la cohabitation des deux HUD dans `PlayerExperienceView` et retirer les vues mortes en découlent directement.
+
+N'anticipe aucune tranche dépendant d'un contrat backend non publié — à commencer par l'audio, pour lequel le serveur ne publie rien.
