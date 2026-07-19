@@ -12,3 +12,6 @@
 10. `project.yml` reste l’unique source de vérité du projet Xcode généré.
 11. Le mode démonstration reste navigable sans backend et clairement identifiable.
 12. Les contrats inconnus ou incompatibles échouent explicitement au lieu d’être interprétés silencieusement.
+13. Le mode démonstration n’est accessible que dans l’état anonyme ; aucun point d’entrée ne subsiste une fois authentifié.
+14. La présentation reste plein écran et pilotée par le HUD ; aucune chrome de navigation système n’est réintroduite.
+15. Le son est désactivable en permanence et ne porte jamais seul une information.

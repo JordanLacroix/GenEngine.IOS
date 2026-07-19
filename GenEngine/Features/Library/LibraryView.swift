@@ -14,6 +14,26 @@ struct LibraryView: View {
             StoryCanvas(accent: GenEngineTheme.verdigris)
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    // La recherche est un élément du HUD, pas une barre de navigation système.
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(GenEngineTheme.amber).accessibilityHidden(true)
+                        TextField(searchPrompt, text: $query)
+                            .textFieldStyle(.plain)
+                            .foregroundStyle(GenEngineTheme.ivory)
+                            .autocorrectionDisabled()
+                            .accessibilityLabel(searchPrompt)
+                        if !query.isEmpty {
+                            Button { query = "" } label: {
+                                Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(GenEngineTheme.secondaryText)
+                            .accessibilityLabel("Effacer la recherche")
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 52)
+                    .hudSurface(cornerRadius: 18)
                     if let categories = state.experience?.document.categories.filter(\.isVisible), !categories.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
@@ -57,15 +77,17 @@ struct LibraryView: View {
                     }
                 }
                 .padding(22)
-                .padding(.bottom, 100)
+                .padding(.bottom, 24)
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in
                     min(availableWidth, 1_024)
                 }
             }
         }
-        .navigationTitle(state.copy("nav.library", fallback: "Bibliothèque"))
-        .searchable(text: $query, prompt: "Rechercher \(state.copy("entity.story.singular", fallback: "une histoire").lowercased())")
         .task { await state.loadCatalog() }
+    }
+
+    private var searchPrompt: String {
+        "Rechercher \(state.copy("entity.story.singular", fallback: "une histoire").lowercased())"
     }
 }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlayerView: View {
     @Environment(AppState.self) private var state
+    @Environment(GameAudioDirector.self) private var audio
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var textInput = ""
     @State private var showsTree = false
@@ -36,9 +37,22 @@ struct PlayerView: View {
                 }
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showsTree) { SessionTreeView(graph: state.questGraph, failure: state.treeError) }
+        .overlay {
+            // La carte est un panneau de HUD superposé au jeu, pas un écran de navigation.
+            if showsTree {
+                HUDOverlayPanel(title: "Carte du scénario", symbol: "point.3.connected.trianglepath.dotted", onClose: { showsTree = false }) {
+                    SessionTreePanel(graph: state.questGraph, failure: state.treeError)
+                }
+            }
+        }
+        .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: showsTree)
+        .task { audio.enter(.session) }
         .onChange(of: state.step?.nodeId) { _, _ in interactionCompleted = false }
+        // Le son ne fait que doubler un état déjà écrit à l'écran (« Chemin accompli »).
+        .onChange(of: state.step?.status) { _, status in
+            guard let status, status == .completed || status == .abandoned else { return }
+            audio.signal(.gameOver)
+        }
     }
 
     private func playerHeader(session: SessionView) -> some View {
@@ -116,6 +130,7 @@ struct PlayerView: View {
             VStack(spacing: 14) {
                 ForEach(Array(step.choices.enumerated()), id: \.element.id) { index, choice in
                     Button {
+                        audio.signal(.choice)
                         Task {
                             if step.kind == .quiz { await state.submit(answerID: choice.id) }
                             else { await state.submit(choiceID: choice.id) }
@@ -144,7 +159,7 @@ struct PlayerView: View {
     private func interactionArtifact(_ step: CurrentStep) -> some View {
         if step.status != .completed && step.status != .abandoned {
             if state.isDemoSession, let interaction = DemoStory.node(id: step.nodeId)?.interaction {
-                HStack(spacing: 14) { Image(systemName: interaction.symbol).font(.title).foregroundStyle(GenEngineTheme.amber); VStack(alignment: .leading) { EyebrowText(text: "INTERACTION DU SCÉNARIO", color: GenEngineTheme.amber); Text(interaction.label).font(.headline).foregroundStyle(GenEngineTheme.ivory); Text(interaction.hint).font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Button(interactionCompleted ? "Signal reçu" : "Interagir") { interactionCompleted = true }.buttonStyle(.borderedProminent).tint(GenEngineTheme.verdigris) }.padding(16).frame(maxWidth: 720).glassPanel()
+                HStack(spacing: 14) { Image(systemName: interaction.symbol).font(.title).foregroundStyle(GenEngineTheme.amber); VStack(alignment: .leading) { EyebrowText(text: "INTERACTION DU SCÉNARIO", color: GenEngineTheme.amber); Text(interaction.label).font(.headline).foregroundStyle(GenEngineTheme.ivory); Text(interaction.hint).font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Button(interactionCompleted ? "Signal reçu" : "Interagir") { interactionCompleted = true; audio.signal(.reward) }.buttonStyle(.borderedProminent).tint(GenEngineTheme.verdigris) }.padding(16).frame(maxWidth: 720).glassPanel()
             } else if !state.isDemoSession {
                 Label(materializedLabel(step), systemImage: "hand.tap.fill").font(.caption).foregroundStyle(GenEngineTheme.verdigris).padding(12).glassPanel()
             }
@@ -188,31 +203,21 @@ struct PlayerView: View {
     }
 }
 
-private struct SessionTreeView: View {
+private struct SessionTreePanel: View {
     let graph: QuestGraph?
     let failure: String?
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                StoryCanvas(accent: GenEngineTheme.violet)
-                ScrollView {
-                    if let graph {
-                        QuestGraphView(graph: graph, title: "Carte du scénario", subtitle: "Tout le scénario, pas seulement le chemin emprunté.")
-                            .padding(18)
-                    } else if let failure {
-                        VStack(spacing: 10) {
-                            Label("Carte indisponible", systemImage: "exclamationmark.triangle.fill").font(.headline).foregroundStyle(GenEngineTheme.amber)
-                            Text(failure).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).multilineTextAlignment(.center)
-                        }
-                        .padding(24)
-                    } else {
-                        ProgressView("Chargement de la carte…").tint(GenEngineTheme.amber).padding(40)
-                    }
-                }
+        if let graph {
+            QuestGraphView(graph: graph, title: "Carte du scénario", subtitle: "Tout le scénario, pas seulement le chemin emprunté.")
+        } else if let failure {
+            VStack(spacing: 10) {
+                Label("Carte indisponible", systemImage: "exclamationmark.triangle.fill").font(.headline).foregroundStyle(GenEngineTheme.amber)
+                Text(failure).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).multilineTextAlignment(.center)
             }
-            .navigationTitle("Exploration")
-            .navigationBarTitleDisplayMode(.inline)
+            .frame(maxWidth: .infinity)
+        } else {
+            ProgressView("Chargement de la carte…").tint(GenEngineTheme.amber).padding(40)
         }
     }
 }

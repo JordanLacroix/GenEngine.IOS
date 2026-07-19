@@ -9,11 +9,15 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 30) {
                     header
-                    HeroStoryCard(story: DemoStory.summary, startLabel: state.copy("action.start", fallback: "Commencer")) { Task { await state.open(DemoStory.summary) } }
+                    // L'histoire mise en avant est la démonstration hors ligne pour un
+                    // visiteur anonyme, et une histoire réelle du catalogue une fois connecté.
+                    if let featured = state.featuredStory {
+                        HeroStoryCard(story: featured, startLabel: state.copy("action.start", fallback: "Commencer")) { Task { await state.open(featured) } }
+                    }
                     VStack(alignment: .leading, spacing: 14) {
                         Text(state.copy("home.discover", fallback: "À découvrir")).font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 16)], spacing: 16) {
-                            ForEach(state.stories.dropFirst()) { story in
+                            ForEach(state.stories.filter { $0.id != state.featuredStory?.id }) { story in
                                 CompactStoryCard(story: story) { Task { await state.open(story) } }
                             }
                         }
@@ -21,14 +25,12 @@ struct HomeView: View {
                 }
                 .padding(.horizontal, 22)
                 .padding(.top, 18)
-                .padding(.bottom, 110)
+                .padding(.bottom, 24)
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in
                     min(availableWidth, 1_024)
                 }
             }
         }
-        .navigationTitle(state.copy("nav.home", fallback: "Accueil"))
-        .navigationBarTitleDisplayMode(.inline)
         .task { await state.loadCatalog() }
     }
 

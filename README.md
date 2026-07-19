@@ -55,6 +55,9 @@ Le dépôt conserve deux parcours explicitement séparés :
 | Portes ancrées aux repères de la carte | ✅ Adaptées à `scaledToFill` |
 | Périodes métier et import CSV de memberships | ✅ Prévalidation, rapport d’erreurs et application idempotente |
 | Affectations de parcours et catalogue filtré | ✅ Résolues côté serveur et reflétées nativement |
+| Présentation plein écran pilotée par un HUD | ✅ Barre basse iPhone, rail iPad, aucune chrome système |
+| Démonstration réservée à l’état anonyme | ✅ Retirée de tous les points d’entrée connectés |
+| Audio configurable et désactivable | ⚠️ Abstraction et réglages prêts, aucun pack d’assets livré |
 
 ## Démarrage rapide
 
@@ -107,12 +110,65 @@ Le configurateur s’adapte en deux colonnes sur iPad et en pile sur les largeur
 
 Un exemple est fourni dans [`GenEngine/Resources/aster-familiar-pack.json`](GenEngine/Resources/aster-familiar-pack.json).
 
+### Présentation plein écran et HUD
+
+L’application n’utilise plus ni `TabView`, ni `NavigationStack`, ni barre de navigation système. `GameShellView` affiche la destination courante bord à bord et superpose un HUD :
+
+- barre haute permanente (nom du jeu, état de chargement, son) ;
+- navigation en barre basse sur largeur compacte (iPhone), en rail vertical à gauche sur largeur régulière (iPad) ;
+- menus rendus en panneaux superposés (`HUDOverlayPanel`) plutôt qu’en écrans empilés ;
+- partie présentée en `fullScreenCover`, avec son propre HUD et sa carte en panneau.
+
+Le HUD flotte : il ne réserve pas de place, mais le contenu défilant dégage sa zone via `safeAreaPadding`, de sorte qu’aucune commande ne reste sous la surcouche. Le HUD est un conteneur d’accessibilité voisin du contenu : il n’est jamais `accessibilityHidden`, ne piège pas le focus VoiceOver, et seuls les panneaux réellement modaux portent le trait `isModal`. Chaque cible tactile fait au moins 44 points et chaque état est porté par un symbole et un texte, jamais par la couleur seule.
+
+`AppState.destinations` calcule les destinations exposées selon l’authentification puis les permissions, et `AppState.activeTab` ramène la sélection dans cette liste : un changement d’état ne laisse jamais le HUD sur une destination disparue. Masquer une destination reste une commodité d’interface et ne remplace pas l’autorisation côté serveur.
+
+### Démonstration réservée à l’état anonyme
+
+La démonstration hors ligne est un argument de découverte, pas une fonctionnalité du produit connecté. Une fois le joueur authentifié :
+
+- `AppState.isDemoAvailable` passe à faux et `DemoStory.library` quitte le catalogue ;
+- la destination `Accueil`, qui met la démonstration en avant, disparaît du HUD ;
+- `unlockDemo()`, `startDemo()` et `open(_:)` refusent la fixture, avec un message explicite dans le dernier cas ;
+- la mémoire cumulée de démonstration n’apparaît plus dans le journal ;
+- une authentification en cours de démonstration referme immédiatement l’accès et la partie hors ligne.
+
+Pour un visiteur anonyme, la démonstration reste intégralement jouable sans réseau : elle ne déclenche aucun appel HTTP.
+
+### Son
+
+Le son passe par `GameAudioDirector`, qui ne connaît que le protocole `GameAudioEngine`. Trois couches indépendantes existent — ambiance liée au lieu de l’application, musique et signaux — chacune avec son volume, et le tout est désactivable à tout instant depuis la barre haute du HUD.
+
+Les assets ne sont pas codés en dur : ils sont déclarés par un manifeste `GenEngine/Resources/audio-manifest.json` de schéma `1`.
+
+```json
+{
+  "version": 1,
+  "attribution": "Kenney (CC0)",
+  "license": "CC0-1.0",
+  "ambiences": { "world": { "resource": "amb-world", "fileExtension": "m4a", "gain": 0.9, "loops": true } },
+  "cues": { "choice": { "resource": "sfx-choice", "fileExtension": "m4a" } }
+}
+```
+
+Clés d’ambiance : `welcome`, `home`, `library`, `world`, `studio`, `administration`, `account`, `session`. Clés de signature : `choice`, `error`, `reward`, `gameOver` — cette dernière étant jouée sur la couche musique et non bouclée.
+
+Comportement par défaut et modes dégradés :
+
+- **aucun manifeste livré** : cas nominal actuel, l’application reste silencieuse et le panneau de son l’annonce explicitement ;
+- **fichier annoncé introuvable** : la piste est ignorée, jamais l’action ;
+- **version de schéma inconnue** : refus explicite et diagnostic, jamais d’interprétation approximative ;
+- **son coupé** : toutes les couches sont ramenées à zéro et l’ambiance est arrêtée.
+
+La session audio utilise la catégorie `ambient` avec `mixWithOthers` : l’application ne coupe jamais la musique déjà écoutée par le joueur et respecte le commutateur silencieux. Aucun son n’est le seul porteur d’une information : chaque signature double un retour visuel déjà rendu à l’écran. Les réglages sont des préférences locales non sensibles dans `UserDefaults` ; le backend ne publie aucun contrat audio à ce jour et n’est donc pas sollicité.
+
 ## Architecture
 
 ```text
 GenEngine/
-├── App/                 # Entrée, navigation et état produit
+├── App/                 # Entrée, coque HUD plein écran et état produit
 ├── Core/
+│   ├── Audio/           # Ambiances, signatures et réglages sonores
 │   ├── Configuration/   # Environnements et endpoints
 │   ├── DesignSystem/    # Tokens et composants partagés
 │   ├── Models/          # Modèles API et présentation

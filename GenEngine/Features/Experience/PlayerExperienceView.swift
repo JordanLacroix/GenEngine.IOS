@@ -37,7 +37,6 @@ struct PlayerExperienceViewScreen: View {
                 immersiveWorld
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
         .task { await state.loadPlatformContext(); await state.loadCatalog(); await state.loadJournal(); hydrateSelection() }
         .fileImporter(isPresented: $showsAssetImporter, allowedContentTypes: [.json]) { importAssetPack($0) }
         .fullScreenCover(isPresented: $showsKeyReward) { keyReward }
@@ -52,7 +51,7 @@ struct PlayerExperienceViewScreen: View {
             else { sectionOverlay }
             gameHUD
         }
-        .background(Color.black).ignoresSafeArea()
+        .background(Color.black)
     }
 
     private var worldDoors: some View {
@@ -82,12 +81,10 @@ struct PlayerExperienceViewScreen: View {
     private var gameHUD: some View {
         VStack {
             HStack(spacing: 12) {
-                Button { state.selectedTab = .home } label: { Label(state.gameName, systemImage: "g.circle.fill").font(.headline) }
                 Spacer()
                 Label(state.playerExperience?.onboarding.status == "Completed" ? "Clé acquise" : "Clé à gagner", systemImage: "key.fill")
                 Text("\(state.playerExperience?.balance ?? 0) \(state.playerExperience?.currencyIcon ?? "✦")").fontWeight(.bold).foregroundStyle(GenEngineTheme.amber)
                 Button { section = .companion } label: { Label(customName.isEmpty ? "Compagnon" : customName, systemImage: "sparkles") }
-                Button { state.selectedTab = .account } label: { Image(systemName: "person.crop.circle.fill").font(.title2) }.accessibilityLabel("Ouvrir le compte")
             }
             .font(.subheadline).foregroundStyle(GenEngineTheme.ivory).padding(10).glassPanel()
             Spacer()
@@ -262,9 +259,6 @@ struct PlayerExperienceViewScreen: View {
                 .padding(16)
                 .glassPanel()
                 .task(id: mastery.scenarioVersionId) { await state.loadScenarioStructure(for: mastery.scenarioVersionId) }
-            }
-            if let graph = state.demoQuestGraph {
-                QuestGraphView(graph: graph, title: "Mémoire de la démonstration", subtitle: "Ce que vous avez découvert au fil de vos parties de démonstration.")
             }
             ForEach(entries) { entry in
                 HStack(alignment: .top, spacing: 14) {
