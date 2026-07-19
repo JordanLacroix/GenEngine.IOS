@@ -1,17 +1,26 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Contenus de l'univers. La carte n'est pas un onglet : c'est l'état de repos de l'écran.
+///
+/// Ces cinq entrées formaient auparavant une seconde barre d'onglets, posée sous la barre
+/// de navigation globale de la coque. Deux barres d'onglets empilées en bas d'écran ne
+/// disent pas au joueur laquelle le déplace : les quatre panneaux sont devenus des actions
+/// du bandeau haut, et la carte reste le fond permanent.
 private enum UniverseSection: String, CaseIterable, Identifiable {
     case map, journal, companion, shop, help
     var id: String { rawValue }
     var title: String { switch self { case .map: "Carte"; case .journal: "Journal"; case .companion: "Compagnon"; case .shop: "Magasin"; case .help: "Aide" } }
     var symbol: String { switch self { case .map: "map.fill"; case .journal: "book.closed.fill"; case .companion: "sparkles"; case .shop: "bag.fill"; case .help: "questionmark.circle.fill" } }
+
+    /// Les panneaux réellement ouvrables. `map` en est exclue : elle est déjà à l'écran.
+    static var panels: [UniverseSection] { [.journal, .companion, .shop, .help] }
 }
 
 struct PlayerExperienceViewScreen: View {
     @Environment(AppState.self) private var state
     @State private var section: UniverseSection = .map
-    @State private var search = ""
+    @State private var doorPage = 0
     @State private var familiarID: UUID?
     @State private var form = "spark"
     @State private var tone = "Warm"
@@ -54,51 +63,138 @@ struct PlayerExperienceViewScreen: View {
         .background(Color.black)
     }
 
+    /// Portes de la carte. Toutes les catégories visibles sont atteignables, sans plafond.
+    ///
+    /// Le `GeometryReader` **ne** déborde **plus** la zone sûre : elle est déjà étendue par
+    /// `GameShellView` pour dégager le HUD global, et déborder revenait à poser des portes
+    /// sous les barres. Les positions viennent de `doorPlacement`, calculé en points écran.
     private var worldDoors: some View {
         GeometryReader { proxy in
-            ForEach(Array(visibleCategories.prefix(5).enumerated()), id: \.element.id) { index, category in
-                let anchors = PlayerExperiencePresentation.doorAnchors(for: proxy.size)
-                let point = PlayerExperiencePresentation.projectMapPoint(anchors[index % anchors.count], into: proxy.size)
-                Button { withAnimation(.snappy) { selectedCategoryID = category.id; section = .map } } label: {
-                    VStack(spacing: 5) {
-                        Image(systemName: selectedCategoryID == category.id ? "door.left.hand.open" : "door.left.hand.closed")
-                            .font(.system(size: 42)).foregroundStyle(GenEngineTheme.amber)
-                        Text(category.name).font(.system(.headline, design: .serif)).multilineTextAlignment(.center)
-                        Text("PORTE \(category.order)").font(.caption2).tracking(1.2)
-                    }
-                    .padding(12).foregroundStyle(GenEngineTheme.ivory)
-                    .background(.black.opacity(selectedCategoryID == category.id ? 0.82 : 0.64), in: RoundedRectangle(cornerRadius: 18))
-                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(selectedCategoryID == category.id ? GenEngineTheme.amber : .white.opacity(0.18)))
-                    .shadow(color: .black.opacity(0.5), radius: 20, y: 10)
+            let categories = visibleCategories
+            let placement = PlayerExperiencePresentation.doorPlacement(
+                total: categories.count, page: doorPage, viewport: proxy.size)
+            ZStack(alignment: .bottom) {
+                ForEach(Array(placement.range.enumerated()), id: \.element) { slot, index in
+                    let category = categories[index]
+                    door(category, isSelected: selectedCategoryID == category.id, size: placement.size)
+                        .position(placement.positions[slot])
                 }
-                .buttonStyle(.plain)
-                .position(point)
-                .accessibilityHint("Afficher les histoires de cette région")
+                if placement.isPaginated {
+                    doorPager(placement)
+                        .position(x: proxy.size.width / 2, y: placement.field.maxY + 22)
+                }
             }
-        }.ignoresSafeArea()
+            .onChange(of: placement.pageCount) { _, count in
+                if doorPage >= count { doorPage = max(0, count - 1) }
+            }
+        }
     }
 
-    private var gameHUD: some View {
-        VStack {
-            HStack(spacing: 12) {
-                Spacer()
-                Label(state.playerExperience?.onboarding.status == "Completed" ? "Clé acquise" : "Clé à gagner", systemImage: "key.fill")
-                Text("\(state.playerExperience?.balance ?? 0) \(state.playerExperience?.currencyIcon ?? "✦")").fontWeight(.bold).foregroundStyle(GenEngineTheme.amber)
-                Button { section = .companion } label: { Label(customName.isEmpty ? "Compagnon" : customName, systemImage: "sparkles") }
+    /// Pagination des portes. Elle n'apparaît que lorsque l'écran ne peut pas toutes les
+    /// porter lisiblement : mieux vaut une page suivante annoncée qu'un empilement muet.
+    private func doorPager(_ placement: PlayerExperiencePresentation.DoorPlacement) -> some View {
+        HStack(spacing: 14) {
+            Button { doorPage = max(0, doorPage - 1) } label: {
+                Image(systemName: "chevron.left").frame(width: HUDMetrics.minimumTarget, height: HUDMetrics.minimumTarget)
             }
-            .font(.subheadline).foregroundStyle(GenEngineTheme.ivory).padding(10).glassPanel()
-            Spacer()
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(UniverseSection.allCases) { item in
-                        Button { withAnimation(.snappy) { section = item } } label: { Label(item.title, systemImage: item.symbol).padding(.horizontal, 12).frame(minHeight: 48) }
-                            .buttonStyle(.plain).foregroundStyle(section == item ? GenEngineTheme.amber : GenEngineTheme.ivory)
-                            .background(section == item ? GenEngineTheme.ember.opacity(0.18) : Color.clear, in: Capsule())
-                    }
-                }.padding(5).glassPanel()
-            }.frame(maxWidth: 620)
+            .disabled(placement.page == 0)
+            .accessibilityLabel("Portes précédentes")
+            Text("Portes \(placement.range.lowerBound + 1)–\(placement.range.upperBound) sur \(visibleCategories.count)")
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+            Button { doorPage = min(placement.pageCount - 1, doorPage + 1) } label: {
+                Image(systemName: "chevron.right").frame(width: HUDMetrics.minimumTarget, height: HUDMetrics.minimumTarget)
+            }
+            .disabled(placement.page >= placement.pageCount - 1)
+            .accessibilityLabel("Portes suivantes")
         }
-        .padding(16)
+        .padding(.horizontal, 10)
+        .foregroundStyle(GenEngineTheme.ivory)
+        .glassPanel()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Page \(placement.page + 1) sur \(placement.pageCount) de portes")
+    }
+
+    private func door(_ category: CategoryDefinition, isSelected: Bool, size: CGSize) -> some View {
+        // La densité décide de la mise en page, pas un seuil sur le nombre de catégories :
+        // c'est la taille réellement disponible qui dit ce qu'une porte peut afficher.
+        let isCompact = size.width < 170
+        let progress = PlayerExperiencePresentation.doorProgress(
+            category: category,
+            stories: state.stories,
+            savedSessions: state.savedSessions)
+        return Button { withAnimation(.snappy) { selectedCategoryID = category.id; section = .map } } label: {
+            VStack(spacing: 5) {
+                Image(systemName: isSelected ? "door.left.hand.open" : "door.left.hand.closed")
+                    .font(.system(size: isCompact ? 28 : 42)).foregroundStyle(GenEngineTheme.amber)
+                Text(category.name)
+                    .font(.system(isCompact ? .subheadline : .headline, design: .serif))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                Text("PORTE \(category.order)").font(.caption2).tracking(1.2)
+                // La progression existait déjà dans la bibliothèque ; la carte l'ignorait.
+                ProgressView(value: progress.fraction)
+                    .tint(GenEngineTheme.verdigris)
+                Text(progress.label)
+                    .font(.caption2)
+                    .foregroundStyle(GenEngineTheme.secondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .padding(isCompact ? 9 : 12)
+            // La porte occupe exactement la place que la disposition lui a réservée :
+            // c'est ce qui garantit qu'elle ne mord ni sur ses voisines, ni sur le cadre.
+            .frame(width: size.width, height: size.height)
+            .foregroundStyle(GenEngineTheme.ivory)
+            .background(.black.opacity(isSelected ? 0.86 : 0.68), in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(isSelected ? GenEngineTheme.amber : .white.opacity(0.18)))
+            .shadow(color: .black.opacity(0.5), radius: 20, y: 10)
+        }
+        .buttonStyle(.plain)
+        .frame(minWidth: HUDMetrics.minimumTarget, minHeight: HUDMetrics.minimumTarget)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Porte \(category.order), \(category.name). \(progress.label)")
+        .accessibilityHint("Afficher les histoires de cette région")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// Bandeau interne de l'univers.
+    ///
+    /// Il n'y a plus qu'une seule barre d'onglets à l'écran, celle de la coque. Ce bandeau
+    /// n'est pas une navigation concurrente : il ouvre des panneaux superposés. Il se place
+    /// dans la zone laissée libre par `HUDMetrics`, que `GameShellView` réserve déjà en
+    /// étendant la zone sûre de la destination.
+    private var gameHUD: some View {
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 10) {
+                    Label(state.playerExperience?.onboarding.status == "Completed" ? "Clé acquise" : "Clé à gagner", systemImage: "key.fill")
+                        .font(.subheadline)
+                    Text("\(state.playerExperience?.balance ?? 0) \(state.playerExperience?.currencyIcon ?? "✦")")
+                        .fontWeight(.bold)
+                        .foregroundStyle(GenEngineTheme.amber)
+                        .accessibilityLabel("Solde : \(state.playerExperience?.balance ?? 0) \(state.playerExperience?.currencyName ?? "accords")")
+                    ForEach(UniverseSection.panels) { item in
+                        HUDButton(
+                            symbol: item.symbol,
+                            title: item == .companion && !customName.isEmpty ? customName : item.title,
+                            showsTitle: true,
+                            isSelected: section == item,
+                            hint: "Ouvrir le panneau \(item.title)") {
+                                withAnimation(.snappy) { section = item }
+                            }
+                    }
+                }
+                .padding(6)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(maxWidth: 620)
+            .foregroundStyle(GenEngineTheme.ivory)
+            .glassPanel()
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 
     @ViewBuilder private var sectionOverlay: some View {
@@ -116,13 +212,52 @@ struct PlayerExperienceViewScreen: View {
         }
     }
 
+    /// Récits de la porte sélectionnée. `LazyHStack` : le dock ne construit plus la totalité
+    /// du catalogue d'un coup pour n'en montrer que deux cartes.
     private var storyDock: some View {
-        VStack { Spacer(); HStack(alignment: .bottom, spacing: 16) {
-            if let category = visibleCategories.first(where: { $0.id == selectedCategoryID }) {
-                VStack(alignment: .leading, spacing: 5) { EyebrowText(text: "PORTE \(category.order)", color: GenEngineTheme.amber); Text(category.name).font(.system(.title2, design: .serif, weight: .bold)); Text(category.description).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2) }.frame(width: 230, alignment: .leading)
+        VStack {
+            Spacer()
+            HStack(alignment: .bottom, spacing: 16) {
+                if let category = visibleCategories.first(where: { $0.id == selectedCategoryID }) {
+                    let progress = PlayerExperiencePresentation.doorProgress(
+                        category: category,
+                        stories: state.stories,
+                        savedSessions: state.savedSessions)
+                    VStack(alignment: .leading, spacing: 5) {
+                        EyebrowText(text: "PORTE \(category.order)", color: GenEngineTheme.amber)
+                        Text(category.name).font(.system(.title2, design: .serif, weight: .bold))
+                        Text(category.description).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2)
+                        ProgressView(value: progress.fraction).tint(GenEngineTheme.verdigris)
+                        Text(progress.label).font(.caption2).foregroundStyle(GenEngineTheme.secondaryText)
+                    }
+                    .frame(width: 230, alignment: .leading)
+                    .accessibilityElement(children: .combine)
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 10) {
+                        ForEach(filteredStories) { story in
+                            Button { Task { await state.open(story) } } label: {
+                                VStack(alignment: .leading, spacing: 7) {
+                                    Text(story.eyebrow.uppercased()).font(.caption2).foregroundStyle(GenEngineTheme.amber)
+                                    Text(story.title).font(.system(.headline, design: .serif))
+                                    Text(story.synopsis).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2)
+                                    Label("Entrer", systemImage: "arrow.right").font(.caption.bold())
+                                }
+                                .padding(14)
+                                .frame(width: 240, alignment: .leading)
+                                .glassPanel()
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(story.title). \(story.synopsis)")
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .scrollBounceBehavior(.basedOnSize)
             }
-            ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 10) { ForEach(filteredStories) { story in Button { Task { await state.open(story) } } label: { VStack(alignment: .leading, spacing: 7) { Text(story.eyebrow.uppercased()).font(.caption2).foregroundStyle(GenEngineTheme.amber); Text(story.title).font(.system(.headline, design: .serif)); Text(story.synopsis).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2); Label("Entrer", systemImage: "arrow.right").font(.caption.bold()) }.padding(14).frame(width: 240, alignment: .leading).glassPanel() }.buttonStyle(.plain) } } }
-        }.foregroundStyle(GenEngineTheme.ivory).padding(16).padding(.bottom, 64) }
+            .foregroundStyle(GenEngineTheme.ivory)
+            .padding(16)
+        }
     }
 
     private var familiarFirstRun: some View {
@@ -132,34 +267,6 @@ struct PlayerExperienceViewScreen: View {
                 image: "FamiliarAster",
                 overlay: LinearGradient(colors: [.black.opacity(0.2), .black.opacity(0.94)], startPoint: .top, endPoint: .bottom)
             )
-    }
-
-    private var keyStatus: some View {
-        let hasKey = state.playerExperience?.onboarding.status == "Completed"
-        return HStack { Label(hasKey ? "Clé du prologue acquise" : "Prologue passé · clé à gagner", systemImage: hasKey ? "key.fill" : "key.horizontal").foregroundStyle(GenEngineTheme.amber); Spacer(); Text(hasKey ? "Toutes les portes sont ouvertes" : "Rejouez le prologue depuis Compte").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }
-            .padding(14).glassPanel()
-    }
-
-    private var header: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 6) {
-                EyebrowText(text: state.gameName)
-                Text("Un monde. Tous vos chemins.").font(.system(.largeTitle, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
-                Text("Explorez, retrouvez vos accomplissements et poursuivez les branches encore inconnues.").foregroundStyle(GenEngineTheme.secondaryText)
-            }
-            Spacer()
-            VStack(alignment: .trailing) {
-                Text("\(state.playerExperience?.balance ?? 0)").font(.system(size: 32, weight: .bold, design: .rounded))
-                Text("\(state.playerExperience?.currencyIcon ?? "♪") \(state.playerExperience?.currencyName ?? "Accords")").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
-            }.foregroundStyle(GenEngineTheme.amber)
-        }
-    }
-
-    private var sectionPicker: some View {
-        Picker("Votre univers", selection: $section) {
-            ForEach(UniverseSection.allCases) { item in Label(item.title, systemImage: item.symbol).tag(item) }
-        }
-        .pickerStyle(.segmented)
     }
 
     private func nextTutorialStep(_ bootstrap: PlayerBootstrapView) -> OnboardingStepDefinition? {
@@ -202,45 +309,10 @@ struct PlayerExperienceViewScreen: View {
         return "sparkle.magnifyingglass"
     }
 
-    private var map: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 5) { Label("La carte des portes", systemImage: "map.fill").font(.title2.bold()); Text(state.playerExperience?.onboarding.status == "Completed" ? "Votre clé ouvre n’importe quelle région. Chaque porte rassemble les histoires configurées dans sa catégorie." : "Le prologue a été passé. Rejouez-le pour gagner la clé ; la disponibilité des histoires reste décidée par le serveur.").foregroundStyle(GenEngineTheme.secondaryText) }.foregroundStyle(GenEngineTheme.ivory)
-            TextField("Rechercher une histoire", text: $search).textFieldStyle(.roundedBorder)
-            GeometryReader { proxy in
-                ZStack {
-                    Image("WorldMap").resizable().scaledToFill().frame(width: proxy.size.width, height: proxy.size.height).clipped()
-                    LinearGradient(colors: [.black.opacity(0.08), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
-                    ForEach(Array(visibleCategories.prefix(5).enumerated()), id: \.element.id) { index, category in
-                        let anchors = PlayerExperiencePresentation.doorAnchors(for: proxy.size)
-                        let point = PlayerExperiencePresentation.projectMapPoint(anchors[index % anchors.count], into: proxy.size)
-                        Button { selectedCategoryID = category.id } label: {
-                            VStack(spacing: 5) {
-                                Image(systemName: selectedCategoryID == category.id ? "door.left.hand.open" : "door.left.hand.closed").font(.system(size: 38)).foregroundStyle(GenEngineTheme.amber)
-                                Text(category.name).font(.system(.headline, design: .serif)).multilineTextAlignment(.center)
-                                Text("PORTE \(category.order)").font(.caption2)
-                            }.padding(10).foregroundStyle(GenEngineTheme.ivory).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(selectedCategoryID == category.id ? GenEngineTheme.amber : .white.opacity(0.18)))
-                        }.buttonStyle(.plain).position(point)
-                    }
-                }
-            }
-            .frame(height: 620).clipShape(RoundedRectangle(cornerRadius: 28)).overlay(RoundedRectangle(cornerRadius: 28).stroke(.white.opacity(0.12)))
-            if let selected = visibleCategories.first(where: { $0.id == selectedCategoryID }) { Text(selected.description).foregroundStyle(GenEngineTheme.secondaryText) }
-            Text("Histoires disponibles").font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 14)], spacing: 14) {
-                ForEach(filteredStories) { story in
-                    CompactStoryCard(story: story) { Task { await state.open(story) } }
-                }
-            }
-        }
-    }
-
     private var filteredStories: [StorySummary] {
-        let category = visibleCategories.first { $0.id == selectedCategoryID }
-        return state.stories.filter { story in
-            let matchesSearch = search.isEmpty || "\(story.title) \(story.synopsis)".localizedCaseInsensitiveContains(search)
-            guard matchesSearch, let ids = category?.scenarioIds, !ids.isEmpty else { return matchesSearch }
-            return story.scenarioID.map(ids.contains) ?? false
-        }
+        guard let ids = visibleCategories.first(where: { $0.id == selectedCategoryID })?.scenarioIds, !ids.isEmpty
+        else { return state.stories }
+        return state.stories.filter { story in story.scenarioID.map(ids.contains) ?? false }
     }
 
     private var visibleCategories: [CategoryDefinition] { (state.experience?.document.categories ?? []).filter(\.isVisible).sorted { $0.order < $1.order } }

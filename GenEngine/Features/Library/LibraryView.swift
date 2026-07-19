@@ -36,7 +36,7 @@ struct LibraryView: View {
                     .hudSurface(cornerRadius: 18)
                     if let categories = state.experience?.document.categories.filter(\.isVisible), !categories.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
+                            LazyHStack(spacing: 12) {
                                 ForEach(categories) { category in
                                     let scenarioIDs = Set(category.scenarioIds ?? [])
                                     let stories = state.stories.filter { story in story.scenarioID.map(scenarioIDs.contains) == true }

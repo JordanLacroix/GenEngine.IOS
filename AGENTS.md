@@ -31,7 +31,7 @@ Les contrats du backend et les invariants narratifs de référence vivent dans l
 - Le backend reste autoritatif sur les histoires, sessions, transitions, permissions et états narratifs.
 - N'implémente aucune règle de `GenEngine.Narrative` dans l'application.
 - Conserve les fixtures dans la frontière de démonstration ; une erreur de production ne doit jamais être remplacée silencieusement par une fixture.
-- Garde les imports Authoring, logs bruts et réglages d'endpoints derrière `#if DEBUG`.
+- Garde les imports Authoring et les logs bruts derrière `#if DEBUG`. L’adressage des six services, lui, est un réglage utilisateur disponible en Release et avant connexion (`Features/Settings`) : ne le renvoie pas derrière `#if DEBUG`.
 - Traite [`project.yml`](project.yml) comme source de vérité ; ne modifie jamais `project.pbxproj` à la main.
 - Préserve une application universelle iPhone/iPad, Dynamic Type, VoiceOver, les contrastes, Reduce Motion et les cibles tactiles minimales.
 - Préfère SwiftUI, Observation, la concurrence structurée, les types valeur et les dépendances derrière protocoles.
@@ -105,16 +105,16 @@ La CI ne fait toujours ni lint Swift, ni analyse statique du code applicatif, ni
 - L'application appelle les six services directement ; un point d'entrée public unique reste recommandé avant distribution.
 - **Aucun rendu n'a été observé en simulateur ni sur appareil** pour la coque HUD et la démonstration Diapason : seuls le build et les tests ont été exécutés, sur instruction du propriétaire du dépôt. Ne présente aucune capacité visuelle comme vérifiée.
 - Les valeurs de `HUDMetrics` (`GenEngine/Core/DesignSystem/HUD.swift`) sont des estimations non calibrées à l'écran.
-- `PlayerExperienceView` conserve son propre HUD de sections sous le HUD de la coque. Cette cohabitation n'a jamais été vue à l'écran et reste à arbitrer.
-- Plusieurs vues sont mortes et ne doivent pas être prises pour l'état réel : `DeveloperView` (ses diagnostics ont été réimplémentés dans `AdministrationView`), ainsi que `keyStatus`, `header` et `sectionPicker` dans `PlayerExperienceView`.
-- Les réglages d'endpoints se modifient depuis **Administration**, pas depuis une destination « Developer » : celle-ci n'existe plus dans le HUD.
+- La seconde barre d'onglets de `PlayerExperienceView` a été retirée : les quatre panneaux (Journal, Compagnon, Magasin, Aide) sont devenus des actions du bandeau haut, la carte reste l'état de repos. Une seule barre d'onglets subsiste, celle de la coque.
+- `DeveloperView` et les vues mortes `keyStatus`, `header`, `sectionPicker` et `map` de `PlayerExperienceView` ont été supprimées.
+- Les réglages d'endpoints se modifient depuis **Paramètres du serveur** (`Features/Settings`), atteignable depuis le menu de l'accueil anonyme, depuis **Compte** et depuis **Administration → Environnement & diagnostic**.
 - Aucun pack audio n'est livré : l'application est silencieuse par conception, ce n'est pas une panne.
 - Le dépôt est public mais ne possède pas encore de licence ; n'affirme aucune permission de réutilisation.
 
 ## Prochaine tâche
 
-Rien n'est cadré. Le client couvre catalogue, Identity, Play, Configuration, PlayerExperience, Organization, la coque HUD plein écran, le graphe de quête avec mémoire cumulée, la carte hors partie et la démonstration Diapason. Les manques honnêtes sont listés dans [`specs/handoff.md`](specs/handoff.md).
+Rien n'est cadré. Le client couvre catalogue, Identity, Play, Configuration, PlayerExperience, Organization, la coque HUD plein écran, le graphe de quête avec mémoire cumulée, la carte hors partie, la démonstration Diapason, les paramètres serveur avant connexion et les confirmations d'actions conséquentes. Les manques honnêtes sont listés dans [`specs/handoff.md`](specs/handoff.md).
 
-La priorité raisonnable, avant toute nouvelle fonctionnalité, est de **regarder l'application tourner** : la coque HUD et la démonstration Diapason n'ont jamais été observées sur simulateur ni sur appareil. Calibrer `HUDMetrics`, trancher la cohabitation des deux HUD dans `PlayerExperienceView` et retirer les vues mortes en découlent directement.
+La priorité raisonnable, avant toute nouvelle fonctionnalité, est de **regarder l'application tourner** : la coque HUD, l'écran de paramètres et la démonstration Diapason n'ont jamais été observés sur simulateur ni sur appareil. Calibrer `HUDMetrics` en découle directement.
 
 N'anticipe aucune tranche dépendant d'un contrat backend non publié — à commencer par l'audio, pour lequel le serveur ne publie rien.

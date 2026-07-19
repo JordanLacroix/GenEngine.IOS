@@ -36,7 +36,7 @@ Dictionnaire extensible de copies publié par le moteur, éditeur natif de libel
 
 Console utilisateurs recherchable avec activation/suppression, parcours et catégories, assets du familier, progression par catégorie, bibliothèque de brouillons et édition visuelle de scène avec archivage.
 
-**Statut : fusionné** (#7, #10). L'onglet Developer a été supprimé du HUD ; `DeveloperView` subsiste comme code mort et ses diagnostics ont été réimplémentés dans `AdministrationView`.
+**Statut : fusionné** (#7, #10). L'onglet Developer a été supprimé du HUD, puis `DeveloperView` elle-même ; ses diagnostics vivent dans `AdministrationView`, et l'adressage des services dans l'écran de paramètres accessible avant connexion.
 
 ## Jalon 3.3 — expérience joueur immersive
 
