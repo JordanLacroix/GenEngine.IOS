@@ -4,6 +4,8 @@
 
 **Client SwiftUI natif pour jouer, découvrir et tester les récits interactifs GenEngine sur iPhone et iPad.**
 
+
+
 [![iOS](https://github.com/JordanLacroix/GenEngine.IOS/actions/workflows/ios.yml/badge.svg)](https://github.com/JordanLacroix/GenEngine.IOS/actions/workflows/ios.yml)
 [![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](https://www.swift.org/)
 [![Status](https://img.shields.io/badge/statut-client%20connecté-2EA44F)](#état-du-projet)
@@ -15,14 +17,20 @@
 
 ---
 
-## Vision
+## Le produit
 
-GenEngine iOS fournit une expérience narrative native, accessible et adaptée à l’iPhone comme à l’iPad. Le serveur reste l’autorité sur les scénarios, les sessions et les transitions ; le client présente les états reçus et transmet les intentions de l’utilisateur.
+**GenEngine est un moteur narratif entièrement paramétrable, livré avec son interface de configuration.** Il est vendu aux **écoles d’ingénieurs, aux entreprises et aux organismes de formation professionnelle**, qui l’exploitent comme un outil de mise en situation : le client achète un moteur et une configuration, pas une histoire figée.
+
+**« Le Diapason »** est la configuration de référence, jouée à la première initialisation et industrialisable par instance client. Son cadre : 2026, notre monde, l’IA partout, le joueur apprenti en école d’ingénieurs. Six **postures** — Lucidité, Discernement, Arbitrage, Courage, Transmission, Autonomie — remplacent les catégories par matière, pour dix scénarios. La bible d’univers vit dans le dépôt backend (`specs/domain/diapason`).
+
+Ce dépôt est le **client iOS**. Le serveur reste l’autorité sur les scénarios, les sessions, les transitions et les permissions ; le client présente les états reçus et transmet les intentions de l’utilisateur. Il n’embarque pas le moteur narratif.
 
 Le dépôt conserve deux parcours explicitement séparés :
 
-- un mode connecté couvrant Identity, le catalogue Authoring et le parcours Play complet ;
-- une démonstration hors ligne stable, destinée à la revue produit et aux tests d’interface.
+- un mode connecté couvrant Identity, Authoring, Play, Configuration, PlayerExperience et Organization ;
+- une démonstration hors ligne, réservée au visiteur anonyme, destinée à la découverte commerciale et à la revue produit.
+
+> **Rendu non vérifié.** La coque HUD plein écran et la démonstration Diapason n’ont jamais été observées sur simulateur ni sur appareil : elles ont été validées par build et tests uniquement. Les descriptions visuelles de ce README décrivent l’intention du code, pas un rendu constaté. Voir [`specs/handoff.md`](specs/handoff.md).
 
 ## État du projet
 
@@ -55,9 +63,12 @@ Le dépôt conserve deux parcours explicitement séparés :
 | Portes ancrées aux repères de la carte | ✅ Adaptées à `scaledToFill` |
 | Périodes métier et import CSV de memberships | ✅ Prévalidation, rapport d’erreurs et application idempotente |
 | Affectations de parcours et catalogue filtré | ✅ Résolues côté serveur et reflétées nativement |
-| Présentation plein écran pilotée par un HUD | ✅ Barre basse iPhone, rail iPad, aucune chrome système |
-| Démonstration réservée à l’état anonyme | ✅ Retirée de tous les points d’entrée connectés |
+| Présentation plein écran pilotée par un HUD | ⚠️ Codée (barre basse iPhone, rail iPad), jamais vue à l’écran |
+| Démonstration réservée à l’état anonyme | ✅ Fermée dans le modèle, pas seulement dans les vues |
+| Démonstration « Le Diapason » (23 scènes) | ⚠️ Codée et testée, jamais vue à l’écran |
 | Audio configurable et désactivable | ⚠️ Abstraction et réglages prêts, aucun pack d’assets livré |
+| Ambiance, musique et portraits de personnage | ❌ Inexistants dans le pack d’assets |
+| Game over de première classe | ❌ Absent du moteur ; l’échec est narratif uniquement |
 
 ## Démarrage rapide
 
@@ -87,7 +98,7 @@ Depuis le dépôt backend :
 docker compose up --build --detach --wait
 ```
 
-Dans une compilation Debug, ouvrez **Developer** pour modifier les endpoints. Le simulateur utilise `localhost` ; un appareil physique exige des endpoints HTTPS joignables. App Transport Security n’est pas désactivé globalement.
+Dans une compilation Debug, les endpoints se modifient depuis **Administration → Environnement & diagnostic**. Il n’existe plus de destination « Developer » dans le HUD ; en build Release, ce panneau affiche uniquement un message d’indisponibilité. Le simulateur utilise `localhost` ; un appareil physique exige des endpoints HTTPS joignables. App Transport Security n’est pas désactivé globalement.
 
 | Service | URL locale |
 |---|---|
@@ -123,6 +134,12 @@ Le HUD flotte : il ne réserve pas de place, mais le contenu défilant dégage s
 
 `AppState.destinations` calcule les destinations exposées selon l’authentification puis les permissions, et `AppState.activeTab` ramène la sélection dans cette liste : un changement d’état ne laisse jamais le HUD sur une destination disparue. Masquer une destination reste une commodité d’interface et ne remplace pas l’autorisation côté serveur.
 
+**Limites assumées de cette coque, à ne pas prendre pour des acquis :**
+
+- elle n’a **jamais été lancée** en simulateur ni sur appareil ; tout ce qui précède décrit le code, pas un rendu observé ;
+- les valeurs de `HUDMetrics` (`topBarHeight: 74`, `bottomBarHeight: 96`, `railWidth: 108`) sont des estimations non calibrées à l’écran ; seul `minimumTarget: 44` est une contrainte réelle ;
+- `PlayerExperienceView` conserve **son propre HUD de sections** sous le HUD de la coque, à la même largeur maximale. Cette cohabitation n’a jamais été vue à l’écran et n’a pas été arbitrée.
+
 ### Ce que joue la démonstration
 
 La démonstration hors ligne échantillonne la configuration de référence
@@ -139,7 +156,13 @@ achète. Un nœud d’accueil laisse le visiteur choisir :
 
 Chaque situation se termine en quelques minutes. Les douze fins reprennent la
 convention de nommage du contenu canonique — `fin-accord-*`, `fin-partielle-*`,
-`fin-rupture-*` — et chacune des trois situations mène à au moins une rupture.
+`fin-rupture-*` — et chacune des trois situations mène à exactement deux
+ruptures, soit six au total, qui obligent à recommencer.
+
+Trois des six postures seulement sont exercées par les choix de la
+démonstration. Discernement et Autonomie n’apparaissent que sur des entrées
+« bientôt disponible », et **Arbitrage n’est encore employée nulle part** en
+dehors de sa déclaration.
 
 Le moteur ne connaissant que `isEnding`, la nature d’une fin est portée par
 `DemoNode.outcome`, **local à la démonstration** et jamais présenté comme un
@@ -154,14 +177,17 @@ La démonstration hors ligne est un argument de découverte, pas une fonctionnal
 - `AppState.isDemoAvailable` passe à faux et `DemoStory.library` quitte le catalogue ;
 - la destination `Accueil`, qui met la démonstration en avant, disparaît du HUD ;
 - `unlockDemo()`, `startDemo()` et `open(_:)` refusent la fixture, avec un message explicite dans le dernier cas ;
-- la mémoire cumulée de démonstration n’apparaît plus dans le journal ;
 - une authentification en cours de démonstration referme immédiatement l’accès et la partie hors ligne.
+
+La fermeture est portée par le modèle, pas par un masquage de vue. Deux limites connues : `AppState.demoQuestGraph` n’est référencé par aucune vue, donc la mémoire cumulée de démonstration n’apparaît **jamais** dans le journal, y compris pour un visiteur anonyme ; et `discardDemoAccess()` ne purge pas `demoDiscoveredNodeIDs` / `demoDiscoveredChoiceIDs`, qui survivent à la connexion.
 
 Pour un visiteur anonyme, la démonstration reste intégralement jouable sans réseau : elle ne déclenche aucun appel HTTP.
 
 ### Son
 
 Le son passe par `GameAudioDirector`, qui ne connaît que le protocole `GameAudioEngine`. Trois couches indépendantes existent — ambiance liée au lieu de l’application, musique et signaux — chacune avec son volume, et le tout est désactivable à tout instant depuis la barre haute du HUD.
+
+**Aucun pack audio n’est livré à ce jour** : le dépôt ne contient ni fichier son, ni manifeste. Il n’existe **ni boucle d’ambiance, ni musique**. L’application est donc silencieuse par conception, et le panneau de son l’annonce plutôt que de laisser croire à une panne. Un pack pourra atterrir sans modifier une ligne de code.
 
 Les assets ne sont pas codés en dur : ils sont déclarés par un manifeste `GenEngine/Resources/audio-manifest.json` de schéma `1`.
 
@@ -175,7 +201,7 @@ Les assets ne sont pas codés en dur : ils sont déclarés par un manifeste `Gen
 }
 ```
 
-Clés d’ambiance : `welcome`, `home`, `library`, `world`, `studio`, `administration`, `account`, `session`. Clés de signature : `choice`, `error`, `reward`, `gameOver` — cette dernière étant jouée sur la couche musique et non bouclée.
+Clés d’ambiance : `welcome`, `home`, `library`, `world`, `studio`, `administration`, `account`, `session`. Clés de signature : `choice`, `error`, `reward`, `gameOver` — cette dernière étant jouée sur la couche musique et non bouclée. Malgré son nom, `gameOver` est déclenchée sur **toute** fin de partie, y compris un accord : c’est un nom de signal, pas un état d’échec (voir « Ce que joue la démonstration »).
 
 Comportement par défaut et modes dégradés :
 
@@ -200,8 +226,8 @@ GenEngine/
 │   └── Security/        # Credentials protégés par Keychain
 └── Features/
     ├── Authentication/
-    ├── Administration/ # Control plane, providers et RBAC
-    ├── Developer/       # Debug uniquement
+    ├── Administration/ # Control plane, providers, RBAC et diagnostics Debug
+    ├── Developer/       # Code mort : remplacé par le panneau diagnostic d'Administration
     ├── Home/
     ├── Library/
     ├── Experience/     # Bootstrap, carte, journal, familier, magasin et aide
@@ -210,6 +236,10 @@ GenEngine/
 ```
 
 Les vues dépendent de `AppState` et les I/O distantes passent par `GenEngineAPI`. Les fixtures vivent dans `DemoStory` et ne remplacent jamais silencieusement une réponse distante en erreur.
+
+Le client appelle les six services directement ; un point d’entrée public unique reste recommandé avant distribution.
+
+Du code mort subsiste et ne doit pas être pris pour l’état réel : `DeveloperView`, ainsi que `keyStatus`, `header` et `sectionPicker` dans `PlayerExperienceView`. Le retrait de `DeveloperView` a aussi rendu `AppState.importAndPublish` (Debug) inatteignable depuis l’interface.
 
 Les frontières et compromis sont détaillés dans [`specs/architecture.md`](specs/architecture.md).
 
@@ -223,14 +253,21 @@ xcodebuild test -project GenEngine.xcodeproj -scheme GenEngine \
   -destination 'platform=iOS Simulator,OS=latest,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO
 ```
 
-Swift Testing couvre la navigation déterministe de la démonstration, la projection du graphe de quête en partie (précédence des états, rangs, ordre stable, scènes inatteignables, entrées dégénérées), sa projection hors partie (mémoire seule, aucun état de monde, mise en page identique à la projection en partie) et la compatibilité des enums API. GitHub Actions régénère le projet avant chaque build.
+Ces trois commandes sont exactement celles qu’exécute la CI ([`.github/workflows/ios.yml`](.github/workflows/ios.yml)).
+
+Swift Testing couvre la navigation déterministe de la démonstration, la fermeture de l’accès démo une fois authentifié, la projection du graphe de quête en partie (précédence des états, rangs, ordre stable, scènes inatteignables, entrées dégénérées), sa projection hors partie (mémoire seule, aucun état de monde, mise en page identique à la projection en partie), le pilotage audio et la compatibilité des enums API. GitHub Actions régénère le projet avant chaque build.
+
+La CI ne fait **ni lint, ni analyse statique, ni test de rendu**. Un build vert et des tests verts ne disent rien de l’apparence à l’écran.
 
 ## Roadmap
 
-La plateforme configurable inclut le flux immersif complet et une administration native distincte du Studio. Sur iPhone et iPad, l’univers joueur occupe tout l’écran : la carte sert de scène, les portes y sont matérialisées et la navigation native disparaît au profit d’une HUD et de panneaux superposés. L’espace Structures gère désormais périodes, unités école/entreprise/formation, participants, encadrants, import CSV prévalidé et affectations de scénarios/catégories/parcours. La carte connectée filtre les catégories d’un membre selon ses affectations effectives. La fin de quête affiche le graphe complet du scénario — pas seulement le chemin emprunté — avec la mémoire de toutes les parties précédentes. Le Journal de l’espace joueur affiche désormais la même carte hors partie : Play publie la topologie d’une version publiée sans session, colorée par la seule mémoire cumulée. Voir [`specs/roadmap.md`](specs/roadmap.md).
+La plateforme configurable inclut le flux immersif complet et une administration native distincte du Studio. Sur iPhone et iPad, l’univers joueur occupe tout l’écran : la carte sert de scène, les portes y sont matérialisées et la navigation native disparaît au profit d’une HUD et de panneaux superposés. L’espace Structures gère désormais périodes, unités école/entreprise/formation, participants, encadrants, import CSV prévalidé et affectations de scénarios/catégories/parcours. La carte connectée filtre les catégories d’un membre selon ses affectations effectives. La fin de quête affiche le graphe complet du scénario — pas seulement le chemin emprunté — avec la mémoire de toutes les parties précédentes. Le Journal de l’espace joueur affiche désormais la même carte hors partie : Play publie la topologie d’une version publiée sans session, colorée par la seule mémoire cumulée.
+
+**Aucune tranche suivante n’est cadrée.** Avant toute nouvelle fonctionnalité, la priorité est d’observer réellement l’application sur simulateur iPhone et iPad, puis de calibrer `HUDMetrics`, d’arbitrer les deux HUD superposés dans `PlayerExperienceView` et de retirer le code mort. Voir [`specs/roadmap.md`](specs/roadmap.md) et [`specs/handoff.md`](specs/handoff.md).
 
 ## Documentation
 
+- [Instructions agents](AGENTS.md) — source de vérité unique pour les agents ; `CLAUDE.md` n’en est qu’un pointeur
 - [Index des spécifications](specs/README.md)
 - [Passage de relais](specs/handoff.md)
 - [Invariants](specs/invariants.md)

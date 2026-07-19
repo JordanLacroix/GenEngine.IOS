@@ -2,9 +2,12 @@
 
 Le dépôt privilégie les changements petits, vérifiables et reliés à un besoin explicite.
 
+GenEngine est un moteur narratif paramétrable vendu aux écoles d’ingénieurs, aux entreprises et aux organismes de formation. Ce dépôt en est le client iOS.
+
 ## Avant de commencer
 
-- Consultez le README, les specs et les issues existantes.
+- Lisez [`AGENTS.md`](AGENTS.md) : c’est la source de vérité unique des instructions du dépôt, humaines comme agents. `CLAUDE.md` n’en est qu’un pointeur et ne doit jamais dupliquer une instruction.
+- Consultez le README, les specs — à commencer par [`specs/handoff.md`](specs/handoff.md), qui liste les manques connus — et les issues existantes.
 - Validez d’abord le besoin pour toute évolution structurante ou nouveau parcours produit.
 - Ne publiez jamais une vulnérabilité exploitable dans une issue ; utilisez le [signalement privé](https://github.com/JordanLacroix/GenEngine.IOS/security/advisories/new).
 
@@ -12,10 +15,21 @@ Le dépôt privilégie les changements petits, vérifiables et reliés à un bes
 
 ```bash
 brew install xcodegen
+```
+
+Les trois commandes suivantes sont exactement celles qu’exécute la CI ([`.github/workflows/ios.yml`](.github/workflows/ios.yml)). Exécutez-les avant d’ouvrir une PR :
+
+```bash
 xcodegen generate
 xcodebuild build -project GenEngine.xcodeproj -scheme GenEngine \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project GenEngine.xcodeproj -scheme GenEngine \
+  -destination 'platform=iOS Simulator,OS=latest,name=iPhone 17 Pro' CODE_SIGNING_ALLOWED=NO
 ```
+
+La CI ne fait ni lint, ni analyse statique, ni test de rendu : un build vert ne dit rien de l’apparence à l’écran. Toute modification visuelle doit être regardée dans Xcode.
+
+`GenEngine/Core/Configuration/ServiceEndpoints.swift` porte souvent une modification locale non committée (adresse privée pour un test sur appareil). Ne la committez pas et ne la révoquez pas.
 
 ## Workflow
 
@@ -35,7 +49,8 @@ Un changement est prêt lorsque :
 - les tests pertinents passent sur un simulateur disponible ;
 - les invariants, l’accessibilité et la séparation démo/production sont préservés ;
 - les changements d’API, de configuration ou d’architecture sont documentés ;
-- README, specs et handoff reflètent l’état réel ;
+- README, specs et handoff reflètent l’état réel, sans présenter une intention comme un fait livré ;
+- toute permission n’est masquée dans l’interface qu’en complément d’une application côté serveur, jamais à sa place ;
 - aucun secret, identifiant de signature ou artefact généré n’est ajouté ;
 - tous les contrôles GitHub requis sont verts.
 
