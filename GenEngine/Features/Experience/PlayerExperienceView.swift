@@ -129,11 +129,12 @@ struct PlayerExperienceViewScreen: View {
     }
 
     private var familiarFirstRun: some View {
-        ZStack {
-            Image("FamiliarAster").resizable().scaledToFill().ignoresSafeArea()
-            LinearGradient(colors: [.black.opacity(0.2), .black.opacity(0.94)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
-            ScrollView { familiarCreation.padding(24).frame(maxWidth: 760).frame(maxWidth: .infinity, alignment: .trailing) }
-        }.background(Color.black).ignoresSafeArea()
+        ScrollView { familiarCreation.padding(24).frame(maxWidth: 760).frame(maxWidth: .infinity, alignment: .trailing) }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .sceneBackdrop(
+                image: "FamiliarAster",
+                overlay: LinearGradient(colors: [.black.opacity(0.2), .black.opacity(0.94)], startPoint: .top, endPoint: .bottom)
+            )
     }
 
     private var keyStatus: some View {
@@ -170,8 +171,6 @@ struct PlayerExperienceViewScreen: View {
 
     private func tutorialStory(_ step: OnboardingStepDefinition, bootstrap: PlayerBootstrapView) -> some View {
         ZStack(alignment: .bottomLeading) {
-            Image(step.order.isMultiple(of: 2) ? "WorldMap" : "IntroGateway").resizable().scaledToFill().ignoresSafeArea()
-            LinearGradient(colors: [.clear, .black.opacity(0.96)], startPoint: .top, endPoint: .bottom)
             VStack(alignment: .leading, spacing: 16) {
                 EyebrowText(text: "PROLOGUE · ÉTAPE \(step.order)", color: GenEngineTheme.amber)
                 Text(step.title).font(.system(size: 48, weight: .bold, design: .serif)).foregroundStyle(GenEngineTheme.ivory)
@@ -184,7 +183,13 @@ struct PlayerExperienceViewScreen: View {
                 }.padding(16).glassPanel()
                 if bootstrap.tutorial.allowSkip { Button("Passer le prologue") { Task { await state.skipOnboarding() } }.foregroundStyle(GenEngineTheme.secondaryText) }
             }.padding(28).frame(maxWidth: 760)
-        }.background(Color.black).ignoresSafeArea().accessibilityElement(children: .contain)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .sceneBackdrop(
+            image: step.order.isMultiple(of: 2) ? "WorldMap" : "IntroGateway",
+            overlay: LinearGradient(colors: [.clear, .black.opacity(0.96)], startPoint: .top, endPoint: .bottom)
+        )
+        .accessibilityElement(children: .contain)
     }
 
     private func completeTutorial(_ step: OnboardingStepDefinition, bootstrap: PlayerBootstrapView) async {
@@ -387,11 +392,16 @@ struct PlayerExperienceViewScreen: View {
     }
 
     private var keyReward: some View {
-        ZStack {
-            Image("TutorialKey").resizable().scaledToFill().ignoresSafeArea()
-            LinearGradient(colors: [.clear, .black.opacity(0.94)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 16) { Spacer(); EyebrowText(text: "PROLOGUE ACCOMPLI", color: GenEngineTheme.amber); Text("La clé des possibles est à vous.").font(.system(size: 50, weight: .bold, design: .serif)).foregroundStyle(GenEngineTheme.ivory); Text("Elle ouvre n’importe quelle porte de la carte. Votre parcours et vos gains sont conservés dans le journal.").font(.title3).foregroundStyle(GenEngineTheme.ivory.opacity(0.84)); Label("1 clé universelle", systemImage: "key.fill").foregroundStyle(GenEngineTheme.amber); Button("Choisir une porte") { showsKeyReward = false; section = .map }.buttonStyle(PrimaryActionStyle()) }.padding(28).frame(maxWidth: 720)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) { EyebrowText(text: "PROLOGUE ACCOMPLI", color: GenEngineTheme.amber); Text("La clé des possibles est à vous.").font(.system(.largeTitle, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory); Text("Elle ouvre n’importe quelle porte de la carte. Votre parcours et vos gains sont conservés dans le journal.").font(.title3).foregroundStyle(GenEngineTheme.ivory.opacity(0.84)); Label("1 clé universelle", systemImage: "key.fill").foregroundStyle(GenEngineTheme.amber); Button("Choisir une porte") { showsKeyReward = false; section = .map }.buttonStyle(PrimaryActionStyle()) }.padding(28).frame(maxWidth: 720)
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .defaultScrollAnchor(.bottom)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sceneBackdrop(
+            image: "TutorialKey",
+            overlay: LinearGradient(colors: [.clear, .black.opacity(0.94)], startPoint: .top, endPoint: .bottom)
+        )
     }
 
     private var shop: some View {
