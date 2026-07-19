@@ -93,7 +93,7 @@ struct GameShellView: View {
 
     private var bottomBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
+            LazyHStack(spacing: 6) {
                 ForEach(state.destinations, id: \.self) { destination in
                     destinationButton(destination, showsTitle: true)
                 }

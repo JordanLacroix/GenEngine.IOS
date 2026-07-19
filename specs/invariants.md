@@ -4,7 +4,7 @@
 2. Le client ne réimplémente aucune règle de `GenEngine.Narrative`.
 3. Une référence locale de session reste opaque ; aucun état narratif serveur n’est dupliqué comme source de vérité.
 4. Une erreur distante n’active jamais silencieusement une fixture de démonstration.
-5. Les outils Authoring, logs bruts et réglages d’endpoints restent absents des builds Release.
+5. Les outils Authoring et les logs bruts restent absents des builds Release. **L’adressage des six services fait exception depuis juillet 2026** : il est réglable en Release et avant authentification, parce qu’un appareil neuf n’avait sinon aucun recours face à une adresse compilée en dur. Ce réglage ne porte aucun secret, n’expose aucun diagnostic et ne contourne aucune autorisation serveur.
 6. Les jetons sont stockés dans Keychain et jamais dans `UserDefaults` ou les logs.
 7. App Transport Security n’est jamais désactivé globalement.
 8. Masquer une action dans l’interface ne remplace jamais l’autorisation côté serveur.

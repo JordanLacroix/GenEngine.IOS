@@ -69,6 +69,9 @@ final class AppState {
     var seedText = "42"
     var isBusy = false
     var errorMessage: String?
+    /// Retour de succès destiné à l'écran. Jusqu'ici une opération réussie n'allait que
+    /// dans `developerLog`, invisible en Release : le geste n'était jamais confirmé.
+    var successMessage: String?
     private(set) var publishedStories: [StorySummary] = []
     private(set) var isLoadingCatalog = false
     /// Chargement d'une page suivante, distinct du premier chargement : l'écran garde ses
@@ -388,7 +391,7 @@ final class AppState {
 
     func loadAdministration() async {
         guard hasPermission("config.read") else { return }
-        await run("Administration chargée") {
+        await run("Administration chargée", notifiesSuccess: false) {
             self.adminConfiguration = try await self.api.adminConfiguration(frontId: self.frontId)
             if self.hasPermission("rbac.manage") {
                 async let permissions = self.api.permissions()
@@ -504,7 +507,7 @@ final class AppState {
     }
 
     func searchUsers(_ query: String) async {
-        await run("Utilisateurs chargés") {
+        await run("Utilisateurs chargés", notifiesSuccess: false) {
             let page = try await self.api.users(query: query)
             self.adminUsers = page.items
             self.adminUsersTotal = page.total
@@ -550,7 +553,7 @@ final class AppState {
     }
 
     func searchScenarios(_ query: String = "") async {
-        await run("Bibliothèque du Studio chargée") { try await self.refreshScenarios(query: query) }
+        await run("Bibliothèque du Studio chargée", notifiesSuccess: false) { try await self.refreshScenarios(query: query) }
     }
 
     func selectScenario(_ scenario: ScenarioView) { generatedScenario = scenario }
@@ -635,7 +638,7 @@ final class AppState {
             step = makeStep(node, turn: turn)
             return
         }
-        await run("Choix envoyé") {
+        await run("Choix envoyé", notifiesSuccess: false) {
             let result = try await self.api.submitChoice(sessionId: session.id, commandId: UUID(), expectedRevision: session.revision, choiceId: choiceID)
             self.session = result.session
             self.step = result.currentStep
@@ -687,7 +690,7 @@ final class AppState {
     }
 
     func resume(_ saved: SavedSession) async {
-        await run("Reprise de l’histoire") {
+        await run("Reprise de l’histoire", notifiesSuccess: false) {
             let session = try await self.api.session(sessionId: saved.id)
             let story = self.stories.first { item in
                 if case let .published(versionID) = item.availability { return versionID == session.scenarioVersionId }
@@ -837,7 +840,7 @@ final class AppState {
     #endif
 
     private func startRemote(versionID: UUID, story: StorySummary) async {
-        await run("Démarrage de l’histoire") {
+        await run("Démarrage de l’histoire", notifiesSuccess: false) {
             let seed = UInt64(self.seedText) ?? 42
             let session = try await self.api.startSession(scenarioVersionId: versionID, seed: seed)
             self.currentStory = story
@@ -853,13 +856,24 @@ final class AppState {
         CurrentStep(nodeId: node.id, text: node.text, status: node.isEnding ? .completed : .awaitingInput, choices: node.choices.map { VisibleChoice(id: $0.id, text: $0.text) }, turn: turn)
     }
 
-    private func run(_ label: String, operation: @escaping @MainActor () async throws -> Void) async {
+    /// Annonce un succès à l'écran sans passer par une opération réseau.
+    func reportSuccess(_ message: String) { successMessage = message }
+
+    /// - Parameter notifiesSuccess: `false` pour les opérations de jeu répétées — un choix,
+    ///   une relance de narration — dont la réussite est déjà visible dans le récit lui-même.
+    private func run(
+        _ label: String,
+        notifiesSuccess: Bool = true,
+        operation: @escaping @MainActor () async throws -> Void
+    ) async {
         isBusy = true
         errorMessage = nil
+        successMessage = nil
         defer { isBusy = false }
         do {
             try await operation()
             developerLog.insert("✓ \(label)", at: 0)
+            if notifiesSuccess { successMessage = label }
         } catch is CancellationError {
             developerLog.insert("– \(label) annulé", at: 0)
         } catch {
@@ -869,7 +883,7 @@ final class AppState {
     }
 
     private func performInput(_ label: String, operation: @escaping @MainActor () async throws -> InputResult) async {
-        await run(label) {
+        await run(label, notifiesSuccess: false) {
             let result = try await operation()
             self.session = result.session
             self.step = result.currentStep

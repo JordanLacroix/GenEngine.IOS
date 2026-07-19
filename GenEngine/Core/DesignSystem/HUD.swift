@@ -99,6 +99,10 @@ struct HUDOverlayPanel<Content: View>: View {
     let title: String
     var symbol: String = "square.stack.3d.up.fill"
     var isModal = true
+    /// Un panneau qui porte une saisie en cours ne se referme pas sur un geste manqué :
+    /// viser le clavier et perdre six adresses saisies n'est pas un compromis acceptable.
+    /// La croix, elle, reste toujours disponible et explicitement libellée.
+    var dismissesOnBackgroundTap = true
     let onClose: () -> Void
     @ViewBuilder let content: Content
 
@@ -110,7 +114,7 @@ struct HUDOverlayPanel<Content: View>: View {
             Color.black.opacity(0.66)
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
-                .onTapGesture(perform: onClose)
+                .onTapGesture { if dismissesOnBackgroundTap { onClose() } }
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
                     Label(title, systemImage: symbol)

@@ -11,6 +11,7 @@ struct StudioView: View {
     @State private var selectedNodeID: String?
     @State private var editedText = ""
     @State private var editedEnding = false
+    @State private var confirmation: ConfirmationAction?
 
     var body: some View {
         ZStack {
@@ -31,6 +32,7 @@ struct StudioView: View {
                 .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 900) }
             }
         }
+        .confirmation($confirmation)
         .task {
             await state.loadPlatformContext()
             await state.searchScenarios()
@@ -122,7 +124,12 @@ struct StudioView: View {
             Text(result.title).font(.system(.title2, design: .serif, weight: .bold)).foregroundStyle(GenEngineTheme.ivory)
             Text("Révision \(result.revision) · prêt à valider, prévisualiser puis publier.").foregroundStyle(GenEngineTheme.secondaryText)
             Label("Identifiant \(result.id.uuidString.lowercased())", systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(GenEngineTheme.verdigris)
-            Button(role: .destructive) { Task { await state.archiveScenario(result) } } label: { Label("Archiver ce scénario", systemImage: "archivebox") }
+            Button(role: .destructive) {
+                confirmation = ConfirmationAction(
+                    title: "Archiver « \(result.title) » ?",
+                    message: "Le brouillon quitte la bibliothèque du Studio. L’archivage est appliqué par le serveur et n’est pas annulable depuis le client.",
+                    confirmLabel: "Archiver") { Task { await state.archiveScenario(result) } }
+            } label: { Label("Archiver ce scénario", systemImage: "archivebox") }
                 .buttonStyle(.bordered)
         }.padding(22).glassPanel()
     }
