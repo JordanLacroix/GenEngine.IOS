@@ -88,11 +88,9 @@ struct GameShellView: View {
                 }
             HUDButton(symbol: "waveform", title: "Réglages du son") { showsAudioPanel = true }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 20)
         .frame(height: HUDMetrics.topBarHeight - 14)
-        .hudSurface(cornerRadius: 22)
-        .padding(.horizontal, 12)
-        .padding(.top, 6)
+        .hudTopBarSurface()
     }
 
     private var bottomBar: some View {

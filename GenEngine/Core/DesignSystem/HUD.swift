@@ -26,8 +26,35 @@ struct HUDSurfaceModifier: ViewModifier {
     }
 }
 
+/// Surface de la barre haute du HUD.
+///
+/// Contrairement aux autres surfaces du HUD, celle-ci ne flotte pas : son matériau remonte
+/// jusqu'au bord physique de l'écran et couvre donc la zone d'état. Une barre flottante,
+/// posée sous l'encoche avec une marge, laisse le contenu défilant réapparaître en clair à
+/// côté de l'horloge : le HUD est bien au-dessus du contenu, mais plus rien ne le voile
+/// au-dessus de la barre. Le contenu passe désormais dessous, voilé de bout en bout.
+struct HUDTopBarSurfaceModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .ignoresSafeArea(edges: .top)
+                    .overlay(alignment: .bottom) {
+                        Rectangle()
+                            .fill(GenEngineTheme.ivory.opacity(0.16))
+                            .frame(height: 1)
+                    }
+                    .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+            }
+    }
+}
+
 extension View {
     func hudSurface(cornerRadius: CGFloat = 26) -> some View { modifier(HUDSurfaceModifier(cornerRadius: cornerRadius)) }
+
+    /// Barre haute ancrée au bord de l'écran, voilant la zone d'état.
+    func hudTopBarSurface() -> some View { modifier(HUDTopBarSurfaceModifier()) }
 }
 
 /// Bouton du HUD. Toujours au moins 44×44 points, toujours doté d'un libellé lisible par

@@ -65,6 +65,10 @@ struct WelcomeView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 24)
             }
+            // L'accueil anonyme porte sa propre barre haute : comme dans la coque, elle
+            // flotte au-dessus du contenu et ne doit pas lui voler de place, mais le
+            // contenu doit dégager sa hauteur pour rester atteignable en fin de course.
+            .safeAreaPadding(.top, HUDMetrics.topBarHeight)
             if shouldShowIntroduction { introduction(introScenes[introIndex]) }
             else { welcomeMenu }
             if showsMenu {
@@ -96,11 +100,11 @@ struct WelcomeView: View {
                     title: audio.isEnabled ? "Couper le son" : "Activer le son") { audio.isEnabled.toggle() }
                 HUDButton(symbol: "line.3.horizontal", title: "Ouvrir le menu") { showsMenu = true }
             }
-            .padding(8)
-            .hudSurface(cornerRadius: 18)
+            .padding(.horizontal, 20)
+            .frame(height: HUDMetrics.topBarHeight - 14)
+            .hudTopBarSurface()
             Spacer()
         }
-        .padding(12)
     }
 
     private var menuEntries: some View {
