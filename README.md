@@ -37,7 +37,7 @@ Le dépôt conserve deux parcours explicitement séparés :
 | Accueil et bibliothèque éditoriale | ✅ Disponible |
 | Démonstration hors ligne | ✅ Disponible |
 | Authentification et stockage Keychain | ✅ Connecté |
-| Catalogue public Authoring | ✅ Connecté |
+| Catalogue public Authoring | ✅ Connecté — paginé, recherche serveur |
 | Choix, quiz et texte libre confirmé | ✅ Connecté à Play |
 | Pause, reprise et arbre explicable | ✅ Connecté à Play |
 | Outils Authoring et journal brut | ✅ Disponibles en Debug uniquement |

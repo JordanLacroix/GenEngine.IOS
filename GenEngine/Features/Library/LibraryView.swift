@@ -4,11 +4,6 @@ struct LibraryView: View {
     @Environment(AppState.self) private var state
     @State private var query = ""
 
-    private var filteredStories: [StorySummary] {
-        guard !query.isEmpty else { return state.stories }
-        return state.stories.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.synopsis.localizedCaseInsensitiveContains(query) }
-    }
-
     var body: some View {
         ZStack {
             StoryCanvas(accent: GenEngineTheme.verdigris)
@@ -70,11 +65,18 @@ struct LibraryView: View {
                             }
                         }
                     }
+                    // La bibliothèque est la surface exhaustive du catalogue : elle charge
+                    // page après page au défilement, jusqu'au dernier récit publié.
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 250), spacing: 18)], spacing: 18) {
-                        ForEach(filteredStories) { story in
+                        ForEach(state.stories) { story in
                             LibraryStoryCard(story: story) { Task { await state.open(story) } }
+                                .onAppear {
+                                    guard story.id == state.stories.last?.id else { return }
+                                    Task { await state.loadMorePublishedStories() }
+                                }
                         }
                     }
+                    catalogFooter
                 }
                 .padding(22)
                 .padding(.bottom, 24)
@@ -84,6 +86,41 @@ struct LibraryView: View {
             }
         }
         .task { await state.loadCatalog() }
+        // Recherche serveur, non un filtrage de la page affichée : sur un catalogue de
+        // plusieurs centaines de récits, filtrer localement ne verrait qu'une page.
+        // La frappe est amortie pour ne pas déclencher une requête par caractère.
+        .task(id: query) {
+            guard query != state.catalogQuery else { return }
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            await state.searchCatalog(query)
+        }
+    }
+
+    /// Pied de liste : progression réelle du chargement et bouton de repli si le
+    /// défilement automatique n'a pas déclenché la page suivante.
+    @ViewBuilder private var catalogFooter: some View {
+        if state.isLoadingMoreCatalog {
+            HStack(spacing: 10) {
+                ProgressView().tint(GenEngineTheme.amber)
+                Text("Chargement des récits suivants…").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+            }
+            .frame(maxWidth: .infinity, minHeight: 52)
+        } else if state.hasMorePublishedStories {
+            Button { Task { await state.loadMorePublishedStories() } } label: {
+                Label("Charger la suite", systemImage: "arrow.down.circle")
+                    .frame(maxWidth: .infinity, minHeight: 52)
+            }
+            .buttonStyle(.bordered)
+            .tint(GenEngineTheme.amber)
+        }
+        if state.catalogTotal > 0 {
+            Text("\(state.publishedStories.count) sur \(state.catalogTotal) \(state.copy("entity.story.plural", fallback: "récits").lowercased())")
+                .font(.caption)
+                .foregroundStyle(GenEngineTheme.secondaryText)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel("\(state.publishedStories.count) récits affichés sur \(state.catalogTotal)")
+        }
     }
 
     private var searchPrompt: String {

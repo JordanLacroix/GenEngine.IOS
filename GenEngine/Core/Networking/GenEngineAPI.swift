@@ -46,7 +46,9 @@ protocol GenEngineAPI: Sendable {
     func updateScenario(scenarioId: UUID, expectedRevision: Int, document: Data) async throws -> ScenarioView
     func archiveScenario(scenarioId: UUID, expectedRevision: Int) async throws
     func generateScenario(request: ScenarioGenerationRequest) async throws -> ScenarioView
-    func listPublishedStories() async throws -> [PublishedScenarioView]
+    /// Catalogue public paginé. `page` est en base 1 et `pageSize` est clampé par le
+    /// serveur à `[1, 100]` ; `query` est une recherche serveur sur le titre.
+    func listPublishedStories(page: Int, pageSize: Int, query: String) async throws -> PagedPublishedScenariosView
     func importScenario(rawJSON: Data) async throws -> ScenarioView
     func validate(scenarioId: UUID) async throws -> ValidationReport
     func analyze(scenarioId: UUID) async throws -> NarrativeStructureReport
@@ -109,6 +111,7 @@ extension GenEngineAPI {
     func archiveScenario(scenarioId _: UUID, expectedRevision _: Int) async throws { throw APIError.invalidScenario("Fonction indisponible.") }
     func generateScenario(request _: ScenarioGenerationRequest) async throws -> ScenarioView { throw APIError.invalidScenario("Fonction indisponible.") }
     func scenarioStructure(scenarioVersionId _: UUID) async throws -> ScenarioStructure { throw APIError.invalidScenario("Fonction indisponible.") }
+    func listPublishedStories(page _: Int, pageSize _: Int, query _: String) async throws -> PagedPublishedScenariosView { throw APIError.invalidScenario("Fonction indisponible.") }
 }
 
 enum APIError: LocalizedError {
@@ -198,7 +201,7 @@ actor LiveGenEngineAPI: GenEngineAPI {
     }
 
     func journal(frontId: String) async throws -> JournalView {
-        try await perform(method: "GET", base: endpoints.playerExperience, path: "/me/experience/journal?frontId=\(escaped(frontId))&limit=100", body: nil, authenticated: true)
+        try await perform(method: "GET", base: endpoints.playerExperience, path: "/me/experience/journal?frontId=\(escaped(frontId))&pageSize=100", body: nil, authenticated: true)
     }
 
     func contextualHelp(frontId: String, request: ContextualHelpRequest) async throws -> ContextualHelpView {
@@ -265,12 +268,41 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await perform(method: "GET", base: endpoints.organization, path: "/me/organization/\(escaped(frontId))", body: nil, authenticated: true)
     }
 
+    /// Unités hiérarchiques. Depuis GenEngine#55 la route est paginée **à plat** : un parent
+    /// peut arriver après son enfant. L'écran d'administration a besoin de l'arbre entier
+    /// (sélecteurs de parent, résolution des noms d'unité) : on parcourt donc toutes les
+    /// pages ici, et l'appelant continue de recevoir la collection complète.
     func organizationUnits(frontId: String) async throws -> [OrganizationUnitView] {
-        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/units", body: nil, authenticated: true)
+        try await allPages(base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/units")
     }
 
     func operatingPeriods(frontId: String) async throws -> [OperatingPeriodView] {
-        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/periods", body: nil, authenticated: true)
+        try await allPages(base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/periods")
+    }
+
+    /// Parcourt toutes les pages d'une liste paginée et concatène les éléments.
+    ///
+    /// Réservé aux surfaces d'administration dont l'écran a réellement besoin de la
+    /// collection entière. Un plafond dur de pages évite qu'un serveur renvoyant un `total`
+    /// incohérent ne fasse boucler le client indéfiniment ; il est atteint à 10 000 éléments,
+    /// bien au-delà des volumes d'un front d'organisation.
+    private func allPages<Item: Decodable & Sendable>(base: String, path: String, pageSize: Int = 100) async throws -> [Item] {
+        let separator = path.contains("?") ? "&" : "?"
+        var collected: [Item] = []
+        var page = 1
+        let maximumPages = 100
+        while page <= maximumPages {
+            let response: PagedList<Item> = try await perform(
+                method: "GET",
+                base: base,
+                path: "\(path)\(separator)page=\(page)&pageSize=\(pageSize)",
+                body: nil,
+                authenticated: true)
+            collected.append(contentsOf: response.items)
+            guard response.items.isEmpty == false, let next = response.nextPage else { break }
+            page = next
+        }
+        return collected
     }
 
     func memberships(frontId: String) async throws -> PagedMembershipsView {
@@ -329,11 +361,17 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await send(method: "POST", base: endpoints.authoring, path: "/scenarios/generate", body: request)
     }
 
-    func listPublishedStories() async throws -> [PublishedScenarioView] {
-        try await perform(
+    /// `GET /catalog?page=&pageSize=&query=` — enveloppe paginée depuis GenEngine#55.
+    /// La recherche est faite par le serveur : filtrer une page de 25 éléments côté client
+    /// donnerait des résultats faux sur un catalogue de plusieurs centaines de récits.
+    func listPublishedStories(page: Int, pageSize: Int, query: String) async throws -> PagedPublishedScenariosView {
+        var path = "/catalog?page=\(max(page, 1))&pageSize=\(min(max(pageSize, 1), 100))"
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { path += "&query=\(escaped(trimmed))" }
+        return try await perform(
             method: "GET",
             base: endpoints.authoring,
-            path: "/catalog",
+            path: path,
             body: nil,
             authenticated: false)
     }

@@ -214,6 +214,11 @@ struct PlayerExperienceViewScreen: View {
 
     /// Récits de la porte sélectionnée. `LazyHStack` : le dock ne construit plus la totalité
     /// du catalogue d'un coup pour n'en montrer que deux cartes.
+    ///
+    /// Deux paginations coexistent sur cet écran et ne doivent pas être confondues :
+    /// `doorPage` pagine l'**affichage** des portes quand le viewport ne peut pas toutes les
+    /// porter — état local à la vue, aucun appel réseau — tandis que le catalogue pagine le
+    /// **contenu** servi par `GET /catalog`. Une porte n'est pas une page de catalogue.
     private var storyDock: some View {
         VStack {
             Spacer()
@@ -249,6 +254,16 @@ struct PlayerExperienceViewScreen: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("\(story.title). \(story.synopsis)")
+                            // Fin du défilement horizontal : on demande la page suivante du
+                            // catalogue. C'est la pagination du *contenu*, sans rapport avec
+                            // `doorPage` qui ne pagine que l'affichage des portes.
+                            .onAppear {
+                                guard story.id == filteredStories.last?.id else { return }
+                                Task { await state.loadMorePublishedStories() }
+                            }
+                        }
+                        if state.isLoadingMoreCatalog {
+                            ProgressView().tint(GenEngineTheme.amber).frame(width: 80)
                         }
                     }
                     .padding(.vertical, 4)
@@ -257,6 +272,24 @@ struct PlayerExperienceViewScreen: View {
             }
             .foregroundStyle(GenEngineTheme.ivory)
             .padding(16)
+        }
+        // Une porte dont aucun récit n'est encore chargé afficherait un dock vide alors que
+        // le serveur en a : on avance dans les pages du catalogue jusqu'à en trouver.
+        //
+        // La clé est `selectedCategoryID`, jamais `doorPage` : changer de page de portes ne
+        // change pas le contenu demandé au serveur, cela ne fait que montrer d'autres portes
+        // du même front. Confondre les deux ferait charger du catalogue à chaque coup de
+        // pagination d'affichage.
+        //
+        // La boucle s'arrête dès qu'une page n'apporte rien — fin de liste ou erreur
+        // réseau — pour ne pas réessayer indéfiniment.
+        .task(id: selectedCategoryID) {
+            var loaded = state.publishedStories.count
+            while filteredStories.isEmpty, state.hasMorePublishedStories, !Task.isCancelled {
+                await state.loadMorePublishedStories()
+                guard state.publishedStories.count > loaded else { return }
+                loaded = state.publishedStories.count
+            }
         }
     }
 

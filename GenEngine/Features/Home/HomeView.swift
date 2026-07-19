@@ -16,10 +16,25 @@ struct HomeView: View {
                     }
                     VStack(alignment: .leading, spacing: 14) {
                         Text(state.copy("home.discover", fallback: "À découvrir")).font(.title2.bold()).foregroundStyle(GenEngineTheme.ivory)
+                        // Chargement progressif au défilement, comme la bibliothèque : le
+                        // catalogue peut compter des centaines de récits et l'accueil ne
+                        // doit pas en montrer une première page présentée comme le tout.
+                        let discoverable = state.stories.filter { $0.id != state.featuredStory?.id }
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 16)], spacing: 16) {
-                            ForEach(state.stories.filter { $0.id != state.featuredStory?.id }) { story in
+                            ForEach(discoverable) { story in
                                 CompactStoryCard(story: story) { Task { await state.open(story) } }
+                                    .onAppear {
+                                        guard story.id == discoverable.last?.id else { return }
+                                        Task { await state.loadMorePublishedStories() }
+                                    }
                             }
+                        }
+                        if state.isLoadingMoreCatalog {
+                            HStack(spacing: 10) {
+                                ProgressView().tint(GenEngineTheme.amber)
+                                Text("Chargement des récits suivants…").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 52)
                         }
                     }
                 }
