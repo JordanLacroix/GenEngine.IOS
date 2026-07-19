@@ -123,6 +123,30 @@ Le HUD flotte : il ne réserve pas de place, mais le contenu défilant dégage s
 
 `AppState.destinations` calcule les destinations exposées selon l’authentification puis les permissions, et `AppState.activeTab` ramène la sélection dans cette liste : un changement d’état ne laisse jamais le HUD sur une destination disparue. Masquer une destination reste une commodité d’interface et ne remplace pas l’autorisation côté serveur.
 
+### Ce que joue la démonstration
+
+La démonstration hors ligne échantillonne la configuration de référence
+« Le Diapason », décrite dans la bible d’univers du dépôt `GenEngine`
+(`specs/domain/diapason`). Elle ne raconte pas une histoire mais **trois
+situations**, pour montrer l’étendue des usages qu’une école ou une entreprise
+achète. Un nœud d’accueil laisse le visiteur choisir :
+
+| Situation | Posture | Usage démontré |
+|---|---|---|
+| La note de service | Lucidité | établir la provenance d’un document que personne ne revendique |
+| La réunion où personne ne doute | Courage | conflit professionnel : objecter au bon moment, dans la bonne forme |
+| La spécification avant le code | Transmission | apprentissage d’une matière — Spec Driven Development |
+
+Chaque situation se termine en quelques minutes. Les douze fins reprennent la
+convention de nommage du contenu canonique — `fin-accord-*`, `fin-partielle-*`,
+`fin-rupture-*` — et chacune des trois situations mène à au moins une rupture.
+
+Le moteur ne connaissant que `isEnding`, la nature d’une fin est portée par
+`DemoNode.outcome`, **local à la démonstration** et jamais présenté comme un
+contrat serveur. Sur une rupture, le bilan fait de « Reprendre depuis le début »
+l’action principale : l’obligation de recommencer est portée par le texte et par
+l’interface, pas par un drapeau moteur qui n’existe pas.
+
 ### Démonstration réservée à l’état anonyme
 
 La démonstration hors ligne est un argument de découverte, pas une fonctionnalité du produit connecté. Une fois le joueur authentifié :

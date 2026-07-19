@@ -5,7 +5,7 @@ Dernière mise à jour : 19 juillet 2026.
 ## État vérifié
 
 - `main` contient une application SwiftUI universelle générée avec XcodeGen.
-- La démonstration hors ligne reste isolée et navigable sans backend.
+- La démonstration hors ligne reste isolée, navigable sans backend, et joue le contenu « Le Diapason ».
 - Le client consomme le catalogue Authoring, Identity et le parcours Play complet.
 - Les onglets sont affichés selon les permissions et séparent jeu, Studio et Administration.
 - Configuration, Azure AI Foundry, modes d’authentification, Entra ID, familier, monnaie, magasin et rôles sont raccordés aux contrats backend.
@@ -63,6 +63,44 @@ Démonstration réservée à l’anonyme : une fois le joueur authentifié, `isD
 Son configurable : `GameAudioDirector` pilote trois couches indépendantes — ambiance liée au lieu, musique, signaux — derrière le protocole `GameAudioEngine`. `BundledGameAudioEngine` lit un manifeste `audio-manifest.json` de schéma `1` ; `SilentGameAudioEngine` sert les tests. Aucun nom de fichier n’est codé en dur : le pack d’assets peut atterrir sans changer une ligne de code. Aucun manifeste n’est livré à ce jour, donc l’application est silencieuse et le panneau de son l’annonce plutôt que de laisser croire à une panne. Une version de schéma inconnue est refusée explicitement. Le backend ne publiant aucun contrat audio, rien n’a été raccordé côté serveur et `ExperienceDocument` n’a pas été modifié. Le son est désactivable en permanence depuis la barre haute et n’est jamais le seul porteur d’une information.
 
 Validation de la tranche immersive HUD : génération XcodeGen, build Swift 6 générique iOS Simulator et 43 tests sur iPhone 17 Pro Simulator réussis sans signature le 19 juillet 2026. Le rendu visuel n’a pas été vérifié en simulateur : il doit l’être sur iPad.
+
+## Démonstration « Le Diapason »
+
+La démonstration native jouait encore l'histoire que Diapason remplace : une
+fixture de treize nœuds ouvrant sur `shore` et finissant sur `dawn`/`watch`,
+avec le familier « Lueur » et le sceau du « Dernier Phare » au bilan.
+
+`DemoStory` porte désormais les 23 mêmes scènes que le client web, tirées de la
+bible d'univers (`specs/domain/diapason` dans le dépôt `GenEngine`). La
+démonstration n'est plus une histoire mais un échantillon d'usages, parce que
+c'est l'étendue qui se vend : un nœud d'accueil ouvre sur **La note de service**
+(Lucidité), **La réunion où personne ne doute** (Courage, conflit professionnel)
+et **La spécification avant le code** (Transmission, Spec Driven Development).
+
+Trois évolutions de modèle, toutes cantonnées à la frontière de démonstration :
+
+- `DemoNode.title` — le bilan affichait `node.id.capitalized` et la carte de
+  quête projetait des paragraphes entiers ; les deux montrent maintenant un
+  titre de scène ;
+- `DemoNode.outcome` — `accord`, `partielle` ou `rupture`, cohérent avec le
+  préfixe de l'identifiant, sur le modèle du contenu canonique ;
+- `DemoChoice.posture` — la posture exercée, reprise dans l'explication d'arête
+  du graphe.
+
+Le moteur n'exposant aucun drapeau d'échec, une rupture est portée par le texte
+et par l'interface : le bilan bascule ses actions et « Reprendre depuis le
+début » devient l'action principale. Les six ruptures sont réparties sur les
+trois situations.
+
+Les tests n'ont pas été affaiblis mais réécrits sur le nouveau contenu : la
+joignabilité couvre 23 nœuds au lieu de 13, `QuestGraphPresentationTests` projette
+le nouveau chemin, et de nouveaux cas vérifient le hub, la convention de nommage
+des fins, la présence d'une rupture par situation, l'emploi exclusif du
+vocabulaire des six postures et l'absence de toute formulation de l'ancienne
+histoire.
+
+Corrigé au passage : le libellé de repli de la monnaie affichait « Braises » ;
+il suit maintenant le défaut Diapason (« Accords », `♪`).
 
 ## Décisions à préserver
 
