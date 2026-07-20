@@ -59,7 +59,15 @@ struct AdministrationView: View {
             }
         }
         .confirmation($confirmation)
-        .task { await state.loadAdministration(); document = state.adminConfiguration?.document }
+        // Le catalogue d'aide est posé une fois pour tout l'écran : chaque champ le lit
+        // par son chemin plutôt que de recevoir son descripteur en paramètre.
+        .environment(\.configurationFieldCatalog, state.fieldCatalog)
+        .task {
+            async let help: Void = state.loadFieldDescriptors()
+            await state.loadAdministration()
+            document = state.adminConfiguration?.document
+            await help
+        }
         .fileImporter(isPresented: $showsMembershipImporter, allowedContentTypes: [.commaSeparatedText, .plainText]) { result in
             guard case let .success(url) = result else { return }
             do { pendingMembershipRows = try Self.parseMembershipCSV(url); membershipImportReport = nil }
@@ -221,7 +229,7 @@ struct AdministrationView: View {
                 }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
             }
             Divider().overlay(.white.opacity(0.15))
-            TextField("Nouvelle clé · ex. home.featured.title", text: $newLabelKey).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+            TextField("Nouvelle clé · ex. home.featured.title", text: $newLabelKey).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never).fieldHelp("language.labels")
             TextField("Texte affiché", text: $newLabelValue, axis: .vertical).textFieldStyle(.roundedBorder)
             Button { let key = newLabelKey.trimmingCharacters(in: .whitespacesAndNewlines); let value = newLabelValue.trimmingCharacters(in: .whitespacesAndNewlines); document?.language.labels[key] = value; newLabelKey = ""; newLabelValue = "" } label: { Label("Ajouter le libellé", systemImage: "plus") }
                 .disabled(newLabelKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || newLabelValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || document?.language.labels[newLabelKey] != nil)
@@ -231,13 +239,17 @@ struct AdministrationView: View {
     private var gamePanel: some View {
         adminPanel("Jeu & histoire", symbol: "globe.europe.africa.fill") {
             if let binding = binding(\.game) {
-                TextField("Nom du jeu", text: binding.name).textFieldStyle(.roundedBorder)
-                TextField("Description", text: binding.description, axis: .vertical).lineLimit(2...5).textFieldStyle(.roundedBorder)
-                TextField("Histoire globale", text: binding.globalStory, axis: .vertical).lineLimit(5...12).textFieldStyle(.roundedBorder)
-                HStack { TextField("Locale", text: binding.locale); TextField("Fuseau", text: binding.timeZone) }.textFieldStyle(.roundedBorder)
+                TextField("Nom du jeu", text: binding.name).textFieldStyle(.roundedBorder).fieldHelp("game.name")
+                TextField("Description", text: binding.description, axis: .vertical).lineLimit(2...5).textFieldStyle(.roundedBorder).fieldHelp("game.description")
+                TextField("Histoire globale", text: binding.globalStory, axis: .vertical).lineLimit(5...12).textFieldStyle(.roundedBorder).fieldHelp("game.globalStory")
+                HStack {
+                    TextField("Locale", text: binding.locale).textFieldStyle(.roundedBorder).fieldHelp("game.locale")
+                    TextField("Fuseau", text: binding.timeZone).textFieldStyle(.roundedBorder).fieldHelp("game.timeZone")
+                }
                 Picker("Organisation", selection: bindingRoot(\.organizationType, fallback: "Custom")) {
                     Text("École").tag("School"); Text("Entreprise").tag("Company"); Text("Formation").tag("TrainingProvider"); Text("Communauté").tag("Community"); Text("Personnalisée").tag("Custom")
                 }
+                .fieldHelp("organizationType")
             }
         }
     }
@@ -246,21 +258,25 @@ struct AdministrationView: View {
         adminPanel("Organisation & catégories", symbol: "square.grid.2x2.fill") {
             if let organization = binding(\.organization) {
                 Text("Structure de l’organisation").font(.headline).foregroundStyle(GenEngineTheme.ivory)
-                TextField("Nom de l’école, entreprise ou structure", text: organization.name).textFieldStyle(.roundedBorder)
-                TextField("Description", text: organization.description, axis: .vertical).textFieldStyle(.roundedBorder)
+                TextField("Nom de l’école, entreprise ou structure", text: organization.name).textFieldStyle(.roundedBorder).fieldHelp("organization.name")
+                TextField("Description", text: organization.description, axis: .vertical).textFieldStyle(.roundedBorder).fieldHelp("organization.description")
             }
             Text("Établissements, classes, départements et équipes peuvent être imbriqués librement.").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             if let unitCount = document?.organization.units.count {
                 ForEach(0..<unitCount, id: \.self) { index in
                     VStack(alignment: .leading, spacing: 9) {
-                        HStack { TextField("Type", text: bindingOrganizationUnit(index, \.type, fallback: "Group")); TextField("Code", text: bindingOrganizationUnit(index, \.code, fallback: "")) }.textFieldStyle(.roundedBorder)
-                        TextField("Nom de l’unité", text: bindingOrganizationUnit(index, \.name, fallback: "")).font(.headline)
-                        TextField("Description", text: bindingOrganizationUnit(index, \.description, fallback: ""), axis: .vertical)
+                        HStack {
+                            TextField("Type", text: bindingOrganizationUnit(index, \.type, fallback: "Group")).textFieldStyle(.roundedBorder).fieldHelp("organization.units[].type")
+                            TextField("Code", text: bindingOrganizationUnit(index, \.code, fallback: "")).textFieldStyle(.roundedBorder).fieldHelp("organization.units[].code")
+                        }
+                        TextField("Nom de l’unité", text: bindingOrganizationUnit(index, \.name, fallback: "")).font(.headline).fieldHelp("organization.units[].name")
+                        TextField("Description", text: bindingOrganizationUnit(index, \.description, fallback: ""), axis: .vertical).fieldHelp("organization.units[].description")
                         Picker("Parent", selection: bindingOrganizationUnit(index, \.parentId, fallback: nil)) {
                             Text("Racine").tag(nil as UUID?)
                             ForEach(document?.organization.units.filter { $0.id != document?.organization.units[index].id } ?? []) { unit in Text(unit.name).tag(Optional(unit.id)) }
                         }
-                        Toggle("Active", isOn: bindingOrganizationUnit(index, \.enabled, fallback: true))
+                        .fieldHelp("organization.units[].parentId")
+                        Toggle("Active", isOn: bindingOrganizationUnit(index, \.enabled, fallback: true)).fieldHelp("organization.units[].enabled")
                         Button("Supprimer l’unité", role: .destructive) {
                             guard let unit = document?.organization.units[index] else { return }
                             confirmation = ConfirmationAction(
@@ -280,10 +296,10 @@ struct AdministrationView: View {
             if let count = document?.categories.count {
                 ForEach(0..<count, id: \.self) { index in
                     VStack(alignment: .leading, spacing: 9) {
-                        TextField("Nom", text: bindingArray(\.categories, index, \.name, fallback: "" )).font(.headline)
-                        TextField("Description", text: bindingArray(\.categories, index, \.description, fallback: ""), axis: .vertical)
-                        Toggle("Visible dans les clients", isOn: bindingArray(\.categories, index, \.isVisible, fallback: true))
-                        TextField("Image HTTPS", text: optionalArray(\.categories, index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+                        TextField("Nom", text: bindingArray(\.categories, index, \.name, fallback: "" )).font(.headline).fieldHelp("categories[].name")
+                        TextField("Description", text: bindingArray(\.categories, index, \.description, fallback: ""), axis: .vertical).fieldHelp("categories[].description")
+                        Toggle("Visible dans les clients", isOn: bindingArray(\.categories, index, \.isVisible, fallback: true)).fieldHelp("categories[].isVisible")
+                        TextField("Image HTTPS", text: optionalArray(\.categories, index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never).fieldHelp("categories[].imageUrl")
                         Button("Supprimer la catégorie", role: .destructive) {
                             guard let category = document?.categories[index] else { return }
                             confirmation = ConfirmationAction(
@@ -302,10 +318,15 @@ struct AdministrationView: View {
             Text("Parcours").font(.headline).foregroundStyle(GenEngineTheme.ivory)
             ForEach(document?.journeys?.indices ?? [].indices, id: \.self) { index in
                 VStack(alignment: .leading, spacing: 9) {
-                    TextField("Nom du parcours", text: bindingJourney(index, \.name, fallback: "" )).font(.headline)
-                    TextField("Description", text: bindingJourney(index, \.description, fallback: ""), axis: .vertical)
-                    TextField("Image HTTPS", text: optionalJourney(index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-                    ForEach(document?.categories ?? []) { category in Toggle(category.name, isOn: Binding(get: { document?.journeys?[index].categoryIds.contains(category.id) == true }, set: { enabled in if enabled { document?.journeys?[index].categoryIds.append(category.id) } else { document?.journeys?[index].categoryIds.removeAll { $0 == category.id } } })) }
+                    TextField("Nom du parcours", text: bindingJourney(index, \.name, fallback: "" )).font(.headline).fieldHelp("journeys[].name")
+                    TextField("Description", text: bindingJourney(index, \.description, fallback: ""), axis: .vertical).fieldHelp("journeys[].description")
+                    TextField("Image HTTPS", text: optionalJourney(index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never).fieldHelp("journeys[].imageUrl")
+                    // Une aide par bascule répéterait la même phrase par catégorie : le
+                    // groupe entier porte le descriptif de `categoryIds`, une seule fois.
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(document?.categories ?? []) { category in Toggle(category.name, isOn: Binding(get: { document?.journeys?[index].categoryIds.contains(category.id) == true }, set: { enabled in if enabled { document?.journeys?[index].categoryIds.append(category.id) } else { document?.journeys?[index].categoryIds.removeAll { $0 == category.id } } })) }
+                    }
+                    .fieldHelp("journeys[].categoryIds[]")
                     Button("Supprimer le parcours", role: .destructive) {
                         guard let journey = document?.journeys?[index] else { return }
                         confirmation = ConfirmationAction(
@@ -322,47 +343,47 @@ struct AdministrationView: View {
     private var playerPanel: some View {
         adminPanel("Accueil, tutoriel & aide", symbol: "sparkles.rectangle.stack.fill") {
             if let intro = binding(\.intro) {
-                Toggle("Introduction avant connexion", isOn: intro.enabled)
-                Picker("Affichage", selection: intro.displayPolicy) { Text("À chaque lancement").tag("EveryLaunch"); Text("Une fois par version").tag("OncePerVersion"); Text("Première installation").tag("FirstInstall") }
-                Toggle("Introduction skippable", isOn: intro.allowSkip)
+                Toggle("Introduction avant connexion", isOn: intro.enabled).fieldHelp("intro.enabled")
+                Picker("Affichage", selection: intro.displayPolicy) { Text("À chaque lancement").tag("EveryLaunch"); Text("Une fois par version").tag("OncePerVersion"); Text("Première installation").tag("FirstInstall") }.fieldHelp("intro.displayPolicy")
+                Toggle("Introduction skippable", isOn: intro.allowSkip).fieldHelp("intro.allowSkip")
             }
             Text("Scènes d’introduction").font(.headline).foregroundStyle(GenEngineTheme.ivory)
             ForEach(0..<(document?.intro.scenes.count ?? 0), id: \.self) { index in
                 VStack(alignment: .leading, spacing: 8) {
-                    TextField("Sur-titre", text: bindingIntroScene(index, \.eyebrow, fallback: "")).textFieldStyle(.roundedBorder)
-                    TextField("Titre", text: bindingIntroScene(index, \.title, fallback: "")).textFieldStyle(.roundedBorder)
-                    TextField("Texte", text: bindingIntroScene(index, \.body, fallback: ""), axis: .vertical).textFieldStyle(.roundedBorder)
-                    TextField("Image HTTPS", text: optionalIntroScene(index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
+                    TextField("Sur-titre", text: bindingIntroScene(index, \.eyebrow, fallback: "")).textFieldStyle(.roundedBorder).fieldHelp("intro.scenes[].eyebrow")
+                    TextField("Titre", text: bindingIntroScene(index, \.title, fallback: "")).textFieldStyle(.roundedBorder).fieldHelp("intro.scenes[].title")
+                    TextField("Texte", text: bindingIntroScene(index, \.body, fallback: ""), axis: .vertical).textFieldStyle(.roundedBorder).fieldHelp("intro.scenes[].body")
+                    TextField("Image HTTPS", text: optionalIntroScene(index, \.imageUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never).fieldHelp("intro.scenes[].imageUrl")
                 }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
             }
-            Button { document?.intro.scenes.append(.init(id: UUID(), eyebrow: document?.game.name ?? "GenEngine", title: "Nouvelle scène", body: "", imageUrl: nil, order: (document?.intro.scenes.count ?? 0) + 1)) } label: { Label("Ajouter une scène", systemImage: "plus") }
+            Button { document?.intro.scenes.append(.init(id: UUID(), eyebrow: document?.game.name.nonEmpty ?? state.gameName, title: "Nouvelle scène", body: "", imageUrl: nil, order: (document?.intro.scenes.count ?? 0) + 1)) } label: { Label("Ajouter une scène", systemImage: "plus") }
             Divider().overlay(.white.opacity(0.15))
             if let demo = binding(\.demo) {
-                Toggle("Mode démo actif", isOn: demo.enabled)
-                TextField("Slug du scénario de démo", text: demo.scenarioSlug).textFieldStyle(.roundedBorder)
-                Stepper("Durée cible : \(demo.targetMinutes.wrappedValue) min", value: demo.targetMinutes, in: 1...120)
+                Toggle("Mode démo actif", isOn: demo.enabled).fieldHelp("demo.enabled")
+                TextField("Slug du scénario de démo", text: demo.scenarioSlug).textFieldStyle(.roundedBorder).fieldHelp("demo.scenarioSlug")
+                Stepper("Durée cible : \(demo.targetMinutes.wrappedValue) min", value: demo.targetMinutes, in: 1...120).fieldHelp("demo.targetMinutes")
             }
             if let onboarding = binding(\.onboarding), let assistant = binding(\.assistantPolicy) {
-                Toggle("Tutoriel actif", isOn: onboarding.enabled)
-                Toggle("Tutoriel skippable", isOn: onboarding.allowSkip)
-                Stepper("Version : \(onboarding.version.wrappedValue)", value: onboarding.version, in: 1...999)
-                Stepper("Fréquence du compagnon : \(assistant.defaultFrequency.wrappedValue)/5", value: assistant.defaultFrequency, in: 0...5)
-                Toggle("Compagnon proactif", isOn: assistant.proactive)
+                Toggle("Tutoriel actif", isOn: onboarding.enabled).fieldHelp("onboarding.enabled")
+                Toggle("Tutoriel skippable", isOn: onboarding.allowSkip).fieldHelp("onboarding.allowSkip")
+                Stepper("Version : \(onboarding.version.wrappedValue)", value: onboarding.version, in: 1...999).fieldHelp("onboarding.version")
+                Stepper("Fréquence du compagnon : \(assistant.defaultFrequency.wrappedValue)/5", value: assistant.defaultFrequency, in: 0...5).fieldHelp("assistantPolicy.defaultFrequency")
+                Toggle("Compagnon proactif", isOn: assistant.proactive).fieldHelp("assistantPolicy.proactive")
             }
             ForEach(0..<(document?.onboarding.steps.count ?? 0), id: \.self) { index in
                 VStack(alignment: .leading, spacing: 8) {
-                    TextField("Étape", text: bindingOnboardingStep(index, \.title, fallback: "")).textFieldStyle(.roundedBorder)
-                    TextField("Explication", text: bindingOnboardingStep(index, \.body, fallback: ""), axis: .vertical).textFieldStyle(.roundedBorder)
-                    TextField("Cible UI", text: bindingOnboardingStep(index, \.target, fallback: "")).textFieldStyle(.roundedBorder)
+                    TextField("Étape", text: bindingOnboardingStep(index, \.title, fallback: "")).textFieldStyle(.roundedBorder).fieldHelp("onboarding.steps[].title")
+                    TextField("Explication", text: bindingOnboardingStep(index, \.body, fallback: ""), axis: .vertical).textFieldStyle(.roundedBorder).fieldHelp("onboarding.steps[].body")
+                    TextField("Cible UI", text: bindingOnboardingStep(index, \.target, fallback: "")).textFieldStyle(.roundedBorder).fieldHelp("onboarding.steps[].target")
                 }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
             }
             Divider().overlay(.white.opacity(0.15))
-            Toggle("Centre d’aide actif", isOn: Binding(get: { document?.help.enabled ?? false }, set: { document?.help.enabled = $0 }))
+            Toggle("Centre d’aide actif", isOn: Binding(get: { document?.help.enabled ?? false }, set: { document?.help.enabled = $0 })).fieldHelp("help.enabled")
             ForEach(0..<(document?.help.articles.count ?? 0), id: \.self) { index in
                 VStack(alignment: .leading, spacing: 8) {
-                    TextField("Article", text: bindingHelpArticle(index, \.title, fallback: "")).textFieldStyle(.roundedBorder)
-                    TextField("Résumé", text: bindingHelpArticle(index, \.summary, fallback: "")).textFieldStyle(.roundedBorder)
-                    TextField("Contenu", text: bindingHelpArticle(index, \.body, fallback: ""), axis: .vertical).textFieldStyle(.roundedBorder)
+                    TextField("Article", text: bindingHelpArticle(index, \.title, fallback: "")).textFieldStyle(.roundedBorder).fieldHelp("help.articles[].title")
+                    TextField("Résumé", text: bindingHelpArticle(index, \.summary, fallback: "")).textFieldStyle(.roundedBorder).fieldHelp("help.articles[].summary")
+                    TextField("Contenu", text: bindingHelpArticle(index, \.body, fallback: ""), axis: .vertical).textFieldStyle(.roundedBorder).fieldHelp("help.articles[].body")
                 }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
             }
         }
@@ -374,7 +395,7 @@ struct AdministrationView: View {
             Text("\(state.adminUsersTotal) comptes").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             ForEach(state.adminUsers) { user in
                 VStack(alignment: .leading, spacing: 9) {
-                    HStack { VStack(alignment: .leading) { Text(user.userName).font(.headline); Text(user.externalProvider == nil ? "Compte GenEngine" : "Microsoft Entra ID").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Text(user.isActive ? "ACTIF" : "DÉSACTIVÉ").font(.caption2.bold()).foregroundStyle(user.isActive ? GenEngineTheme.verdigris : .red) }
+                    HStack { VStack(alignment: .leading) { Text(user.userName).font(.headline); Text(user.externalProvider == nil ? "Compte \(state.gameName)" : "Microsoft Entra ID").font(.caption).foregroundStyle(GenEngineTheme.secondaryText) }; Spacer(); Text(user.isActive ? "ACTIF" : "DÉSACTIVÉ").font(.caption2.bold()).foregroundStyle(user.isActive ? GenEngineTheme.verdigris : .red) }
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
                             ForEach(user.roleAssignments) { assignment in
@@ -395,12 +416,12 @@ struct AdministrationView: View {
     private var identityPanel: some View {
         adminPanel("Authentification", symbol: "person.badge.key.fill") {
             if let binding = binding(\.authentication) {
-                Picker("Mode", selection: binding.mode) { Text("BDD uniquement").tag("LocalOnly"); Text("Microsoft uniquement").tag("EntraOnly"); Text("Cumulatif").tag("Cumulative") }
-                Toggle("Comptes locaux", isOn: binding.localEnabled)
-                Toggle("Microsoft Entra ID", isOn: binding.entraEnabled)
+                Picker("Mode", selection: binding.mode) { Text("BDD uniquement").tag("LocalOnly"); Text("Microsoft uniquement").tag("EntraOnly"); Text("Cumulatif").tag("Cumulative") }.fieldHelp("authentication.mode")
+                Toggle("Comptes locaux", isOn: binding.localEnabled).fieldHelp("authentication.localEnabled")
+                Toggle("Microsoft Entra ID", isOn: binding.entraEnabled).fieldHelp("authentication.entraEnabled")
                 if binding.wrappedValue.entraEnabled {
-                    TextField("Tenant ID", text: optional(binding.entraTenantId)).textFieldStyle(.roundedBorder)
-                    TextField("Client ID", text: optional(binding.entraClientId)).textFieldStyle(.roundedBorder)
+                    TextField("Tenant ID", text: optional(binding.entraTenantId)).textFieldStyle(.roundedBorder).fieldHelp("authentication.entraTenantId")
+                    TextField("Client ID", text: optional(binding.entraClientId)).textFieldStyle(.roundedBorder).fieldHelp("authentication.entraClientId")
                     Text("Le client natif utilise Authorization Code + PKCE ; enregistrez le redirect URI genengine://auth dans Entra.").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
                 }
             }
@@ -412,10 +433,10 @@ struct AdministrationView: View {
             if let count = document?.aiProviders.count {
                 ForEach(0..<count, id: \.self) { index in
                     VStack(alignment: .leading, spacing: 9) {
-                        Toggle(isOn: bindingArray(\.aiProviders, index, \.enabled, fallback: false)) { Text(document?.aiProviders[index].name ?? "Provider").font(.headline) }
-                        TextField("Endpoint OpenAI v1", text: bindingArray(\.aiProviders, index, \.endpoint, fallback: "")).textFieldStyle(.roundedBorder)
-                        TextField("Déploiement", text: bindingArray(\.aiProviders, index, \.deployment, fallback: "")).textFieldStyle(.roundedBorder)
-                        TextField("Référence du secret", text: optionalArray(\.aiProviders, index, \.secretReference)).textFieldStyle(.roundedBorder)
+                        Toggle(isOn: bindingArray(\.aiProviders, index, \.enabled, fallback: false)) { Text(document?.aiProviders[index].name ?? "Provider").font(.headline) }.fieldHelp("aiProviders[].enabled")
+                        TextField("Endpoint OpenAI v1", text: bindingArray(\.aiProviders, index, \.endpoint, fallback: "")).textFieldStyle(.roundedBorder).fieldHelp("aiProviders[].endpoint")
+                        TextField("Déploiement", text: bindingArray(\.aiProviders, index, \.deployment, fallback: "")).textFieldStyle(.roundedBorder).fieldHelp("aiProviders[].deployment")
+                        TextField("Référence du secret", text: optionalArray(\.aiProviders, index, \.secretReference)).textFieldStyle(.roundedBorder).fieldHelp("aiProviders[].secretReference")
                     }.padding(14).background(GenEngineTheme.midnight.opacity(0.65), in: RoundedRectangle(cornerRadius: 16))
                 }
             }
@@ -428,15 +449,18 @@ struct AdministrationView: View {
             if let count = document?.familiars.count {
                 ForEach(0..<count, id: \.self) { index in
                     VStack(alignment: .leading, spacing: 9) {
-                        TextField("Nom", text: bindingArray(\.familiars, index, \.name, fallback: "")).font(.headline)
-                        TextField("Personnalité", text: bindingArray(\.familiars, index, \.description, fallback: ""), axis: .vertical)
-                        HStack { TextField("Forme", text: bindingArray(\.familiars, index, \.form, fallback: "spark")); TextField("Ton", text: bindingArray(\.familiars, index, \.tone, fallback: "Warm")) }.textFieldStyle(.roundedBorder)
-                        TextField("Style d’écriture", text: bindingArray(\.familiars, index, \.writingStyle, fallback: "Socratic")).textFieldStyle(.roundedBorder)
-                        Stepper("Aide par défaut : \(document?.familiars[index].helpLevel ?? 0)", value: bindingArray(\.familiars, index, \.helpLevel, fallback: 2), in: 0...5)
-                        TextField("Portrait HTTPS", text: optionalArray(\.familiars, index, \.portraitUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-                        TextField("Avatar HTTPS", text: optionalArray(\.familiars, index, \.avatarUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-                        TextField("Arrière-plan HTTPS", text: optionalArray(\.familiars, index, \.backgroundUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never)
-                        TextField("Licence", text: optionalArray(\.familiars, index, \.license)).textFieldStyle(.roundedBorder)
+                        TextField("Nom", text: bindingArray(\.familiars, index, \.name, fallback: "")).font(.headline).fieldHelp("familiars[].name")
+                        TextField("Personnalité", text: bindingArray(\.familiars, index, \.description, fallback: ""), axis: .vertical).fieldHelp("familiars[].description")
+                        HStack {
+                            TextField("Forme", text: bindingArray(\.familiars, index, \.form, fallback: "spark")).textFieldStyle(.roundedBorder).fieldHelp("familiars[].form")
+                            TextField("Ton", text: bindingArray(\.familiars, index, \.tone, fallback: "Warm")).textFieldStyle(.roundedBorder).fieldHelp("familiars[].tone")
+                        }
+                        TextField("Style d’écriture", text: bindingArray(\.familiars, index, \.writingStyle, fallback: "Socratic")).textFieldStyle(.roundedBorder).fieldHelp("familiars[].writingStyle")
+                        Stepper("Aide par défaut : \(document?.familiars[index].helpLevel ?? 0)", value: bindingArray(\.familiars, index, \.helpLevel, fallback: 2), in: 0...5).fieldHelp("familiars[].helpLevel")
+                        TextField("Portrait HTTPS", text: optionalArray(\.familiars, index, \.portraitUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never).fieldHelp("familiars[].portraitUrl")
+                        TextField("Avatar HTTPS", text: optionalArray(\.familiars, index, \.avatarUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never).fieldHelp("familiars[].avatarUrl")
+                        TextField("Arrière-plan HTTPS", text: optionalArray(\.familiars, index, \.backgroundUrl)).textFieldStyle(.roundedBorder).textInputAutocapitalization(.never).fieldHelp("familiars[].backgroundUrl")
+                        TextField("Licence", text: optionalArray(\.familiars, index, \.license)).textFieldStyle(.roundedBorder).fieldHelp("familiars[].license")
                         if let urlString = document?.familiars[index].portraitUrl, let url = URL(string: urlString) { AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { ProgressView() }.frame(height: 180).clipShape(RoundedRectangle(cornerRadius: 16)) }
                         Button("Supprimer le familier", role: .destructive) {
                             guard let familiar = document?.familiars[index] else { return }
@@ -455,8 +479,12 @@ struct AdministrationView: View {
     private var economyPanel: some View {
         adminPanel("Économie & magasin", symbol: "bag.fill") {
             if let binding = binding(\.economy) {
-                HStack { TextField("Code", text: binding.currencyCode); TextField("Nom", text: binding.currencyName); TextField("Icône", text: binding.currencyIcon) }.textFieldStyle(.roundedBorder)
-                Stepper("Solde initial : \(binding.wrappedValue.initialBalance)", value: binding.initialBalance, in: 0...10_000)
+                HStack {
+                    TextField("Code", text: binding.currencyCode).textFieldStyle(.roundedBorder).fieldHelp("economy.currencyCode")
+                    TextField("Nom", text: binding.currencyName).textFieldStyle(.roundedBorder).fieldHelp("economy.currencyName")
+                    TextField("Icône", text: binding.currencyIcon).textFieldStyle(.roundedBorder).fieldHelp("economy.currencyIcon")
+                }
+                Stepper("Solde initial : \(binding.wrappedValue.initialBalance)", value: binding.initialBalance, in: 0...10_000).fieldHelp("economy.initialBalance")
             }
             Text("Règles de gains").font(.headline).foregroundStyle(GenEngineTheme.ivory)
             ForEach(document?.economy.rewardRules ?? []) { rule in Label("\(rule.description) · +\(rule.amount)", systemImage: "sparkles").foregroundStyle(GenEngineTheme.secondaryText) }

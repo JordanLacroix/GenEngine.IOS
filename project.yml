@@ -36,7 +36,32 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jordanlacroix.genengine.tests
         GENERATE_INFOPLIST_FILE: YES
+  # Harnais de capture d'écran. Il ne teste rien : il conduit l'application jusqu'aux
+  # écrans qu'un agent ne peut pas atteindre autrement — le simulateur ne reçoit pas la
+  # frappe clavier et n'accepte aucune injection de touche depuis `simctl` — et joint
+  # une capture par écran au bundle de résultat. Il est délibérément **hors** du schéma
+  # `GenEngine` : la CI ne doit pas payer un lancement d'application par exécution.
+  GenEngineUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - GenEngineUITests
+    dependencies:
+      - target: GenEngine
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jordanlacroix.genengine.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: GenEngine
 schemes:
+  GenEngineScreens:
+    build:
+      targets:
+        GenEngine: all
+        GenEngineUITests: [test]
+    test:
+      targets:
+        - GenEngineUITests
   GenEngine:
     build:
       targets:

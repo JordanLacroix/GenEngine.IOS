@@ -65,7 +65,7 @@ struct PlayerView: View {
             .accessibilityLabel("Quitter l’histoire")
             .accessibilityHint("Une confirmation est demandée avant d’abandonner la session")
             VStack(alignment: .leading, spacing: 2) {
-                Text(state.currentStory?.title ?? "GenEngine").font(.subheadline.weight(.semibold)).foregroundStyle(GenEngineTheme.ivory)
+                Text(state.currentStory?.title ?? state.gameName).font(.subheadline.weight(.semibold)).foregroundStyle(GenEngineTheme.ivory)
                 Text("Choix \(session.turn + 1)").font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             }
             Spacer()
