@@ -6,7 +6,14 @@ import SwiftUI
 enum HUDMetrics {
     static let topBarHeight: CGFloat = 74
     static let bottomBarHeight: CGFloat = 96
-    static let railWidth: CGFloat = 108
+    /// Largeur du rail vertical iPad. Calibrée à l'écran sur iPad Pro 13" : le libellé le
+    /// plus long des destinations par défaut est « Administration », un mot insécable qui
+    /// ne se replie pas. Après retrait de la marge du rail (20), de son `padding` (2 × 8) et
+    /// du `padding` horizontal du bouton (2 × 10), il reste ici 84 pt de texte utile, ce qui
+    /// loge « Administration » et « Bibliothèque » en caption2 sans troncature.
+    /// Les libellés étant configurables par le serveur, `minimumScaleFactor` reste le
+    /// filet de sécurité pour un dictionnaire de copies plus bavard.
+    static let railWidth: CGFloat = 140
     /// Cible tactile minimale imposée par l'accessibilité.
     static let minimumTarget: CGFloat = 44
 }
@@ -26,8 +33,35 @@ struct HUDSurfaceModifier: ViewModifier {
     }
 }
 
+/// Surface de la barre haute du HUD.
+///
+/// Contrairement aux autres surfaces du HUD, celle-ci ne flotte pas : son matériau remonte
+/// jusqu'au bord physique de l'écran et couvre donc la zone d'état. Une barre flottante,
+/// posée sous l'encoche avec une marge, laisse le contenu défilant réapparaître en clair à
+/// côté de l'horloge : le HUD est bien au-dessus du contenu, mais plus rien ne le voile
+/// au-dessus de la barre. Le contenu passe désormais dessous, voilé de bout en bout.
+struct HUDTopBarSurfaceModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .ignoresSafeArea(edges: .top)
+                    .overlay(alignment: .bottom) {
+                        Rectangle()
+                            .fill(GenEngineTheme.ivory.opacity(0.16))
+                            .frame(height: 1)
+                    }
+                    .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+            }
+    }
+}
+
 extension View {
     func hudSurface(cornerRadius: CGFloat = 26) -> some View { modifier(HUDSurfaceModifier(cornerRadius: cornerRadius)) }
+
+    /// Barre haute ancrée au bord de l'écran, voilant la zone d'état.
+    func hudTopBarSurface() -> some View { modifier(HUDTopBarSurfaceModifier()) }
 }
 
 /// Bouton du HUD. Toujours au moins 44×44 points, toujours doté d'un libellé lisible par
@@ -85,6 +119,12 @@ struct HUDBadge: View {
         Label(text, systemImage: symbol)
             .font(.caption.weight(.semibold))
             .foregroundStyle(tint)
+            // La barre haute est étroite : une étiquette qui se replie sur trois lignes
+            // écrase le nom de l'application à côté d'elle. Elle tient sur une ligne et
+            // conserve sa largeur naturelle — c'est le nom de l'application, plus long et
+            // déjà limité à une ligne, qui cède en premier.
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 12)
             .frame(minHeight: 32)
             .background(tint.opacity(0.14), in: Capsule())

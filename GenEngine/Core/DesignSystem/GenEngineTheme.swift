@@ -1,35 +1,49 @@
 import SwiftUI
 
+/// Rôles de couleur de l'application.
+///
+/// Les valeurs ne sont plus compilées : elles proviennent de `BrandTheme.shared.palette`,
+/// alimentée par `GET /client-bootstrap/{frontId}`. Le repli reste `BrandPalette.fallback`,
+/// identique aux couleurs historiques, lorsque la route est injoignable.
+@MainActor
 enum GenEngineTheme {
-    static let ink = Color(red: 0.025, green: 0.035, blue: 0.055)
-    static let midnight = Color(red: 0.055, green: 0.075, blue: 0.11)
-    static let ivory = Color(red: 0.96, green: 0.92, blue: 0.82)
-    static let ember = Color(red: 0.94, green: 0.42, blue: 0.18)
-    static let amber = Color(red: 0.96, green: 0.68, blue: 0.28)
-    static let verdigris = Color(red: 0.25, green: 0.67, blue: 0.61)
-    static let violet = Color(red: 0.53, green: 0.43, blue: 0.77)
-    static let secondaryText = ivory.opacity(0.66)
+    private static var palette: BrandPalette { BrandTheme.shared.palette }
 
-    static func accent(_ accent: StoryAccent) -> Color {
-        switch accent {
-        case .ember: ember
-        case .verdigris: verdigris
-        case .violet: violet
-        }
-    }
+    static var ink: Color { palette.ink }
+    static var midnight: Color { palette.midnight }
+    static var ivory: Color { palette.ivory }
+    static var ember: Color { palette.ember }
+    static var amber: Color { palette.amber }
+    static var verdigris: Color { palette.verdigris }
+    static var violet: Color { palette.violet }
+    static var secondaryText: Color { palette.ivory.opacity(0.66) }
+
+    /// Couleur d'un accent de contenu. L'accent porte un **jeton nommé** servi par le
+    /// moteur (`or`, `azur`, `encre`, `sauge`…) ; il est résolu contre `accentPalette`.
+    static func accent(_ accent: StoryAccent) -> Color { palette.accent(token: accent.token) }
 }
 
+/// Décor ambiant d'un écran.
+///
+/// Les halos portent une taille intrinsèque fixe. Placés en **frères** dans un `ZStack`,
+/// ils imposaient cette largeur (460 pt) au conteneur : sur un iPhone de 402 pt de large,
+/// tout le contenu était mis en page trop large puis débordait des deux côtés, et rien ne
+/// permettait de l'atteindre. Le dégradé, lui, est souple ; les halos passent donc en
+/// `overlay`, où ils ne participent plus au calcul de la taille.
+///
+/// Utilise ce décor en `.background { StoryCanvas() }`, jamais en frère de contenu.
 struct StoryCanvas: View {
     var accent: Color = GenEngineTheme.ember
 
     var body: some View {
-        ZStack {
-            LinearGradient(colors: [GenEngineTheme.midnight, GenEngineTheme.ink], startPoint: .topLeading, endPoint: .bottomTrailing)
-            Circle().fill(accent.opacity(0.18)).frame(width: 460).blur(radius: 110).offset(x: 180, y: -260)
-            Circle().fill(GenEngineTheme.verdigris.opacity(0.09)).frame(width: 360).blur(radius: 100).offset(x: -190, y: 320)
-        }
-        .ignoresSafeArea()
-        .accessibilityHidden(true)
+        LinearGradient(colors: [GenEngineTheme.midnight, GenEngineTheme.ink], startPoint: .topLeading, endPoint: .bottomTrailing)
+            .overlay {
+                Circle().fill(accent.opacity(0.18)).frame(width: 460).blur(radius: 110).offset(x: 180, y: -260)
+                Circle().fill(GenEngineTheme.verdigris.opacity(0.09)).frame(width: 360).blur(radius: 100).offset(x: -190, y: 320)
+            }
+            .clipped()
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
     }
 }
 

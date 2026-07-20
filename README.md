@@ -120,6 +120,23 @@ Pour Entra ID, déclarez l’application iOS comme client public et ajoutez `gen
 
 Les jetons sont conservés dans Keychain. Les préférences d’endpoints et références opaques de sessions sont stockées dans `UserDefaults`. L’état narratif reste exclusivement autoritatif dans Play.
 
+### Identité et charte de la configuration
+
+Au démarrage, **avant toute authentification**, le client appelle `GET /client-bootstrap/{frontId}` sur le service Configuration. Cette route est anonyme : c'est elle qui donne à l'application son nom, son accroche, ses libellés et sa charte, exactement comme pour le client Web.
+
+| Champ consommé | Effet dans le client | Défaut si absent |
+| --- | --- | --- |
+| `applicationName` | Nom affiché dans la barre haute, l'accueil et les messages | `game.name` publié, sinon `GenEngine` |
+| `tagline` | Titre de l'écran de connexion | copie `welcome.title`, sinon un défaut compilé |
+| `labels` | Dictionnaire de copies | copies publiées d'abord, puis ce dictionnaire, puis le défaut compilé |
+| `branding.theme.colors` | Rôles de couleur (`accent`, `accentAlt`, `surface`, `ink`…) | `BrandPalette.fallback`, les couleurs historiques |
+| `branding.accentPalette` | Jetons nommés (`or`, `azur`, `encre`, `sauge`, `cuivre`, `aube`) portés par catégories, parcours et familiers | correspondance connue vers un rôle local, sinon une couleur lisible |
+| `demoEnabled` | Ouvre ou ferme l'entrée de démonstration anonyme | `true` — un moteur injoignable ne doit pas fermer la seule porte hors ligne |
+
+Portée : un front (`frontId`), résolu côté service propriétaire. Validation : chaque couleur doit être un hexadécimal `#rrggbb`, `#rrggbbaa` ou `#rgb` ; une valeur illisible est ignorée et laisse le repli en place plutôt que d'inventer une couleur. Si la route entière est injoignable, le client démarre sur ses valeurs de repli et journalise l'échec — il ne le masque pas.
+
+Le client conserve délibérément son **substrat sombre** même lorsque la configuration publie `colorScheme: "Light"`. Le moteur décrit là une surface destinée au client Web ; la coque iOS est une présentation immersive plein écran, où reprendre `surface` comme fond donnerait du texte crème sur crème. Sont repris du serveur les accents, les jetons nommés et la teinte d'encre, cette dernière assombrie pour servir de base au dégradé de fond.
+
 ### Packs visuels de familier
 
 L’espace Compagnon importe un manifeste JSON de schéma `1` depuis l’app Fichiers. Il accepte un asset inclus dans l’application ou un portrait HTTPS, avec licence et attribution obligatoires. Le manifeste reste une préférence locale non sensible dans `UserDefaults` : il ne crée ni propriété, ni achat, ni progression. PlayerExperience demeure l’autorité sur la sélection du familier.

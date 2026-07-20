@@ -23,11 +23,15 @@ struct WelcomeView: View {
                         .foregroundStyle(GenEngineTheme.amber, GenEngineTheme.ember)
                         .accessibilityHidden(true)
                     VStack(spacing: 14) {
-                        EyebrowText(text: state.copy("welcome.eyebrow", fallback: "Vos choix. Votre histoire."))
-                        Text(state.copy("welcome.title", fallback: "Entrez dans des mondes qui se souviennent de vous."))
+                        // L'identité vient de la configuration, pas du moteur : le nom de
+                        // l'application en surtitre, son accroche en titre. Sans amorce
+                        // cliente joignable, on retombe sur les copies génériques.
+                        EyebrowText(text: state.gameName)
+                        Text(state.tagline ?? state.copy("welcome.title", fallback: "Entrez dans des mondes qui se souviennent de vous."))
                             .font(.system(.largeTitle, design: .serif, weight: .semibold))
                             .multilineTextAlignment(.center)
                             .foregroundStyle(GenEngineTheme.ivory)
+                            .frame(maxWidth: .infinity)
                         Text(state.copy("welcome.subtitle", fallback: "Une nouvelle génération de récits interactifs."))
                             .font(.body)
                             .multilineTextAlignment(.center)
@@ -48,15 +52,27 @@ struct WelcomeView: View {
                         VStack(spacing: 9) {
                             Text("Pas encore prêt à créer un compte ? Essayez une histoire complète, puis consultez le chemin parcouru.")
                                 .font(.caption).multilineTextAlignment(.center).foregroundStyle(GenEngineTheme.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity)
                             Button { withAnimation(reduceMotion ? nil : .snappy) { state.unlockDemo() } } label: {
                                 Label(state.copy("demo.explore", fallback: "Lancer la démo"), systemImage: "play.fill").frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.borderedProminent).tint(GenEngineTheme.verdigris)
+                            .buttonStyle(.borderedProminent).tint(GenEngineTheme.amber)
                         }.frame(maxWidth: 440)
                     }
                     Spacer(minLength: 44)
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 24)
+            }
+            // L'accueil anonyme porte sa propre barre haute : elle flotte au-dessus du
+            // contenu et ne lui vole pas de place, mais le contenu doit dégager sa hauteur
+            // pour ne pas venir se lire par-dessus l'horloge en fin de course.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Color.clear
+                    .frame(height: HUDMetrics.topBarHeight)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
             if shouldShowIntroduction { introduction(introScenes[introIndex]) }
             else { welcomeMenu }
@@ -89,11 +105,11 @@ struct WelcomeView: View {
                     title: audio.isEnabled ? "Couper le son" : "Activer le son") { audio.isEnabled.toggle() }
                 HUDButton(symbol: "line.3.horizontal", title: "Ouvrir le menu") { showsMenu = true }
             }
-            .padding(8)
-            .hudSurface(cornerRadius: 18)
+            .padding(.horizontal, 20)
+            .frame(height: HUDMetrics.topBarHeight - 14)
+            .hudTopBarSurface()
             Spacer()
         }
-        .padding(12)
     }
 
     private var menuEntries: some View {
@@ -109,7 +125,7 @@ struct WelcomeView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(GenEngineTheme.verdigris)
+                .tint(GenEngineTheme.amber)
                 .frame(minHeight: HUDMetrics.minimumTarget)
                 Text("Une histoire complète, hors ligne, sans compte et sans appel réseau.")
                     .font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
@@ -124,7 +140,7 @@ struct WelcomeView: View {
             .buttonStyle(.bordered)
             .tint(GenEngineTheme.ivory)
             .frame(minHeight: HUDMetrics.minimumTarget)
-            Text("Indiquez où sont installés les six services GenEngine, ensemble ou séparément.")
+            Text("Indiquez où sont installés les six services qui servent \(state.gameName), ensemble ou séparément.")
                 .font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
             Button {
                 showsMenu = false
@@ -164,32 +180,55 @@ struct WelcomeView: View {
     }
 
     private func introduction(_ scene: IntroSceneDefinition) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            // Le texte défile si la scène est longue ou si Dynamic Type est agrandi ;
-            // les commandes restent hors du ScrollView, donc toujours visibles.
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    EyebrowText(text: scene.eyebrow, color: GenEngineTheme.amber)
-                    Text(scene.title)
-                        .font(.system(.largeTitle, design: .serif, weight: .bold))
-                        .foregroundStyle(GenEngineTheme.ivory)
-                    Text(scene.body).font(.title3).foregroundStyle(GenEngineTheme.ivory.opacity(0.82))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .scrollBounceBehavior(.basedOnSize)
-            .defaultScrollAnchor(.bottom)
-
-            introductionControls
+        // Une scène sans image ne doit pas réserver la place de l'image absente.
+        // `ViewThatFits` retient la version qui se referme sur son texte quand celui-ci
+        // tient à l'écran, et ne bascule sur la version défilante que lorsqu'il déborde
+        // — scène longue, Dynamic Type agrandi ou petit écran.
+        ViewThatFits(in: .vertical) {
+            introductionCard(scene, scrolls: false)
+            introductionCard(scene, scrolls: true)
         }
-        .padding(28)
-        .frame(maxWidth: 720)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Le décor passe en `background` : une image `scaledToFill` placée en
         // frère de ZStack impose sa taille intrinsèque (l'asset carré 1254×1254
         // dépassait la hauteur de l'écran) et poussait les commandes hors cadre.
         .background { introductionBackdrop(scene) }
         .transition(.opacity)
+    }
+
+    @ViewBuilder
+    private func introductionCard(_ scene: IntroSceneDefinition, scrolls: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            // Les commandes restent hors du ScrollView, donc toujours visibles.
+            if scrolls {
+                ScrollView {
+                    introductionText(scene)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .defaultScrollAnchor(.bottom)
+            } else {
+                introductionText(scene)
+            }
+
+            introductionControls
+        }
+        .padding(28)
+        .frame(maxWidth: 720)
+    }
+
+    private func introductionText(_ scene: IntroSceneDefinition) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            EyebrowText(text: scene.eyebrow, color: GenEngineTheme.amber)
+            Text(scene.title)
+                .font(.system(.largeTitle, design: .serif, weight: .bold))
+                .foregroundStyle(GenEngineTheme.ivory)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(scene.body)
+                .font(.title3)
+                .foregroundStyle(GenEngineTheme.ivory.opacity(0.82))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func introductionBackdrop(_ scene: IntroSceneDefinition) -> some View {

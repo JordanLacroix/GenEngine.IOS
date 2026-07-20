@@ -26,9 +26,21 @@ struct GameShellView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 // Le HUD ne réserve pas de place : il flotte. Le contenu défilant, lui,
                 // dégage la zone occupée pour rester atteignable en fin de course.
-                .safeAreaPadding(.top, HUDMetrics.topBarHeight)
-                .safeAreaPadding(.leading, usesRail ? HUDMetrics.railWidth : 0)
-                .safeAreaPadding(.bottom, usesRail ? 0 : HUDMetrics.bottomBarHeight)
+                //
+                // Ces marges passent par `safeAreaInset` et non par `safeAreaPadding` :
+                // `safeAreaPadding` agrandit réellement la vue de la marge demandée.
+                // `safeAreaInset` réserve la bande *à l'intérieur* des limites : la vue
+                // garde la taille de l'écran et le contenu défile bien sous le HUD.
+                //
+                // Attention : cette réservation ne protège de rien si la destination
+                // elle-même déborde. Un enfant qui impose sa taille intrinsèque — une
+                // `Image` `scaledToFill` posée en frère de pile, par exemple — élargit la
+                // `ZStack`, qui recentre alors *toute* la coque, HUD compris, hors de
+                // l'écran. Les destinations posent donc leur décor en arrière-plan, via
+                // `sceneBackdrop`, où il ne dicte plus la mise en page.
+                .safeAreaInset(edge: .top, spacing: 0) { hudClearance(height: HUDMetrics.topBarHeight) }
+                .safeAreaInset(edge: .leading, spacing: 0) { hudClearance(width: usesRail ? HUDMetrics.railWidth : 0) }
+                .safeAreaInset(edge: .bottom, spacing: 0) { hudClearance(height: usesRail ? 0 : HUDMetrics.bottomBarHeight) }
             hud
             if showsAudioPanel {
                 HUDOverlayPanel(title: "Son", symbol: "waveform", onClose: { showsAudioPanel = false }) {
@@ -39,6 +51,16 @@ struct GameShellView: View {
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: showsAudioPanel)
         .animation(reduceMotion ? nil : .snappy(duration: 0.25), value: state.activeTab)
         .onChange(of: state.activeTab, initial: true) { _, tab in audio.enter(tab.ambience) }
+    }
+
+    /// Bande vide réservant la place du HUD dans la zone sûre du contenu.
+    /// Elle est décorative et transparente aux gestes : le HUD, lui, est une vue voisine
+    /// posée par-dessus, et c'est lui qui reçoit les touches.
+    private func hudClearance(width: CGFloat = 0, height: CGFloat = 0) -> some View {
+        Color.clear
+            .frame(width: width, height: height)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     @ViewBuilder
@@ -72,7 +94,11 @@ struct GameShellView: View {
                 .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
             if state.isDemoAccess {
-                HUDBadge(symbol: "play.rectangle.on.rectangle", text: "Démonstration hors ligne", tint: GenEngineTheme.verdigris)
+                // La barre haute doit loger le nom de l'application, l'étiquette d'état et
+                // deux commandes. L'étiquette porte donc la forme courte ; VoiceOver, lui,
+                // continue d'annoncer l'état complet.
+                HUDBadge(symbol: "play.rectangle.on.rectangle", text: "Démo", tint: GenEngineTheme.verdigris)
+                    .accessibilityLabel("Démonstration hors ligne")
             }
             Spacer(minLength: 0)
             if state.isBusy { ProgressView().tint(GenEngineTheme.amber).accessibilityLabel("Chargement en cours") }
@@ -84,16 +110,18 @@ struct GameShellView: View {
                 }
             HUDButton(symbol: "waveform", title: "Réglages du son") { showsAudioPanel = true }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 20)
         .frame(height: HUDMetrics.topBarHeight - 14)
-        .hudSurface(cornerRadius: 22)
-        .padding(.horizontal, 12)
-        .padding(.top, 6)
+        .hudTopBarSurface()
     }
 
     private var bottomBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 6) {
+            // `HStack` et non `LazyHStack` : une pile paresseuse ne publie pas de hauteur
+            // idéale fiable, et le `fixedSize` ci-dessous mesure alors la barre trop courte,
+            // rognant les libellés sous les icônes. Les destinations se comptent sur les
+            // doigts d'une main : la paresse n'y gagnait rien.
+            HStack(spacing: 6) {
                 ForEach(state.destinations, id: \.self) { destination in
                     destinationButton(destination, showsTitle: true)
                 }
@@ -101,6 +129,11 @@ struct GameShellView: View {
             .padding(6)
         }
         .scrollBounceBehavior(.basedOnSize)
+        // Un `ScrollView` horizontal reste gourmand sur son axe transverse : sans cette
+        // contrainte il prenait toute la hauteur restante sous la barre haute. Son fond
+        // `.ultraThinMaterial` recouvrait alors l'écran entier — le contenu apparaissait
+        // flouté et illisible, et les onglets flottaient au milieu de l'écran.
+        .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: 620)
         .hudSurface(cornerRadius: 24)
         .padding(.horizontal, 12)

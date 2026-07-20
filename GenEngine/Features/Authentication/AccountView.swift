@@ -28,7 +28,8 @@ struct AccountView: View {
                 }
                 .padding(22)
                 .padding(.bottom, 24)
-                .containerRelativeFrame(.horizontal) { availableWidth, _ in min(availableWidth, 620) }
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
             }
             if showsServerSettings {
                 HUDOverlayPanel(title: "Paramètres du serveur", symbol: "server.rack", dismissesOnBackgroundTap: false, onClose: { showsServerSettings = false }) {
@@ -102,6 +103,6 @@ struct AccountView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(GenEngineTheme.ivory)
-        .accessibilityHint("Configurer l’adresse des six services GenEngine")
+        .accessibilityHint("Configurer l’adresse des six services qui servent \(state.gameName)")
     }
 }

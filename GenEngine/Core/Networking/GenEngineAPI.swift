@@ -8,6 +8,7 @@ protocol GenEngineAPI: Sendable {
     func authenticationProviders() async throws -> AuthenticationProvidersView
     func exchangeEntra(accessToken: String) async throws -> AccessToken
     func access() async throws -> UserAccessView
+    func clientBootstrap(frontId: String) async throws -> ClientBootstrapView
     func publicExperience(frontId: String) async throws -> PublishedExperienceView
     func playerExperience(frontId: String) async throws -> PlayerExperienceView
     func playerBootstrap(frontId: String) async throws -> PlayerBootstrapView
@@ -72,6 +73,7 @@ extension GenEngineAPI {
     func authenticationProviders() async throws -> AuthenticationProvidersView { throw APIError.invalidScenario("Fonction indisponible.") }
     func exchangeEntra(accessToken _: String) async throws -> AccessToken { throw APIError.invalidScenario("Fonction indisponible.") }
     func access() async throws -> UserAccessView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func clientBootstrap(frontId _: String) async throws -> ClientBootstrapView { throw APIError.invalidScenario("Fonction indisponible.") }
     func publicExperience(frontId _: String) async throws -> PublishedExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
     func playerExperience(frontId _: String) async throws -> PlayerExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
     func playerBootstrap(frontId _: String) async throws -> PlayerBootstrapView { throw APIError.invalidScenario("Fonction indisponible.") }
@@ -174,6 +176,11 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     func access() async throws -> UserAccessView {
         try await perform(method: "GET", base: endpoints.identity, path: "/me", body: nil, authenticated: true)
+    }
+
+    /// Amorce cliente anonyme : identité, charte et libellés avant toute authentification.
+    func clientBootstrap(frontId: String) async throws -> ClientBootstrapView {
+        try await perform(method: "GET", base: endpoints.configuration, path: "/client-bootstrap/\(escaped(frontId))", body: nil, authenticated: false)
     }
 
     func publicExperience(frontId: String) async throws -> PublishedExperienceView {
@@ -368,12 +375,16 @@ actor LiveGenEngineAPI: GenEngineAPI {
         var path = "/catalog?page=\(max(page, 1))&pageSize=\(min(max(pageSize, 1), 100))"
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty { path += "&query=\(escaped(trimmed))" }
+        // Le catalogue est la seule route métier qui partait sans `Authorization`, héritage
+        // de l'époque où elle était publique. Depuis qu'elle est paginée et protégée côté
+        // serveur, elle répondait 401 pour un utilisateur pourtant connecté. Le jeton n'est
+        // posé que s'il existe : la démonstration anonyme, elle, reste inchangée.
         return try await perform(
             method: "GET",
             base: endpoints.authoring,
             path: path,
             body: nil,
-            authenticated: false)
+            authenticated: true)
     }
 
     func importScenario(rawJSON: Data) async throws -> ScenarioView {

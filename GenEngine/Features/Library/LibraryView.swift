@@ -80,9 +80,8 @@ struct LibraryView: View {
                 }
                 .padding(22)
                 .padding(.bottom, 24)
-                .containerRelativeFrame(.horizontal) { availableWidth, _ in
-                    min(availableWidth, 1_024)
-                }
+                .frame(maxWidth: 1_024)
+                .frame(maxWidth: .infinity)
             }
         }
         .task { await state.loadCatalog() }

@@ -44,7 +44,24 @@ enum StoryCatalog {
     }
 }
 
-enum StoryAccent: Hashable, Sendable { case ember, verdigris, violet }
+/// Accent de contenu, exprimé par le **jeton nommé** que sert le moteur.
+///
+/// Les catégories, parcours et familiers portent `accent: "or" | "azur" | "encre" |
+/// "sauge" | "cuivre" | "aube" | "amber"…. Ce type était auparavant une énumération fermée
+/// à trois cas : tout jeton servi était perdu à la conversion. Il transporte désormais le
+/// jeton tel quel et laisse `BrandPalette` le résoudre contre `branding.accentPalette`.
+struct StoryAccent: Hashable, Sendable {
+    let token: String
+
+    init(_ token: String) {
+        self.token = token.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    /// Jetons de repli, conservés pour les fixtures hors ligne et les écrans sans contenu servi.
+    static let ember = StoryAccent("cuivre")
+    static let verdigris = StoryAccent("azur")
+    static let violet = StoryAccent("aube")
+}
 
 /// Nature d'une fin, dans la convention du contenu canonique « Le Diapason ».
 /// Le moteur ne connaît qu'`isEnding` : cette distinction reste locale à la
@@ -289,4 +306,13 @@ enum DemoStory {
             choices: [],
             outcome: .rupture)
     ]
+}
+
+extension String {
+    /// La chaîne débarrassée de ses blancs, ou `nil` si elle n'en contenait que.
+    /// Une copie servie mais vide doit retomber sur le défaut, pas effacer un libellé.
+    var nonEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
