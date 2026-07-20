@@ -623,6 +623,120 @@ struct PlayerExperienceView: Decodable, Sendable {
     let ownedOfferIds: [UUID]
     let recentEntries: [WalletEntryView]
     let recentJournal: [PlayerJournalEntryView]
+    /// Deux champs additifs de `GET /me/experience`, servis comme `media` : tout document
+    /// publié les porte, leur défaut est une liste vide. Ils sont **optionnels et tolérants** —
+    /// une instance sans catalogue publié renvoie une liste vide ou omet la clé, jamais une
+    /// erreur. Le décodage par élément est lui-même tolérant (`LossyArray`) : une entrée
+    /// malformée est écartée sans emporter le reste de l'expérience.
+    private let stats: LossyArray<PlayerStatView>?
+    private let rewards: LossyArray<ConditionalRewardView>?
+
+    /// Catalogue des statistiques joueur publiées, dans l'ordre servi. Vide si le bloc est
+    /// absent ou désactivé.
+    var statList: [PlayerStatView] { stats?.elements ?? [] }
+    /// Récompenses conditionnelles publiées, obtenues ou à venir, dans l'ordre servi.
+    var rewardList: [ConditionalRewardView] { rewards?.elements ?? [] }
+}
+
+/// Une statistique joueur telle que servie sur `GET /me/experience`. Libellé, description,
+/// valeur et plafond voyagent ensemble : un client dessine sa jauge sans jamais recouper le
+/// contrat de configuration. Une statistique jamais gagnée arrive à `0`, pas omise.
+struct PlayerStatView: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let key: String
+    let label: String
+    let description: String
+    let value: Int
+    let maximum: Int
+}
+
+/// Progression d'une seule condition, servie pour les récompenses obtenues comme à venir :
+/// exactement le niveau de service de `finale`, pour ne jamais présenter une porte fermée
+/// sans dire ce qui manque. `kind` est décodé en `String` — le moteur peut ajouter des
+/// natures de condition sans nous prévenir — et interprété à la présentation.
+struct ProgressConditionProgress: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let kind: String
+    let description: String
+    let satisfied: Bool
+    let current: Int
+    let target: Int
+}
+
+/// Ce qu'une récompense **accorde réellement**. `type` est décodé en `String` avec repli à
+/// la présentation, jamais en énumération fermée qui ferait échouer le décodage sur une
+/// nature ajoutée par un moteur plus récent. `amount` n'est lu que pour la monnaie.
+struct RewardGrantPlan: Decodable, Sendable {
+    let type: String
+    let label: String
+    let reference: String?
+    let amount: Int?
+}
+
+/// Une récompense conditionnelle telle qu'un client la rend : ce qu'elle est, si elle est
+/// obtenue, et — sinon — où en est chaque condition. `mode` est décodé en `String` tolérant.
+struct ConditionalRewardView: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let label: String
+    let description: String
+    let earned: Bool
+    let earnedAt: Date?
+    let mode: String
+    let conditions: [ProgressConditionProgress]
+    let grants: [RewardGrantPlan]
+    let visualUrl: String?
+    let labelKey: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, label, description, earned, earnedAt, mode, conditions, grants, visualUrl, labelKey
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        label = try container.decodeIfPresent(String.self, forKey: .label) ?? ""
+        description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
+        earned = try container.decodeIfPresent(Bool.self, forKey: .earned) ?? false
+        earnedAt = try container.decodeIfPresent(Date.self, forKey: .earnedAt)
+        mode = try container.decodeIfPresent(String.self, forKey: .mode) ?? ""
+        conditions = (try container.decodeIfPresent(LossyArray<ProgressConditionProgress>.self, forKey: .conditions))?.elements ?? []
+        grants = (try container.decodeIfPresent(LossyArray<RewardGrantPlan>.self, forKey: .grants))?.elements ?? []
+        visualUrl = try container.decodeIfPresent(String.self, forKey: .visualUrl)
+        labelKey = try container.decodeIfPresent(String.self, forKey: .labelKey)
+    }
+
+    init(id: UUID, label: String, description: String, earned: Bool, earnedAt: Date?, mode: String, conditions: [ProgressConditionProgress], grants: [RewardGrantPlan], visualUrl: String? = nil, labelKey: String? = nil) {
+        self.id = id
+        self.label = label
+        self.description = description
+        self.earned = earned
+        self.earnedAt = earnedAt
+        self.mode = mode
+        self.conditions = conditions
+        self.grants = grants
+        self.visualUrl = visualUrl
+        self.labelKey = labelKey
+    }
+}
+
+/// Décodage tolérant d'un tableau JSON : un élément malformé est écarté sans emporter les
+/// autres. Chaque élément est décodé dans une enveloppe qui absorbe son erreur, donc le
+/// conteneur avance toujours d'exactement un élément par itération — pas de boucle infinie.
+/// Même intention que `TolerantBlock` de `ConsultableDocument`, généralisée.
+struct LossyArray<Element: Decodable & Sendable>: Decodable, Sendable {
+    let elements: [Element]
+
+    private struct Holder: Decodable {
+        let value: Element?
+        init(from decoder: Decoder) throws { value = try? Element(from: decoder) }
+    }
+
+    init(from decoder: Decoder) throws {
+        let holders = try [Holder](from: decoder)
+        elements = holders.compactMap(\.value)
+    }
+
+    init(_ elements: [Element]) { self.elements = elements }
 }
 struct OnboardingStateView: Decodable, Sendable { let tutorialId: UUID; let version: Int; let status: String; let completedStepIds: [UUID]; let completedAt: Date?; let skippedAt: Date?; let revision: Int }
 struct ScenarioMasteryView: Decodable, Identifiable, Sendable { var id: UUID { scenarioVersionId }; let scenarioId: UUID; let scenarioVersionId: UUID; let choiceIds: [String]; let nodeIds: [String]; let endingIds: [String]; let discoveredObjectives: Int; let totalObjectives: Int; let masteryPercent: Int; let updatedAt: Date }
