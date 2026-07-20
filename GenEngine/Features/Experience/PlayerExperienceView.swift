@@ -19,6 +19,7 @@ private enum UniverseSection: String, CaseIterable, Identifiable {
 
 struct PlayerExperienceViewScreen: View {
     @Environment(AppState.self) private var state
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var section: UniverseSection = .map
     @State private var doorPage = 0
     @State private var familiarID: UUID?
@@ -31,6 +32,12 @@ struct PlayerExperienceViewScreen: View {
     @State private var frequency = 2
     @State private var proactive = true
     @State private var selectedCategoryID: UUID?
+    /// Ouverture du panneau de porte, **distincte** de la sélection.
+    ///
+    /// Une porte reste sélectionnée sur la carte après refermeture du panneau : le joueur
+    /// voit toujours où il en est. Confondre les deux états rendrait la fermeture
+    /// destructrice, elle effacerait le repère qu'il vient de poser.
+    @State private var showsDoorPanel = false
     @State private var assetPack = FamiliarAssetPackStore.load()
     @State private var showsAssetImporter = false
     @State private var showsKeyReward = false
@@ -84,9 +91,30 @@ struct PlayerExperienceViewScreen: View {
     private var immersiveWorld: some View {
         ZStack {
             worldDoors
-            if section == .map { storyDock }
-            else { sectionOverlay }
+            if section == .map {
+                if showsDoorPanel { doorScenarioPanel }
+            } else {
+                sectionOverlay
+            }
             gameHUD
+        }
+        // L'avance automatique dans les pages du catalogue vit ici, sur la carte, et non
+        // dans le panneau : une porte ouverte puis refermée avant la fin du chargement
+        // perdrait autrement la recherche en cours, et la rouvrir repartirait de zéro.
+        // La clé est `selectedCategoryID`, jamais `doorPage` : changer de page de portes ne
+        // change pas le contenu demandé au serveur, cela ne fait que montrer d'autres portes.
+        //
+        // La boucle s'arrête dès qu'une page n'apporte rien — fin de liste ou erreur
+        // réseau — pour ne pas réessayer indéfiniment.
+        .task(id: selectedCategoryID) {
+            var loaded = state.publishedStories.count
+            while PlayerExperiencePresentation.shouldRequestMoreScenarios(
+                loadedForCategory: selectedScenarios.count,
+                hasMoreCatalog: state.hasMorePublishedStories), !Task.isCancelled {
+                await state.loadMorePublishedStories()
+                guard state.publishedStories.count > loaded else { return }
+                loaded = state.publishedStories.count
+            }
         }
         .sceneBackdrop(
             image: "WorldMap",
@@ -156,7 +184,15 @@ struct PlayerExperienceViewScreen: View {
             category: category,
             stories: state.stories,
             savedSessions: state.savedSessions)
-        return Button { withAnimation(.snappy) { selectedCategoryID = category.id; section = .map } } label: {
+        // Une porte s'ouvre : elle ne devient pas une vignette de catalogue. Le tap
+        // sélectionne la porte *et* ouvre le panneau qui porte ses récits.
+        return Button {
+            withAnimation(reduceMotion ? nil : .snappy) {
+                selectedCategoryID = category.id
+                section = .map
+                showsDoorPanel = true
+            }
+        } label: {
             VStack(spacing: 5) {
                 Image(systemName: isSelected ? "door.left.hand.open" : "door.left.hand.closed")
                     .font(.system(size: isCompact ? 28 : 42)).foregroundStyle(GenEngineTheme.amber)
@@ -187,7 +223,7 @@ struct PlayerExperienceViewScreen: View {
         .frame(minWidth: HUDMetrics.minimumTarget, minHeight: HUDMetrics.minimumTarget)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Porte \(category.order), \(category.name). \(progress.label)")
-        .accessibilityHint("Afficher les histoires de cette région")
+        .accessibilityHint("Ouvrir cette porte et afficher ses récits")
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
@@ -256,85 +292,112 @@ struct PlayerExperienceViewScreen: View {
         }
     }
 
-    /// Récits de la porte sélectionnée. `LazyHStack` : le dock ne construit plus la totalité
-    /// du catalogue d'un coup pour n'en montrer que deux cartes.
+    /// Panneau des récits d'une porte, ouvert au clic sur la porte.
+    ///
+    /// Il remplace le dock horizontal permanent, qui posait deux problèmes. Le premier était
+    /// visuel et vérifié à l'écran, sur iPhone comme sur iPad et dans les deux orientations :
+    /// les cartes de récit **recouvraient partiellement les cartes de porte**, masquant le
+    /// numéro et la progression de celles qu'elles chevauchaient. Le second était de sens :
+    /// un bandeau de catalogue collé en bas de la carte transformait les portes en simples
+    /// filtres d'une liste toujours présente. Une porte se franchit, elle ne trie pas.
+    ///
+    /// Le panneau réutilise `HUDOverlayPanel`, la surface superposée que la coque emploie
+    /// déjà : même matériau, même croix libellée, même comportement modal pour VoiceOver.
+    /// La carte n'a pas besoin d'un second vocabulaire de panneau.
     ///
     /// Deux paginations coexistent sur cet écran et ne doivent pas être confondues :
     /// `doorPage` pagine l'**affichage** des portes quand le viewport ne peut pas toutes les
     /// porter — état local à la vue, aucun appel réseau — tandis que le catalogue pagine le
     /// **contenu** servi par `GET /catalog`. Une porte n'est pas une page de catalogue.
-    private var storyDock: some View {
-        VStack {
-            Spacer()
-            HStack(alignment: .bottom, spacing: 16) {
-                if let category = visibleCategories.first(where: { $0.id == selectedCategoryID }) {
-                    let progress = PlayerExperiencePresentation.doorProgress(
-                        category: category,
-                        stories: state.stories,
-                        savedSessions: state.savedSessions)
-                    VStack(alignment: .leading, spacing: 5) {
+    @ViewBuilder private var doorScenarioPanel: some View {
+        if let category = selectedCategory {
+            let progress = PlayerExperiencePresentation.doorProgress(
+                category: category,
+                stories: state.stories,
+                savedSessions: state.savedSessions)
+            let scenarios = selectedScenarios
+            HUDOverlayPanel(
+                title: category.name,
+                symbol: "door.left.hand.open",
+                // Fermer ne perd que l'affichage : `selectedCategoryID` survit, la porte
+                // reste marquée sélectionnée sur la carte.
+                onClose: { withAnimation(reduceMotion ? nil : .snappy) { showsDoorPanel = false } }
+            ) {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 6) {
                         EyebrowText(text: "PORTE \(category.order)", color: GenEngineTheme.amber)
-                        Text(category.name).font(.system(.title2, design: .serif, weight: .bold))
-                        Text(category.description).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2)
+                        Text(category.description).font(.callout).foregroundStyle(GenEngineTheme.secondaryText)
                         ProgressView(value: progress.fraction).tint(GenEngineTheme.verdigris)
-                        Text(progress.label).font(.caption2).foregroundStyle(GenEngineTheme.secondaryText)
+                        Text(progress.label).font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
                     }
-                    .frame(width: 230, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityElement(children: .combine)
-                }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 10) {
-                        ForEach(filteredStories) { story in
-                            Button { Task { await state.open(story) } } label: {
-                                VStack(alignment: .leading, spacing: 7) {
-                                    Text(story.eyebrow.uppercased()).font(.caption2).foregroundStyle(GenEngineTheme.amber)
-                                    Text(story.title).font(.system(.headline, design: .serif))
-                                    Text(story.synopsis).font(.caption).foregroundStyle(GenEngineTheme.secondaryText).lineLimit(2)
-                                    Label("Entrer", systemImage: "arrow.right").font(.caption.bold())
+
+                    if scenarios.isEmpty {
+                        Label(
+                            PlayerExperiencePresentation.doorPanelEmptyLabel(
+                                isLoading: state.isLoadingMoreCatalog,
+                                hasMoreCatalog: state.hasMorePublishedStories),
+                            systemImage: "hourglass")
+                            .font(.callout)
+                            .foregroundStyle(GenEngineTheme.secondaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    // `LazyVStack` : le panneau ne construit pas la totalité du catalogue
+                    // d'un coup pour n'en montrer que les premières cartes.
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        ForEach(scenarios) { story in
+                            doorScenarioCard(story)
+                                // Fin du défilement : on demande la page suivante du
+                                // catalogue. C'est la pagination du *contenu*, sans rapport
+                                // avec `doorPage` qui ne pagine que l'affichage des portes.
+                                .onAppear {
+                                    guard story.id == scenarios.last?.id, state.hasMorePublishedStories else { return }
+                                    Task { await state.loadMorePublishedStories() }
                                 }
-                                .padding(14)
-                                .frame(width: 240, alignment: .leading)
-                                .glassPanel()
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("\(story.title). \(story.synopsis)")
-                            // Fin du défilement horizontal : on demande la page suivante du
-                            // catalogue. C'est la pagination du *contenu*, sans rapport avec
-                            // `doorPage` qui ne pagine que l'affichage des portes.
-                            .onAppear {
-                                guard story.id == filteredStories.last?.id else { return }
-                                Task { await state.loadMorePublishedStories() }
-                            }
-                        }
-                        if state.isLoadingMoreCatalog {
-                            ProgressView().tint(GenEngineTheme.amber).frame(width: 80)
                         }
                     }
-                    .padding(.vertical, 4)
+
+                    if state.isLoadingMoreCatalog {
+                        ProgressView()
+                            .tint(GenEngineTheme.amber)
+                            .frame(maxWidth: .infinity)
+                            .accessibilityLabel("Chargement des récits de cette porte")
+                    } else if state.hasMorePublishedStories, !scenarios.isEmpty {
+                        // Le défilement automatique ne suffit pas à VoiceOver ni au clavier :
+                        // une commande explicite reste atteignable, comme dans la bibliothèque.
+                        Button("Charger la suite") { Task { await state.loadMorePublishedStories() } }
+                            .buttonStyle(.bordered)
+                            .tint(GenEngineTheme.amber)
+                            .frame(minWidth: HUDMetrics.minimumTarget, minHeight: HUDMetrics.minimumTarget)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
-                .scrollBounceBehavior(.basedOnSize)
             }
+        }
+    }
+
+    private func doorScenarioCard(_ story: StorySummary) -> some View {
+        Button { Task { await state.open(story) } } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                Text(story.eyebrow.uppercased()).font(.caption2).foregroundStyle(GenEngineTheme.amber)
+                Text(story.title).font(.system(.headline, design: .serif))
+                Text(story.synopsis).font(.caption).foregroundStyle(GenEngineTheme.secondaryText)
+                Label("Entrer", systemImage: "arrow.right").font(.caption.bold())
+            }
+            .padding(14)
+            // Pleine largeur du panneau : le nom et le synopsis se replient au lieu d'être
+            // rognés, ce que la carte de 240 points du dock ne permettait pas en Dynamic
+            // Type agrandi.
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: HUDMetrics.minimumTarget)
             .foregroundStyle(GenEngineTheme.ivory)
-            .padding(16)
+            .glassPanel()
         }
-        // Une porte dont aucun récit n'est encore chargé afficherait un dock vide alors que
-        // le serveur en a : on avance dans les pages du catalogue jusqu'à en trouver.
-        //
-        // La clé est `selectedCategoryID`, jamais `doorPage` : changer de page de portes ne
-        // change pas le contenu demandé au serveur, cela ne fait que montrer d'autres portes
-        // du même front. Confondre les deux ferait charger du catalogue à chaque coup de
-        // pagination d'affichage.
-        //
-        // La boucle s'arrête dès qu'une page n'apporte rien — fin de liste ou erreur
-        // réseau — pour ne pas réessayer indéfiniment.
-        .task(id: selectedCategoryID) {
-            var loaded = state.publishedStories.count
-            while filteredStories.isEmpty, state.hasMorePublishedStories, !Task.isCancelled {
-                await state.loadMorePublishedStories()
-                guard state.publishedStories.count > loaded else { return }
-                loaded = state.publishedStories.count
-            }
-        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(story.title). \(story.synopsis)")
+        .accessibilityHint("Entrer dans ce récit")
     }
 
     private var familiarFirstRun: some View {
@@ -386,10 +449,14 @@ struct PlayerExperienceViewScreen: View {
         return "sparkle.magnifyingglass"
     }
 
-    private var filteredStories: [StorySummary] {
-        guard let ids = visibleCategories.first(where: { $0.id == selectedCategoryID })?.scenarioIds, !ids.isEmpty
-        else { return state.stories }
-        return state.stories.filter { story in story.scenarioID.map(ids.contains) ?? false }
+    private var selectedCategory: CategoryDefinition? {
+        visibleCategories.first { $0.id == selectedCategoryID }
+    }
+
+    /// Récits de la porte sélectionnée. Le filtre lui-même vit dans
+    /// `PlayerExperiencePresentation`, où il est testable sans monter de vue.
+    private var selectedScenarios: [StorySummary] {
+        PlayerExperiencePresentation.doorScenarios(category: selectedCategory, stories: state.stories)
     }
 
     private var visibleCategories: [CategoryDefinition] { (state.experience?.document.categories ?? []).filter(\.isVisible).sorted { $0.order < $1.order } }

@@ -130,9 +130,20 @@ enum PlayerExperiencePresentation {
         (min(topInset, viewport.height * 0.16), min(bottomInset, viewport.height * 0.38))
     }
 
-    /// Espace réservé au bandeau interne et au dock des récits, retiré du champ des portes.
+    /// Espace réservé au bandeau interne, retiré du champ des portes.
     static let doorFieldTopInset: CGFloat = 84
-    static let doorFieldBottomInset: CGFloat = 200
+    /// Espace réservé sous le champ des portes, pour la pagination d'affichage.
+    ///
+    /// Cette valeur était de 200 tant qu'un dock de récits occupait le bas de la carte en
+    /// permanence. Elle ne le réservait d'ailleurs pas assez : le dock recouvrait quand
+    /// même le numéro et la progression des portes basses, défaut vu sur iPhone comme sur
+    /// iPad, dans les deux orientations. `DoorLayoutTests` ne pouvait pas l'attraper —
+    /// il prouve que les portes ne se recouvrent pas *entre elles*, pas qu'un autre calque
+    /// les épargne. Les récits sont passés dans un panneau superposé, ouvert à la demande :
+    /// plus aucun calque permanent ne dispute le bas de l'écran aux portes, et l'inset se
+    /// limite à ce que la pagination d'affichage réclame réellement — son centre est posé
+    /// 22 points sous le champ, sur une cible tactile de 44.
+    static let doorFieldBottomInset: CGFloat = 72
     static let doorSpacing: CGFloat = 12
     static let doorMargin: CGFloat = 16
     /// En deçà, une porte ne peut plus porter son nom, son rang et sa progression.
@@ -256,6 +267,39 @@ enum PlayerExperiencePresentation {
             return false
         }.count
         return DoorProgress(total: categoryStories.count, started: started)
+    }
+
+    // MARK: - Panneau d'une porte
+
+    /// Récits servis derrière une porte.
+    ///
+    /// Une catégorie qui ne déclare aucun scénario ne filtre rien : elle montre le catalogue
+    /// chargé. C'est le comportement que portait déjà le dock, conservé tel quel — le
+    /// backend reste autoritatif sur ce qu'une catégorie contient, le client ne le devine pas.
+    static func doorScenarios(category: CategoryDefinition?, stories: [StorySummary]) -> [StorySummary] {
+        guard let ids = category?.scenarioIds, !ids.isEmpty else { return stories }
+        let declared = Set(ids)
+        return stories.filter { story in story.scenarioID.map(declared.contains) ?? false }
+    }
+
+    /// `true` tant que la porte ouverte n'a aucun récit chargé et que le catalogue en
+    /// promet d'autres.
+    ///
+    /// C'est la condition d'avance automatique dans les pages de `GET /catalog` : une porte
+    /// dont la première page du catalogue ne contient aucun récit afficherait un panneau
+    /// vide alors que le serveur en a. Elle est clavetée sur la catégorie, **jamais** sur
+    /// `doorPage` : la pagination d'affichage des portes ne demande rien au serveur, et
+    /// confondre les deux ferait charger du catalogue à chaque coup de pagination.
+    static func shouldRequestMoreScenarios(loadedForCategory: Int, hasMoreCatalog: Bool) -> Bool {
+        loadedForCategory == 0 && hasMoreCatalog
+    }
+
+    /// Ce qu'annonce un panneau de porte sans aucun récit à montrer. Un panneau muet
+    /// laisserait croire à une panne là où il n'y a qu'un chargement ou une porte vide.
+    static func doorPanelEmptyLabel(isLoading: Bool, hasMoreCatalog: Bool) -> String {
+        isLoading || hasMoreCatalog
+            ? "Recherche des récits de cette porte…"
+            : "Aucun récit n’est encore publié derrière cette porte."
     }
 
     static func projectMapPoint(_ point: CGPoint, into viewport: CGSize) -> CGPoint {

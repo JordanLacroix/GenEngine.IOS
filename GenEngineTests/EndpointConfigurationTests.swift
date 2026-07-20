@@ -262,4 +262,80 @@ struct DoorLayoutTests {
         #expect(started.started == 1)
         #expect(started.percent == 100)
     }
+
+    @Test("Le champ des portes ne réserve plus la place d’un dock qui n’existe plus")
+    func doorFieldReclaimsTheDockSpace() {
+        // Le dock permanent recouvrait les portes basses ; il est devenu un panneau ouvert
+        // à la demande. L'inset ne réserve donc plus que la pagination d'affichage, dont le
+        // centre est posé 22 points sous le champ sur une cible tactile de 44.
+        #expect(PlayerExperiencePresentation.doorFieldBottomInset >= 22 + HUDMetrics.minimumTarget)
+        #expect(PlayerExperiencePresentation.doorFieldBottomInset < 200)
+
+        // La place rendue profite réellement aux portes : à nombre égal, le champ est plus
+        // haut qu'avec l'ancienne réserve de 200 points.
+        for (name, viewport) in viewports {
+            let now = PlayerExperiencePresentation.doorPlacement(total: 6, viewport: viewport)
+            let before = PlayerExperiencePresentation.doorPlacement(
+                total: 6, viewport: viewport, bottomInset: 200)
+            #expect(now.field.height >= before.field.height, "\(name) : champ rétréci")
+            #expect(now.capacity >= before.capacity, "\(name) : capacité réduite")
+        }
+    }
+}
+
+struct DoorScenarioPanelTests {
+    private func category(scenarioIds: [UUID]?) -> CategoryDefinition {
+        CategoryDefinition(
+            id: UUID(), name: "Lucidité", description: "", accent: "amber",
+            order: 1, isVisible: true, imageUrl: nil, scenarioIds: scenarioIds)
+    }
+
+    private func story(scenarioID: UUID?) -> StorySummary {
+        let versionID = UUID()
+        return StorySummary(
+            id: versionID.uuidString.lowercased(), title: "Récit", eyebrow: "", synopsis: "",
+            duration: "", symbol: "book", accent: .verdigris,
+            availability: .published(versionID), scenarioID: scenarioID)
+    }
+
+    @Test("Une porte ne montre que les récits que sa catégorie déclare")
+    func keepsOnlyDeclaredScenarios() {
+        let mine = UUID()
+        let theirs = UUID()
+        let stories = [story(scenarioID: mine), story(scenarioID: theirs), story(scenarioID: nil)]
+        let filtered = PlayerExperiencePresentation.doorScenarios(
+            category: category(scenarioIds: [mine]), stories: stories)
+        #expect(filtered.count == 1)
+        #expect(filtered.first?.scenarioID == mine)
+    }
+
+    @Test("Une catégorie sans scénario déclaré ne filtre rien")
+    func undeclaredCategoryShowsEverything() {
+        let stories = [story(scenarioID: UUID()), story(scenarioID: UUID())]
+        #expect(PlayerExperiencePresentation.doorScenarios(category: category(scenarioIds: []), stories: stories).count == 2)
+        #expect(PlayerExperiencePresentation.doorScenarios(category: category(scenarioIds: nil), stories: stories).count == 2)
+        // Aucune porte ouverte : la carte n'invente pas un filtre vide.
+        #expect(PlayerExperiencePresentation.doorScenarios(category: nil, stories: stories).count == 2)
+    }
+
+    @Test("Le catalogue n’avance que pour une porte vide qui promet encore des récits")
+    func advancesCatalogOnlyWhileTheDoorIsEmpty() {
+        // Le comportement que portait le dock : tant que la porte ouverte n'a rien, on
+        // demande la page suivante de `GET /catalog`.
+        #expect(PlayerExperiencePresentation.shouldRequestMoreScenarios(loadedForCategory: 0, hasMoreCatalog: true))
+        // Fin de liste : ne pas boucler indéfiniment.
+        #expect(!PlayerExperiencePresentation.shouldRequestMoreScenarios(loadedForCategory: 0, hasMoreCatalog: false))
+        // Un seul récit suffit à arrêter l'avance automatique.
+        #expect(!PlayerExperiencePresentation.shouldRequestMoreScenarios(loadedForCategory: 1, hasMoreCatalog: true))
+    }
+
+    @Test("Un panneau vide dit s’il cherche encore ou s’il n’y a rien")
+    func emptyPanelDistinguishesLoadingFromEmptiness() {
+        let searching = PlayerExperiencePresentation.doorPanelEmptyLabel(isLoading: true, hasMoreCatalog: false)
+        let pending = PlayerExperiencePresentation.doorPanelEmptyLabel(isLoading: false, hasMoreCatalog: true)
+        let empty = PlayerExperiencePresentation.doorPanelEmptyLabel(isLoading: false, hasMoreCatalog: false)
+        #expect(searching == pending)
+        #expect(empty != searching)
+        #expect(!empty.isEmpty)
+    }
 }
