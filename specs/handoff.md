@@ -32,7 +32,44 @@ GenEngine est un moteur narratif paramétrable vendu aux écoles d'ingénieurs, 
 
   **Le substrat sombre est conservé délibérément.** Le moteur publie `colorScheme: "Light"` et une surface crème, destinés au client Web ; la coque iOS est une présentation immersive plein écran. Reprendre `surface` comme fond donnerait du texte crème sur crème. Sont donc repris du serveur les accents, les jetons nommés et la teinte d'encre, cette dernière assombrie pour servir de base au dégradé.
 - **Jetons d'accent nommés rendables.** `StoryAccent` n'est plus une énumération fermée à trois cas qui perdait le jeton servi : c'est un porteur de jeton (`or`, `azur`, `encre`, `sauge`, `cuivre`, `aube`, `amber`…) résolu contre `branding.accentPalette`. Un jeton inconnu retombe sur une couleur lisible plutôt que de disparaître. **Limite connue** : `PublishedScenarioView` ne publie aucun accent, donc les cartes de scénario du catalogue conservent une alternance locale ; seuls catégories, parcours et familiers portent réellement un jeton servi.
+
+- **Aide intégrée par champ, servie et non recopiée.** `GET /admin/configuration/field-descriptors` (service Configuration, permission `config.read`) sert **202 descripteurs** — `path`, `label`, `description`, `example`, `constraint`. Le client les consomme (`GenEngineAPI.configurationFieldDescriptors()`), les indexe par chemin (`ConfigurationFieldCatalog`) et les met en cache dans le répertoire Caches (`ConfigurationFieldCache`) : le catalogue décrit le **schéma**, pas un front, et ne bouge qu'avec la version du moteur. Les phrases restent maintenues côté moteur, où un test de complétude bidirectionnel interdit qu'un champ du document reste sans descripteur ; les recopier ici les ferait diverger.
+
+  **Présentation retenue : repliée derrière un bouton ⓘ en fin de ligne**, pas dépliée sous le champ. C'est un arbitrage de densité assumé : le panneau « Accueil & aide » aligne une vingtaine de contrôles, et deux à trois lignes ajoutées par champ auraient transformé un formulaire de deux écrans en notice de six en portrait. Le coût vertical de l'affordance est nul ; seule la largeur perd la cible tactile de 44 pt. Le contenu s'ouvre en popover ancré au champ, y compris en compact (`presentationCompactAdaptation(.popover)`), pour ne pas perdre de vue le champ décrit.
+
+  **L'accessibilité ne reconduit pas cet arbitrage.** Un lecteur d'écran ne survole pas un encart : la description et la contrainte sont posées en `accessibilityHint` **du champ lui-même**, donc annoncées avec lui, et le bouton ⓘ est retiré de l'arbre d'accessibilité (`accessibilityHidden`). Un utilisateur VoiceOver entend toute l'aide sans rien ouvrir et ne parcourt aucun élément supplémentaire.
+
+  **Repli.** Un chemin absent du catalogue — moteur plus ancien, `config.read` refusé, moteur injoignable — rend le champ **inchangé** : ni bouton, ni encart vide, ni texte inventé. Couvert par `ConfigurationFieldHelpTests`.
+
+  **Limite.** L'adressage des six services (`ServerSettingsPanel`) est un réglage **de l'appareil** : il n'appartient pas au document de configuration, n'apparaît dans aucun descripteur servi, et le moteur ne peut pas le décrire. Ses trois textes d'aide sont donc écrits dans le client et assumés comme locaux, avec la même présentation et le même contrat d'accessibilité.
 - **Démonstration Diapason hors ligne.** 23 scènes exactement dans `DemoStory` (`StoryModels.swift:123-291`). Un nœud d'accueil ouvre sur trois situations — La note de service (Lucidité), La réunion où personne ne doute (Courage), La spécification avant le code (Transmission). Douze fins suivant la convention `fin-accord-*`, `fin-partielle-*`, `fin-rupture-*` : exactement 6 ruptures, 2 par situation. `DemoNode.title`, `DemoNode.outcome` et `DemoChoice.posture` restent locaux à la frontière de démonstration. Aucun appel réseau.
+
+### Fuites de marque : ce qui a été corrigé, ce qui est gardé
+
+Le partage retenu : « GenEngine » est le nom du **moteur**. Il reste légitime dans une mention technique destinée à l'exploitant ou dans un identifiant ; il ne l'est pas là où l'utilisateur devrait lire le nom de **sa** configuration.
+
+Corrigé — ces textes lisent désormais `state.gameName`, donc l'`applicationName` servi par l'amorce :
+
+| Emplacement | Avant |
+| --- | --- |
+| `Info.plist` · `CFBundleDisplayName` | l'icône d'accueil affichait « GenEngine » |
+| `ServerSettingsPanel` · introduction | « GenEngine appelle six services… » |
+| `AppState.gameName` · dernier repli | `?? "GenEngine"` → nom du paquet |
+| `AppState` · synopsis d'histoire publiée | « …votre environnement GenEngine. » |
+| `AppState` · synopsis de session reprise | « …depuis le moteur GenEngine. » |
+| `AppState` · titre de session sauvegardée | « Histoire GenEngine » |
+| `PlayerView` · titre de partie | `?? "GenEngine"` |
+| `AdministrationView` · sur-titre de scène | `?? "GenEngine"` |
+| `AdministrationView` · origine de compte | « Compte GenEngine » |
+
+`WelcomeView` (« les six services qui servent … ») lisait **déjà** `gameName` : la fuite observée au simulateur venait d'une compilation de `main`, où le correctif n'est pas encore fusionné.
+
+Gardé délibérément :
+
+- **Identifiants et clés de stockage** — `genengine.saved-sessions.v1`, `genengine.audio.settings.v1`, `genengine.service-endpoints`, `genengine.intro.last-version`, `com.jordanlacroix.genengine`, `genengine.familiar.asset-pack`. Les renommer orphelinerait les données déjà écrites sur les appareils, sans qu'aucun utilisateur ne voie jamais ces chaînes.
+- **Schéma d'URL `genengine://auth`**, y compris la phrase d'`AdministrationView` qui demande de l'enregistrer dans Entra. C'est la valeur littérale à recopier dans un portail Azure : la traduire la rendrait fausse.
+- **`FamiliarAssetPack`** · licence et attribution (« GenEngine project asset… », « Illustration originale générée pour GenEngine »). C'est un relevé de provenance, où le nom du projet producteur est l'information exacte.
+- **Nom de cible, `PRODUCT_NAME` et identifiant de paquet** restent « GenEngine » : c'est l'identité de code, pas une identité affichée.
 
 ## Manques honnêtes et points cassés
 
@@ -43,6 +80,19 @@ Ce sont les points à ne pas présenter comme résolus.
   L'écran « Mon univers » a ensuite été **regardé tourner sur iPad Pro 13 pouces / iOS 26.5, en portrait et en paysage, connecté** au compte `diapason-admin` de la pile locale. Le rail vertical a donc enfin été rendu. Trois défauts bloquants y ont été trouvés et corrigés (voir ci-dessous). Le non-regression iPhone a été revérifié à l'écran, connecté, après ces correctifs.
 
   **L'écran de paramètres, la bibliothèque, le Studio et l'administration n'ont toujours pas été observés**, non plus qu'aucun rendu sur appareil physique ni en Dynamic Type agrandi.
+
+  **L'administration et l'écran de paramètres ont depuis été observés**, connectés à la pile locale, sur iPhone 17 Pro en portrait et sur iPad Pro 13 pouces en portrait **et** en paysage — voir « Harnais de capture » ci-dessous. Y ont été vus : l'accueil anonyme, le menu anonyme, `ServerSettingsPanel`, le panneau « Jeu & histoire » de l'administration avec ses boutons d'aide, et le popover d'aide ouvert sur `game.name` affichant bien le texte **servi** par le moteur (« Le titre affiché partout dans les clients et dans l'introduction. », contrainte « Obligatoire. », exemple « Le Diapason »). Aucun débordement ni recouvrement n'a été constaté sur ces écrans, dans aucune des orientations rendues.
+
+  **La bibliothèque et le Studio n'ont toujours pas été observés**, non plus qu'aucun rendu sur appareil physique ni en Dynamic Type agrandi. Le popover d'aide n'a été ouvert **qu'en portrait sur iPhone** : en paysage sur iPad, la tape en coordonnées du harnais a manqué la cible et le popover n'a pas été rendu. Ne pas présenter ce cas comme vérifié.
+- **Harnais de capture d'écran (`GenEngineUITests`).** Le simulateur ne reçoit pas la frappe clavier — elle est captée comme raccourcis — et `simctl` n'injecte aucune touche : sans pilotage du bureau, tout écran situé derrière une connexion est **inatteignable** pour un agent. `ScreenCaptureTests` contourne ce point en pilotant l'application depuis l'intérieur du simulateur et en joignant une capture par écran au bundle de résultat. Ce n'est **pas** un test : il n'assure presque rien et un passage vert ne dit rien de la lisibilité d'un écran. Il vit dans le schéma **`GenEngineScreens`**, délibérément hors du schéma `GenEngine` : la CI ne doit pas payer un lancement d'application par exécution.
+
+  ```bash
+  xcodebuild test -project GenEngine.xcodeproj -scheme GenEngineScreens \
+    -destination 'platform=iOS Simulator,id=<UDID>' -resultBundlePath /tmp/screens.xcresult
+  xcrun xcresulttool export attachments --path /tmp/screens.xcresult --output-path <dossier>
+  ```
+
+  Deux pièges rencontrés, tous deux corrigés dans le harnais : `CODE_SIGNING_ALLOWED=NO` prive l'application de son entitlement de trousseau et fait échouer la connexion sur `Keychain error (-34018)` — ne pas le passer pour ce schéma ; et une session survit d'une exécution à l'autre, ce qui envoyait la frappe dans le champ de recherche de la bibliothèque — réinitialiser par `xcrun simctl uninstall` puis `xcrun simctl keychain <UDID> reset`.
 
   Défauts trouvés en regardant, tous corrigés et re-vérifiés à l'écran :
   1. **Le HUD recouvrait l'écran entier.** La barre basse est un `ScrollView` horizontal, gourmand sur son axe transverse : il prenait toute la hauteur restante sous la barre haute, et son fond `.ultraThinMaterial` floutait tout le contenu derrière lui. L'écran de démonstration paraissait ne jamais charger — il était rendu, mais illisible sous un verre dépoli plein écran, les onglets flottant au centre. Corrigé par `.fixedSize(horizontal: false, vertical: true)` (`GameShellView.swift`).
@@ -61,6 +111,8 @@ Ce sont les points à ne pas présenter comme résolus.
 - **Valeurs de `HUDMetrics` partiellement calibrées.** `railWidth` est passé de 108 à **140**, calibré à l'écran sur iPad Pro 13 pouces : à 108, « Administration » — un mot insécable — et « Bibliothèque » ne tenaient pas. À 140 les cinq libellés par défaut tiennent sans troncature ; les libellés restant configurables par le serveur, `minimumScaleFactor` demeure le filet. `topBarHeight: 74` et `bottomBarHeight: 96` restent des estimations : la barre basse mesure environ 79 pt sur iPhone 17 Pro, `bottomBarHeight` sur-réserve donc un peu, sans rien recouvrir.
 - **Bandeau interne vu à l'écran.** L'écran « Mon univers » a été ouvert, connecté, sur iPhone et sur iPad dans les deux orientations. Deux défauts y ont été trouvés et corrigés (deuxième et troisième défauts iPad ci-dessus).
 - **Écran de paramètres jamais vu à l'écran.** `ServerSettingsPanel` compile et ses règles d'adressage sont couvertes par `EndpointDraftTests`. Sa mise en page, son comportement clavier et le rendu du contrôle de connectivité n'ont été observés ni en simulateur ni sur appareil.
+
+- **Écran de paramètres partiellement vu.** `ServerSettingsPanel` a été rendu au simulateur sur iPhone et sur iPad : l'en-tête, le sélecteur de mode et le sélecteur de schéma tiennent, et le panneau défile correctement dans le `ScrollView` de `HUDOverlayPanel`. **Son comportement clavier et le rendu du contrôle de connectivité n'ont toujours pas été observés** : le harnais n'a pas saisi d'adresse ni déclenché de test de joignabilité.
 - **Disposition des portes prouvée, mais non observée.** `DoorLayoutTests` vérifie en points écran, sur cinq viewports réels (iPhone portrait et paysage, iPhone SE, iPad portrait et paysage) et jusqu'à cinquante catégories, qu'aucune porte ne sort du cadre, qu'aucune paire ne se recouvre, que la taille reste au-dessus de la cible tactile et que la pagination couvre bien toutes les catégories. Ces garanties sont géométriques, pas visuelles : la lisibilité réelle d'une page pleine, le confort de la pagination et le comportement en Dynamic Type agrandi demandent toujours un rendu. Les insets du champ des portes (84 en haut, 200 en bas, plafonnés en proportion sur écran court) sont, comme `HUDMetrics`, des estimations non calibrées.
 - **Aucun pack audio.** Aucun `audio-manifest.json` n'est livré et le dépôt ne contient aucun fichier son. Il n'existe **ni boucle d'ambiance, ni musique**. L'application est donc silencieuse ; le panneau de son l'annonce plutôt que de laisser croire à une panne. Le backend ne publie aucun contrat audio.
 - **Aucun portrait de personnage.** Le catalogue d'assets ne contient que quatre illustrations : `FamiliarAster` (la créature compagnon), `IntroGateway`, `TutorialKey` et `WorldMap`. Aucun portrait humain.
@@ -100,6 +152,8 @@ xcodebuild test -project GenEngine.xcodeproj -scheme GenEngine \
 Rien n'est cadré et aucune tranche fonctionnelle n'est engagée.
 
 La priorité reste de **regarder l'application tourner**, mais sur ce qui ne l'a pas encore été : l'écran de paramètres, la bibliothèque, le Studio et l'administration, et en Dynamic Type agrandi. La passe iPhone puis la passe iPad ont chacune trouvé trois défauts bloquants que build et tests laissaient passer ; il n'y a pas de raison de croire les écrans restants indemnes.
+
+La priorité reste de **regarder l'application tourner**, mais sur ce qui ne l'a pas encore été : la bibliothèque, le Studio, et n'importe quel écran en Dynamic Type agrandi. La passe iPhone puis la passe iPad ont chacune trouvé trois défauts bloquants que build et tests laissaient passer ; il n'y a pas de raison de croire les écrans restants indemnes. `GenEngineScreens` rend maintenant ce regard reproductible — l'étendre à ces écrans est peu coûteux.
 
 Un défaut visuel reste **ouvert et non corrigé**, vu sur iPhone comme sur iPad, en portrait et en paysage : les cartes de récit du `storyDock` **recouvrent partiellement les cartes de porte**, masquant le numéro de porte et la progression de la porte qu'elles chevauchent. `DoorLayoutTests` ne l'attrape pas — il prouve que les portes ne se recouvrent pas *entre elles*, pas qu'un autre calque les épargne. C'est la prochaine correction évidente.
 

@@ -20,6 +20,7 @@ protocol GenEngineAPI: Sendable {
     func configureFamiliar(frontId: String, request: ConfigureFamiliarRequest) async throws -> PlayerExperienceView
     func purchase(frontId: String, request: PurchaseRequest) async throws -> PlayerExperienceView
     func adminConfiguration(frontId: String) async throws -> ExperienceConfigurationView
+    func configurationFieldDescriptors() async throws -> [ConfigurationFieldDescriptor]
     func updateConfiguration(frontId: String, request: UpdateConfigurationRequest) async throws -> ExperienceConfigurationView
     func publishConfiguration(frontId: String, request: PublishConfigurationRequest) async throws -> ExperienceConfigurationView
     func permissions() async throws -> [PermissionView]
@@ -85,6 +86,7 @@ extension GenEngineAPI {
     func configureFamiliar(frontId _: String, request _: ConfigureFamiliarRequest) async throws -> PlayerExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
     func purchase(frontId _: String, request _: PurchaseRequest) async throws -> PlayerExperienceView { throw APIError.invalidScenario("Fonction indisponible.") }
     func adminConfiguration(frontId _: String) async throws -> ExperienceConfigurationView { throw APIError.invalidScenario("Fonction indisponible.") }
+    func configurationFieldDescriptors() async throws -> [ConfigurationFieldDescriptor] { throw APIError.invalidScenario("Fonction indisponible.") }
     func updateConfiguration(frontId _: String, request _: UpdateConfigurationRequest) async throws -> ExperienceConfigurationView { throw APIError.invalidScenario("Fonction indisponible.") }
     func publishConfiguration(frontId _: String, request _: PublishConfigurationRequest) async throws -> ExperienceConfigurationView { throw APIError.invalidScenario("Fonction indisponible.") }
     func permissions() async throws -> [PermissionView] { throw APIError.invalidScenario("Fonction indisponible.") }
@@ -225,6 +227,13 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     func adminConfiguration(frontId: String) async throws -> ExperienceConfigurationView {
         try await perform(method: "GET", base: endpoints.configuration, path: "/admin/configuration/\(escaped(frontId))", body: nil, authenticated: true)
+    }
+
+    /// Aide intégrée par champ. La route décrit le **schéma** et non un front : elle ne
+    /// prend donc pas de `frontId` et vit à côté des routes d'administration, pas dans le
+    /// groupe par front. Elle exige `config.read`.
+    func configurationFieldDescriptors() async throws -> [ConfigurationFieldDescriptor] {
+        try await perform(method: "GET", base: endpoints.configuration, path: "/admin/configuration/field-descriptors", body: nil, authenticated: true)
     }
 
     func updateConfiguration(frontId: String, request: UpdateConfigurationRequest) async throws -> ExperienceConfigurationView {

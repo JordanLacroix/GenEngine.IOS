@@ -36,7 +36,7 @@ struct ServerSettingsPanel: View {
             Text("Où sont installés vos services ?")
                 .font(.system(.title3, design: .serif, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
-            Text("GenEngine appelle six services. Ils peuvent tenir sur une seule machine, ou être déployés séparément. Ce réglage reste local à cet appareil et ne contient aucun secret.")
+            Text("\(state.gameName) appelle six services. Ils peuvent tenir sur une seule machine, ou être déployés séparément. Ce réglage reste local à cet appareil et ne contient aucun secret.")
                 .font(.callout)
                 .foregroundStyle(GenEngineTheme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -75,6 +75,7 @@ struct ServerSettingsPanel: View {
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
                 .accessibilityLabel("Hôte commun des six services")
+                .fieldHelp(local: Self.hostHelp)
             Text("Un port par service").font(.headline)
             ForEach(ServiceKind.allCases) { service in
                 HStack(spacing: 12) {
@@ -86,6 +87,7 @@ struct ServerSettingsPanel: View {
                         .keyboardType(.numberPad)
                         .frame(width: 96)
                         .accessibilityLabel("Port de \(service.title)")
+                        .fieldHelp(local: Self.portHelp(service))
                 }
                 .frame(minHeight: HUDMetrics.minimumTarget)
             }
@@ -104,6 +106,7 @@ struct ServerSettingsPanel: View {
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                         .accessibilityLabel("Adresse complète de \(service.title)")
+                        .fieldHelp(local: Self.urlHelp(service))
                 }
             }
         }
@@ -188,6 +191,40 @@ struct ServerSettingsPanel: View {
             }
             .buttonStyle(.bordered)
         }
+    }
+
+    // MARK: - Aide par champ, locale et assumée comme telle
+    //
+    // L'adressage des services est un réglage **de l'appareil**, pas un champ du document
+    // de configuration : il n'apparaît dans aucun des descripteurs servis par
+    // `/admin/configuration/field-descriptors`, et le moteur ne peut pas le décrire — il
+    // ignore où on cherche à le joindre. Ces trois textes sont donc écrits ici. Ils passent
+    // par la même présentation et le même contrat d'accessibilité que l'aide servie, pour
+    // que l'affordance ⓘ veuille dire la même chose partout dans l'application.
+
+    private static let hostHelp = ConfigurationFieldDescriptor(
+        path: "device.endpoints.host",
+        label: "Hôte commun",
+        description: "Le nom de machine ou l'adresse IP où répondent les six services, quand ils partagent la même machine. Chaque service garde son propre port.",
+        example: "192.168.1.10",
+        constraint: "Sans schéma ni port : ils sont demandés à part.")
+
+    private static func portHelp(_ service: ServiceKind) -> ConfigurationFieldDescriptor {
+        ConfigurationFieldDescriptor(
+            path: "device.endpoints.port.\(service.rawValue)",
+            label: "Port de \(service.title)",
+            description: service.purpose,
+            example: String(service.defaultPort),
+            constraint: "Un entier entre 1 et 65535.")
+    }
+
+    private static func urlHelp(_ service: ServiceKind) -> ConfigurationFieldDescriptor {
+        ConfigurationFieldDescriptor(
+            path: "device.endpoints.url.\(service.rawValue)",
+            label: "Adresse de \(service.title)",
+            description: service.purpose,
+            example: "https://exemple:\(service.defaultPort)",
+            constraint: "URL complète, schéma compris. Un appareil physique exige HTTPS.")
     }
 
     private func portBinding(_ service: ServiceKind) -> Binding<String> {

@@ -98,6 +98,9 @@ final class AppState {
     private(set) var playerJournal: JournalView?
     private(set) var contextualHelp: ContextualHelpView?
     private(set) var adminConfiguration: ExperienceConfigurationView?
+    /// Aide intégrée par champ, servie par le moteur. Vide tant que la route n'a pas
+    /// répondu — les écrans restent alors utilisables, simplement sans aide.
+    private(set) var fieldCatalog = ConfigurationFieldCatalog.empty
     private(set) var permissionsCatalog: [PermissionView] = []
     private(set) var roles: [RoleView] = []
     private(set) var adminUsers: [AdminUserView] = []
@@ -150,8 +153,18 @@ final class AppState {
         bootstrap?.applicationName?.nonEmpty
             ?? bootstrap?.branding?.applicationName?.nonEmpty
             ?? experience?.document.game.name.nonEmpty
-            ?? "GenEngine"
+            ?? Self.bundleDisplayName
     }
+
+    /// Dernier repli du nom affiché, quand le moteur est injoignable au tout premier
+    /// lancement. Il lit le nom livré dans le paquet, que chaque instance cliente
+    /// redéfinit en recompilant avec sa propre marque. Le repli ultime reste « GenEngine » :
+    /// le binaire est le moteur, et « Le Diapason » est une configuration servie à
+    /// l'exécution par GET /client-bootstrap — l'inscrire ici en dur confondrait les deux.
+    static let bundleDisplayName: String =
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)?.nonEmpty
+            ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)?.nonEmpty
+            ?? "GenEngine"
 
     /// Accroche de la configuration, si le moteur en publie une.
     var tagline: String? {
@@ -175,7 +188,7 @@ final class AppState {
         var items = publishedStories
         if let scenarioVersionID, let publishedTitle {
             let id = scenarioVersionID.uuidString.lowercased()
-            let local = StorySummary(id: id, title: publishedTitle, eyebrow: "Publié localement", synopsis: "Une histoire connectée à votre environnement GenEngine.", duration: "À découvrir", symbol: "network", accent: .verdigris, availability: .published(scenarioVersionID))
+            let local = StorySummary(id: id, title: publishedTitle, eyebrow: "Publié localement", synopsis: "Une histoire connectée à votre environnement \(gameName).", duration: "À découvrir", symbol: "network", accent: .verdigris, availability: .published(scenarioVersionID))
             if !items.contains(where: { $0.id == id }), matchesCatalogQuery(local) {
                 items.insert(local, at: 0)
             }
@@ -423,6 +436,28 @@ final class AppState {
                 frontId: self.frontId,
                 request: PurchaseRequest(offerId: offer.id, idempotencyKey: UUID().uuidString.lowercased()))
         }
+    }
+
+    /// Charge l'aide par champ servie par le moteur, en servant d'abord le cache disque.
+    ///
+    /// Le catalogue décrit le schéma et ne change qu'avec la version du moteur : le relire
+    /// à chaque ouverture de l'administration serait gratuit en fraîcheur et coûteux en
+    /// latence. Le cache est donc affiché immédiatement, puis remplacé par la réponse
+    /// réseau quand elle arrive. Un échec — route absente, `config.read` refusé, moteur
+    /// injoignable — laisse simplement le catalogue vide : les champs restent utilisables
+    /// sans aide, ce qui est le repli attendu, et l'erreur est journalisée sans être masquée.
+    func loadFieldDescriptors() async {
+        if fieldCatalog.isEmpty, let cached = ConfigurationFieldCache.load() {
+            fieldCatalog = ConfigurationFieldCatalog(descriptors: cached)
+        }
+        guard hasPermission("config.read") else { return }
+        do {
+            let descriptors = try await api.configurationFieldDescriptors()
+            fieldCatalog = ConfigurationFieldCatalog(descriptors: descriptors)
+            ConfigurationFieldCache.save(descriptors)
+        }
+        catch is CancellationError { }
+        catch { developerLog.insert("✗ Aide par champ: \(error.localizedDescription)", at: 0) }
     }
 
     func loadAdministration() async {
@@ -731,7 +766,7 @@ final class AppState {
             let story = self.stories.first { item in
                 if case let .published(versionID) = item.availability { return versionID == session.scenarioVersionId }
                 return false
-            } ?? StorySummary(id: session.scenarioVersionId.uuidString.lowercased(), title: saved.title, eyebrow: "Session sauvegardée", synopsis: "Reprenez cette histoire depuis le moteur GenEngine.", duration: "Tour \(session.turn + 1)", symbol: "bookmark.fill", accent: .verdigris, availability: .published(session.scenarioVersionId))
+            } ?? StorySummary(id: session.scenarioVersionId.uuidString.lowercased(), title: saved.title, eyebrow: "Session sauvegardée", synopsis: "Reprenez cette histoire depuis \(self.gameName).", duration: "Tour \(session.turn + 1)", symbol: "bookmark.fill", accent: .verdigris, availability: .published(session.scenarioVersionId))
             self.currentStory = story
             self.isDemoSession = false
             self.session = session
@@ -978,7 +1013,7 @@ final class AppState {
     }
 
     private func remember(_ session: SessionView) {
-        let title = currentStory?.title ?? savedSessions.first(where: { $0.id == session.id })?.title ?? "Histoire GenEngine"
+        let title = currentStory?.title ?? savedSessions.first(where: { $0.id == session.id })?.title ?? "Histoire \(gameName)"
         let saved = SavedSession(id: session.id, scenarioVersionId: session.scenarioVersionId, title: title, status: session.status.label, revision: session.revision, turn: session.turn, updatedAt: .now)
         savedSessions.removeAll { $0.id == session.id }
         savedSessions.insert(saved, at: 0)

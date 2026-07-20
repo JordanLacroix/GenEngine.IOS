@@ -19,6 +19,15 @@
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<!-- Nom affiché sur l'écran d'accueil. Il porte le nom de la *configuration* livrée,
+	     pas celui du moteur : un joueur du Diapason ne doit pas lancer « GenEngine ».
+	     C'est un réglage d'industrialisation, à changer par instance client au même titre
+	     que l'icône. L'identité de code — nom de cible, PRODUCT_NAME, bundle identifier —
+	     reste « GenEngine » et ne bouge pas. -->
+	<!-- Le binaire reste le moteur : « Le Diapason » est une configuration, servie
+	     à l'exécution par GET /client-bootstrap et affichée dans toute l'interface.
+	     Le nom du bundle est figé à la compilation et ne peut pas en venir ; une
+	     instance client le redéfinit en recompilant avec sa propre marque. -->
 	<key>CFBundleDisplayName</key>
 	<string>GenEngine</string>
 	<key>CFBundleShortVersionString</key>
