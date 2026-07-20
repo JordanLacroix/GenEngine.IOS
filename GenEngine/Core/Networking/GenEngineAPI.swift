@@ -155,13 +155,18 @@ actor LiveGenEngineAPI: GenEngineAPI {
     private var token: String?
     private let session: URLSession
 
-    init(endpoints: ServiceEndpoints, token: String? = nil) {
+    /// `protocolClasses` n'existe que pour les tests : il permet d'intercepter les requêtes
+    /// avec un `URLProtocol` et d'observer les chemins réellement construits — un chemin
+    /// erroné ne se voyait jusqu'ici qu'à l'exécution, contre un vrai serveur. En production
+    /// le paramètre est omis et la configuration reste celle d'origine.
+    init(endpoints: ServiceEndpoints, token: String? = nil, protocolClasses: [AnyClass]? = nil) {
         self.endpoints = endpoints
         self.token = token
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 15
         configuration.waitsForConnectivity = true
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        if let protocolClasses { configuration.protocolClasses = protocolClasses }
         session = URLSession(configuration: configuration)
     }
 
@@ -442,7 +447,10 @@ actor LiveGenEngineAPI: GenEngineAPI {
             throw APIError.invalidScenario("Le document narratif est invalide.")
         }
         let body = try JSONSerialization.data(withJSONObject: ["expectedRevision": expectedRevision, "document": object])
-        return try await perform(method: "PUT", base: endpoints.authoring, path: scenarioPath(scenarioId), body: body, authenticated: true)
+        // Le moteur n'expose pas `PUT /scenarios/{id}` — cette route n'existe que pour `GET`
+        // et `DELETE`, et répondait donc 405. Le brouillon a sa propre ressource, celle que
+        // le client web vise déjà.
+        return try await perform(method: "PUT", base: endpoints.authoring, path: "\(scenarioPath(scenarioId))/draft", body: body, authenticated: true)
     }
 
     func archiveScenario(scenarioId: UUID, expectedRevision: Int) async throws {
