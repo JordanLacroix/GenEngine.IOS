@@ -48,15 +48,17 @@ struct GameAudioTests {
         #expect(manifest.isEmpty == false)
         #expect(manifest.license?.isEmpty == false, "un pack distribué doit porter sa licence")
 
+        // Le pack couvre les douze clés : une clé perdue rendrait un écran muet en
+        // silence, sans que rien d'autre ne le signale.
         for ambience in AudioAmbience.allCases {
-            guard let track = manifest.track(for: ambience) else { continue }
+            let track = try #require(manifest.track(for: ambience), "ambiance \(ambience.rawValue) absente du manifeste")
             #expect(
                 bundle.url(forResource: track.resource, withExtension: track.fileExtension) != nil,
                 "ambiance \(ambience.rawValue) : \(track.resource).\(track.fileExtension) absent du bundle")
         }
 
         for cue in AudioCue.allCases {
-            guard let track = manifest.track(for: cue) else { continue }
+            let track = try #require(manifest.track(for: cue), "signature \(cue.rawValue) absente du manifeste")
             #expect(
                 bundle.url(forResource: track.resource, withExtension: track.fileExtension) != nil,
                 "signature \(cue.rawValue) : \(track.resource).\(track.fileExtension) absent du bundle")
