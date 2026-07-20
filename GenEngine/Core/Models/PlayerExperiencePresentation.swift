@@ -49,13 +49,28 @@ enum PlayerExperiencePresentation {
     }
 
     static let worldMapSize = CGSize(width: 1536, height: 1024)
+    /// Centres des six champs dessinés dans `WorldMap` (`diapason-domains.svg`).
+    ///
+    /// Ces coordonnées ne sont pas relevées après coup sur une image existante :
+    /// elles sont écrites en même temps que la composition, et les deux se
+    /// modifient ensemble. Elles sont identiques à `worldDoorAnchors` du client
+    /// web, qui affiche le même plan. L'anneau évite le coin supérieur gauche,
+    /// occupé par le titre de la carte.
+    ///
+    /// Il en faut au moins autant que de catégories publiées : la configuration
+    /// de référence en compte six. Avec cinq ancres, la sixième posture retombait
+    /// sur la disposition en grille calculée, sans rapport avec le dessin.
     static let doorAnchors = [
-        CGPoint(x: 850, y: 280), CGPoint(x: 1230, y: 400), CGPoint(x: 390, y: 330),
-        CGPoint(x: 380, y: 680), CGPoint(x: 1070, y: 760)
+        CGPoint(x: 768, y: 268), CGPoint(x: 1200, y: 360), CGPoint(x: 1240, y: 700),
+        CGPoint(x: 830, y: 800), CGPoint(x: 420, y: 716), CGPoint(x: 392, y: 430)
     ]
+    /// En portrait, `projectMapPoint` recadre en `cover` sur la largeur : seule
+    /// une bande centrale du plan reste visible, en pratique `x` entre 530 et
+    /// 1005 sur un iPhone courant. Les ancres larges tomberaient hors champ.
+    /// La grille est aussi décalée vers le bas, sous le titre de la carte.
     static let compactDoorAnchors = [
-        CGPoint(x: 850, y: 280), CGPoint(x: 770, y: 570), CGPoint(x: 1070, y: 760),
-        CGPoint(x: 620, y: 410), CGPoint(x: 930, y: 440)
+        CGPoint(x: 658, y: 416), CGPoint(x: 879, y: 416), CGPoint(x: 658, y: 618),
+        CGPoint(x: 879, y: 618), CGPoint(x: 658, y: 820), CGPoint(x: 879, y: 820)
     ]
 
     static func doorAnchors(for viewport: CGSize) -> [CGPoint] {

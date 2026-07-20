@@ -99,17 +99,31 @@ struct DemoStoryTests {
         #expect(throws: FamiliarAssetPackError.self) {
             _ = try FamiliarAssetPack(schemaVersion: 1, id: "unsafe", name: "Unsafe", targetFamiliarId: nil, bundledAssetName: nil, portraitUrl: URL(string: "http://example.test/pet.png"), license: "Test", attribution: "Test").validated()
         }
-        #expect(try FamiliarAssetPack.aster.validated().id == "genengine.aster.original")
+        #expect(try FamiliarAssetPack.tierce.validated().id == "genengine.tierce.original")
     }
 
     @Test func worldDoorAnchorsFollowTheScaledMap() {
         let center = PlayerExperiencePresentation.projectMapPoint(CGPoint(x: 768, y: 512), into: CGSize(width: 2048, height: 930))
-        let lighthouse = PlayerExperiencePresentation.projectMapPoint(CGPoint(x: 390, y: 330), into: CGSize(width: 2048, height: 930))
+        let domain = PlayerExperiencePresentation.projectMapPoint(CGPoint(x: 392, y: 430), into: CGSize(width: 2048, height: 930))
         #expect(center.x == 1024)
         #expect(center.y == 465)
-        #expect(abs(lighthouse.x - 520) < 0.01)
-        #expect(abs(lighthouse.y - 222.333) < 0.01)
-        #expect(PlayerExperiencePresentation.doorAnchors(for: CGSize(width: 768, height: 1024))[1] == CGPoint(x: 770, y: 570))
+        #expect(abs(domain.x - 522.667) < 0.01)
+        #expect(abs(domain.y - 355.667) < 0.01)
+        #expect(PlayerExperiencePresentation.doorAnchors(for: CGSize(width: 768, height: 1024))[1] == CGPoint(x: 879, y: 416))
+    }
+
+    /// En portrait, le plan est recadré en `cover` sur la largeur : une ancre
+    /// trop excentrée sort du champ et sa porte devient invisible. C'était le
+    /// cas des anciennes ancres compactes en `x: 390` et `x: 1070`. Les bornes
+    /// verticales tiennent compte du titre de la carte et de la barre d'onglets.
+    @Test func compactDoorAnchorsStayInsideAPortraitViewport() {
+        for viewport in [CGSize(width: 390, height: 844), CGSize(width: 375, height: 812)] {
+            for anchor in PlayerExperiencePresentation.doorAnchors(for: viewport) {
+                let point = PlayerExperiencePresentation.projectMapPoint(anchor, into: viewport)
+                #expect(point.x > 55 && point.x < viewport.width - 55)
+                #expect(point.y > 250 && point.y < viewport.height - 120)
+            }
+        }
     }
 
     @Test func playerExperienceValuesAreLocalized() {

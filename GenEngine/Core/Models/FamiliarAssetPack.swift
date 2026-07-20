@@ -10,15 +10,15 @@ struct FamiliarAssetPack: Codable, Sendable {
     let license: String
     let attribution: String
 
-    static let aster = FamiliarAssetPack(
+    static let tierce = FamiliarAssetPack(
         schemaVersion: 1,
-        id: "genengine.aster.original",
-        name: "Aster — constellation",
+        id: "genengine.tierce.original",
+        name: "Tierce — intervalle",
         targetFamiliarId: nil,
-        bundledAssetName: "FamiliarAster",
+        bundledAssetName: "FamiliarTierce",
         portraitUrl: nil,
         license: "GenEngine project asset — no external trademark or ownership metadata",
-        attribution: "Illustration originale générée pour GenEngine")
+        attribution: "Composition SVG originale produite pour GenEngine")
 
     func validated() throws -> FamiliarAssetPack {
         guard schemaVersion == 1,
@@ -44,7 +44,7 @@ enum FamiliarAssetPackStore {
     static func load() -> FamiliarAssetPack {
         guard let data = UserDefaults.standard.data(forKey: key),
               let pack = try? JSONDecoder().decode(FamiliarAssetPack.self, from: data),
-              let validated = try? pack.validated() else { return .aster }
+              let validated = try? pack.validated() else { return .tierce }
         return validated
     }
 

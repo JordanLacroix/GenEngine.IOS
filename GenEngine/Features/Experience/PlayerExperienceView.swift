@@ -341,7 +341,7 @@ struct PlayerExperienceViewScreen: View {
         ScrollView { familiarCreation.padding(24).frame(maxWidth: 760).frame(maxWidth: .infinity, alignment: .trailing) }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .sceneBackdrop(
-                image: "FamiliarAster",
+                image: "FamiliarTierce",
                 overlay: LinearGradient(colors: [.black.opacity(0.2), .black.opacity(0.94)], startPoint: .top, endPoint: .bottom)
             )
     }
