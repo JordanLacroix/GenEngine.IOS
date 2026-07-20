@@ -166,6 +166,7 @@ struct PaginatedCatalogTests {
         func sessionTree(sessionId _: UUID) async throws -> NarrativeTree { throw APIError.invalidScenario("stub") }
         func submitChoice(sessionId _: UUID, commandId _: UUID, expectedRevision _: Int, choiceId _: String) async throws -> InputResult { throw APIError.invalidScenario("stub") }
         func continueInteraction(sessionId _: UUID, commandId _: UUID, expectedRevision _: Int) async throws -> InputResult { throw APIError.invalidScenario("stub") }
+        func consultDocument(sessionId _: UUID, commandId _: UUID, expectedRevision _: Int) async throws -> InputResult { throw APIError.invalidScenario("stub") }
         func submitAnswer(sessionId _: UUID, commandId _: UUID, expectedRevision _: Int, answerId _: String) async throws -> InputResult { throw APIError.invalidScenario("stub") }
         func submitText(sessionId _: UUID, commandId _: UUID, expectedRevision _: Int, text _: String) async throws -> InputResult { throw APIError.invalidScenario("stub") }
         func confirmTextAnalysis(sessionId _: UUID, commandId _: UUID, expectedRevision _: Int, confirmed _: Bool) async throws -> InputResult { throw APIError.invalidScenario("stub") }

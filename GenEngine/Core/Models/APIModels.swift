@@ -59,8 +59,16 @@ struct PublishedScenarioView: Decodable, Sendable {
     let categoryId: UUID?
 }
 
+/// État d'une session.
+///
+/// Le cas `unknown` n'est pas une commodité : le moteur est autoritatif sur les états
+/// narratifs et en ajoute au fil des versions de schéma. Une énumération fermée fait
+/// échouer le décodage de **toute** la réponse — donc de `CurrentStep`, donc de la
+/// session — sur un seul état inconnu. Dégrader vaut mieux que bloquer.
 enum SessionStatus: Equatable, Sendable {
     case awaitingInput, paused, completed, abandoned, awaitingExternalInput, awaitingValidation
+    case unknown(String)
+
     var label: String {
         switch self {
         case .awaitingInput: "En cours"
@@ -69,12 +77,20 @@ enum SessionStatus: Equatable, Sendable {
         case .abandoned: "Abandonné"
         case .awaitingExternalInput: "Saisie attendue"
         case .awaitingValidation: "Validation attendue"
+        case .unknown: "État inconnu"
         }
     }
 }
 
+/// Nature de l'interaction courante.
+///
+/// Même raisonnement que `SessionStatus`, et ce n'est pas hypothétique : le schéma v6
+/// a introduit `Document`, absent de cette énumération, ce qui faisait échouer le
+/// décodage entier de `CurrentStep` et bloquait la session au lieu de la dégrader.
 enum InteractionKind: Equatable, Sendable {
     case legacyChoice, narration, choiceSet, quiz, characteristicGate, freeText, completed
+    case document
+    case unknown(String)
 }
 
 extension InteractionKind: Decodable {
@@ -89,11 +105,13 @@ extension InteractionKind: Decodable {
             case "characteristicgate": self = .characteristicGate
             case "freetext": self = .freeText
             case "completed": self = .completed
-            default: throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unknown interaction kind: \(raw)")
+            case "document": self = .document
+            default: self = .unknown(raw)
             }
             return
         }
-        switch try container.decode(Int.self) {
+        let numeric = try container.decode(Int.self)
+        switch numeric {
         case 0: self = .legacyChoice
         case 1: self = .narration
         case 2: self = .choiceSet
@@ -101,7 +119,8 @@ extension InteractionKind: Decodable {
         case 4: self = .characteristicGate
         case 5: self = .freeText
         case 6: self = .completed
-        default: throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unknown numeric interaction kind")
+        case 7: self = .document
+        default: self = .unknown(String(numeric))
         }
     }
 }
@@ -117,18 +136,19 @@ extension SessionStatus: Decodable {
             case "abandoned": self = .abandoned
             case "awaitingexternalinput": self = .awaitingExternalInput
             case "awaitingvalidation": self = .awaitingValidation
-            default: throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unknown session status: \(raw)")
+            default: self = .unknown(raw)
             }
             return
         }
-        switch try container.decode(Int.self) {
+        let numeric = try container.decode(Int.self)
+        switch numeric {
         case 0: self = .awaitingInput
         case 1: self = .paused
         case 2: self = .completed
         case 3: self = .abandoned
         case 4: self = .awaitingExternalInput
         case 5: self = .awaitingValidation
-        default: throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unknown numeric session status")
+        default: self = .unknown(String(numeric))
         }
     }
 }
@@ -152,8 +172,16 @@ struct CurrentStep: Decodable, Equatable, Sendable {
     let interactionId: String?
     let kind: InteractionKind
     let pendingTextAnalysis: TextAnalysisResult?
+    /// L'interaction courante peut être ignorée (schéma de scénario v4).
+    let isOptional: Bool
+    /// Choix de sortie du nœud, à présenter **avec** l'interaction et jamais comme sa
+    /// conclusion : le moteur garantit que cette liste est vide lorsque l'interaction
+    /// est obligatoire, donc sa présence *est* l'autorisation de partir sans la jouer.
+    let exitChoices: [VisibleChoice]
+    /// Renseigné uniquement lorsque `kind` vaut `.document` (schéma de scénario v6).
+    let document: ConsultableDocument?
 
-    init(nodeId: String, text: String, status: SessionStatus, choices: [VisibleChoice], turn: Int, interactionId: String? = nil, kind: InteractionKind = .legacyChoice, pendingTextAnalysis: TextAnalysisResult? = nil) {
+    init(nodeId: String, text: String, status: SessionStatus, choices: [VisibleChoice], turn: Int, interactionId: String? = nil, kind: InteractionKind = .legacyChoice, pendingTextAnalysis: TextAnalysisResult? = nil, isOptional: Bool = false, exitChoices: [VisibleChoice] = [], document: ConsultableDocument? = nil) {
         self.nodeId = nodeId
         self.text = text
         self.status = status
@@ -162,6 +190,29 @@ struct CurrentStep: Decodable, Equatable, Sendable {
         self.interactionId = interactionId
         self.kind = kind
         self.pendingTextAnalysis = pendingTextAnalysis
+        self.isOptional = isOptional
+        self.exitChoices = exitChoices
+        self.document = document
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case nodeId, text, status, choices, turn, interactionId, kind, pendingTextAnalysis
+        case isOptional, exitChoices, document
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        nodeId = try container.decode(String.self, forKey: .nodeId)
+        text = try container.decode(String.self, forKey: .text)
+        status = try container.decode(SessionStatus.self, forKey: .status)
+        choices = try container.decodeIfPresent([VisibleChoice].self, forKey: .choices) ?? []
+        turn = try container.decode(Int.self, forKey: .turn)
+        interactionId = try container.decodeIfPresent(String.self, forKey: .interactionId)
+        kind = try container.decodeIfPresent(InteractionKind.self, forKey: .kind) ?? .legacyChoice
+        pendingTextAnalysis = try container.decodeIfPresent(TextAnalysisResult.self, forKey: .pendingTextAnalysis)
+        isOptional = try container.decodeIfPresent(Bool.self, forKey: .isOptional) ?? false
+        exitChoices = try container.decodeIfPresent([VisibleChoice].self, forKey: .exitChoices) ?? []
+        document = try container.decodeIfPresent(ConsultableDocument.self, forKey: .document)
     }
 }
 struct SubmitChoiceRequest: Encodable, Sendable { let commandId: UUID; let expectedRevision: Int; let choiceId: String }

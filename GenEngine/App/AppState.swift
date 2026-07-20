@@ -725,6 +725,16 @@ final class AppState {
         }
     }
 
+    /// Consulter un document **consomme un tour** : c'est une commande de jeu, pas une
+    /// lecture. Elle ne part donc que sur une action explicite du joueur, jamais à
+    /// l'affichage du document.
+    func consultDocument() async {
+        guard let session, !isDemoSession else { return }
+        await performInput("Document consulté") {
+            try await self.api.consultDocument(sessionId: session.id, commandId: UUID(), expectedRevision: session.revision)
+        }
+    }
+
     func submit(answerID: String) async {
         guard let session, !isDemoSession else { return }
         await performInput("Réponse envoyée") {
