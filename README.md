@@ -143,7 +143,7 @@ L’espace Compagnon importe un manifeste JSON de schéma `1` depuis l’app Fic
 
 Le configurateur s’adapte en deux colonnes sur iPad et en pile sur les largeurs compactes. Les valeurs contractuelles restent inchangées à l’enregistrement tandis que leurs libellés sont présentés en français.
 
-Un exemple est fourni dans [`GenEngine/Resources/aster-familiar-pack.json`](GenEngine/Resources/aster-familiar-pack.json).
+Un exemple est fourni dans [`GenEngine/Resources/tierce-familiar-pack.json`](GenEngine/Resources/tierce-familiar-pack.json).
 
 ### Présentation plein écran et HUD
 
