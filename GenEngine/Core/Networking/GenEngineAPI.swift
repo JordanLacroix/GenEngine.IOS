@@ -63,6 +63,10 @@ protocol GenEngineAPI: Sendable {
     func scenarioStructure(scenarioVersionId: UUID) async throws -> ScenarioStructure
     func submitChoice(sessionId: UUID, commandId: UUID, expectedRevision: Int, choiceId: String) async throws -> InputResult
     func continueInteraction(sessionId: UUID, commandId: UUID, expectedRevision: Int) async throws -> InputResult
+    /// Consultation d'un document (schéma de scénario v6). Côté moteur c'est une
+    /// commande joueur idempotente qui **consomme un tour**, pas une lecture : elle ne
+    /// part donc jamais toute seule, seulement sur une action explicite du joueur.
+    func consultDocument(sessionId: UUID, commandId: UUID, expectedRevision: Int) async throws -> InputResult
     func submitAnswer(sessionId: UUID, commandId: UUID, expectedRevision: Int, answerId: String) async throws -> InputResult
     func submitText(sessionId: UUID, commandId: UUID, expectedRevision: Int, text: String) async throws -> InputResult
     func confirmTextAnalysis(sessionId: UUID, commandId: UUID, expectedRevision: Int, confirmed: Bool) async throws -> InputResult
@@ -124,6 +128,13 @@ enum APIError: LocalizedError {
     case http(Int, ProblemDetails?)
     case decoding(String)
     case transport(String)
+    /// Le plafond de sécurité de parcours de pages a été atteint avant la fin de la liste.
+    ///
+    /// Une liste incomplète se lit à l'écran exactement comme une liste complète : rien ne
+    /// distingue « il n'y a que ça » de « on a arrêté de demander ». Le client refuse donc de
+    /// livrer une collection tronquée en silence et remonte une erreur explicite, que
+    /// l'appelant présente comme n'importe quel refus serveur.
+    case incompleteList(loaded: Int, total: Int)
 
     var errorDescription: String? {
         switch self {
@@ -133,6 +144,8 @@ enum APIError: LocalizedError {
             "Le service a répondu \(code)" + [problem?.title, problem?.detail].compactMap { $0 }.filter { !$0.isEmpty }.map { " — \($0)" }.joined()
         case let .decoding(message): "La réponse du service est incompatible — \(message)"
         case let .transport(message): "Connexion impossible — \(message)"
+        case let .incompleteList(loaded, total):
+            "Liste trop volumineuse — \(loaded) éléments chargés sur \(total). Affiner la recherche ou filtrer avant de réessayer."
         }
     }
 }
@@ -209,8 +222,63 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await perform(method: "POST", base: endpoints.playerExperience, path: "/me/experience/onboarding/reset?frontId=\(escaped(frontId))", body: nil, authenticated: true)
     }
 
+    /// Journal du joueur. L'écran n'offre aucun défilement paginé : il dédoublonne et présente
+    /// l'historique entier. Une seule page en cachait donc la fin sans le dire. On parcourt
+    /// toutes les pages en une seule passe.
+    ///
+    /// `totalsByType` est un agrégat serveur portant sur l'ensemble du journal et non sur la
+    /// page : celui de la première réponse est déjà le bon, on le conserve tel quel.
     func journal(frontId: String) async throws -> JournalView {
-        try await perform(method: "GET", base: endpoints.playerExperience, path: "/me/experience/journal?frontId=\(escaped(frontId))&pageSize=100", body: nil, authenticated: true)
+        let path = "/me/experience/journal?frontId=\(escaped(frontId))"
+        var entries: [PlayerJournalEntryView] = []
+        var totalsByType: [String: Int] = [:]
+        var page = 1
+        let maximumPages = 100
+        while page <= maximumPages {
+            let response: JournalPageEnvelope = try await perform(
+                method: "GET",
+                base: endpoints.playerExperience,
+                path: "\(path)&page=\(page)&pageSize=100",
+                body: nil,
+                authenticated: true)
+            if page == 1 { totalsByType = response.totalsByType }
+            entries.append(contentsOf: response.items)
+            guard response.items.isEmpty == false, let next = response.nextPage else { break }
+            if next > maximumPages {
+                throw APIError.incompleteList(loaded: entries.count, total: response.total)
+            }
+            page = next
+        }
+        return JournalView(items: entries, total: entries.count, totalsByType: totalsByType)
+    }
+
+    /// Enveloppe paginée du journal. `JournalView` ne porte ni `page` ni `pageSize` : sans eux
+    /// le client ne peut pas savoir qu'une suite existe. Ce type intermédiaire les lit — avec la
+    /// même tolérance que `PagedList` — pour piloter le parcours des pages.
+    private struct JournalPageEnvelope: Decodable, Sendable {
+        let items: [PlayerJournalEntryView]
+        let page: Int
+        let pageSize: Int
+        let total: Int
+        let totalsByType: [String: Int]
+
+        private enum CodingKeys: String, CodingKey { case items, page, pageSize, total, totalsByType }
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let decodedItems = try container.decodeIfPresent([PlayerJournalEntryView].self, forKey: .items) ?? []
+            let decodedPage = try container.decodeIfPresent(Int.self, forKey: .page) ?? 1
+            let decodedPageSize = try container.decodeIfPresent(Int.self, forKey: .pageSize) ?? max(decodedItems.count, 1)
+            let declaredTotal = try container.decodeIfPresent(Int.self, forKey: .total) ?? decodedItems.count
+            items = decodedItems
+            page = max(decodedPage, 1)
+            pageSize = max(decodedPageSize, 1)
+            let floor = decodedItems.isEmpty ? 0 : (max(decodedPage, 1) - 1) * max(decodedPageSize, 1) + decodedItems.count
+            total = max(declaredTotal, floor)
+            totalsByType = try container.decodeIfPresent([String: Int].self, forKey: .totalsByType) ?? [:]
+        }
+
+        var nextPage: Int? { page * pageSize < total ? page + 1 : nil }
     }
 
     func contextualHelp(frontId: String, request: ContextualHelpRequest) async throws -> ContextualHelpView {
@@ -298,10 +366,15 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     /// Parcourt toutes les pages d'une liste paginée et concatène les éléments.
     ///
-    /// Réservé aux surfaces d'administration dont l'écran a réellement besoin de la
-    /// collection entière. Un plafond dur de pages évite qu'un serveur renvoyant un `total`
-    /// incohérent ne fasse boucler le client indéfiniment ; il est atteint à 10 000 éléments,
-    /// bien au-delà des volumes d'un front d'organisation.
+    /// Réservé aux surfaces dont l'écran a réellement besoin de la collection entière. Un
+    /// plafond dur de pages évite qu'un serveur renvoyant un `total` incohérent ne fasse
+    /// boucler le client indéfiniment ; il est atteint à 10 000 éléments, bien au-delà des
+    /// volumes d'un front d'organisation.
+    ///
+    /// **Le plafond n'est jamais silencieux.** S'il est atteint alors que le serveur annonce
+    /// encore des éléments, la méthode lève `APIError.incompleteList` plutôt que de rendre une
+    /// collection tronquée : à l'écran, une liste amputée est indiscernable d'une liste
+    /// complète, et c'est précisément ce qui rend la troncature dangereuse.
     private func allPages<Item: Decodable & Sendable>(base: String, path: String, pageSize: Int = 100) async throws -> [Item] {
         let separator = path.contains("?") ? "&" : "?"
         var collected: [Item] = []
@@ -315,7 +388,10 @@ actor LiveGenEngineAPI: GenEngineAPI {
                 body: nil,
                 authenticated: true)
             collected.append(contentsOf: response.items)
-            guard response.items.isEmpty == false, let next = response.nextPage else { break }
+            guard response.items.isEmpty == false, let next = response.nextPage else { return collected }
+            if next > maximumPages {
+                throw APIError.incompleteList(loaded: collected.count, total: response.total)
+            }
             page = next
         }
         return collected
@@ -444,6 +520,10 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     func continueInteraction(sessionId: UUID, commandId: UUID, expectedRevision: Int) async throws -> InputResult {
         try await send(method: "POST", base: endpoints.play, path: sessionPath(sessionId) + "/continue", body: ContinueInteractionRequest(commandId: commandId, expectedRevision: expectedRevision))
+    }
+
+    func consultDocument(sessionId: UUID, commandId: UUID, expectedRevision: Int) async throws -> InputResult {
+        try await send(method: "POST", base: endpoints.play, path: sessionPath(sessionId) + "/document-consultations", body: ContinueInteractionRequest(commandId: commandId, expectedRevision: expectedRevision))
     }
 
     func submitAnswer(sessionId: UUID, commandId: UUID, expectedRevision: Int, answerId: String) async throws -> InputResult {

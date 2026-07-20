@@ -95,6 +95,14 @@ struct PlayerView: View {
                 Text("Histoire en pause").font(.headline).foregroundStyle(GenEngineTheme.ivory)
                 Button("Reprendre") { Task { await state.pauseOrResume() } }.buttonStyle(PrimaryActionStyle())
             }
+        } else if let document = step.document {
+            // Le document est rendu **avec** les choix de sortie et jamais à leur
+            // place : consulter n'est pas un passage obligé, c'est un choix qui coûte
+            // un tour. Les sorties restent donc atteignables sans avoir consulté.
+            VStack(spacing: 20) {
+                DocumentSheetView(document: document, busy: state.isBusy) { Task { await state.consultDocument() } }
+                exitChoices(step)
+            }
         } else if step.kind == .narration {
             Button("Continuer") { Task { await state.continueInteraction() } }
                 .buttonStyle(PrimaryActionStyle())
@@ -155,6 +163,37 @@ struct PlayerView: View {
                     .buttonStyle(.plain)
                     .disabled(state.isBusy || requiresDemoInteraction(step))
                     .accessibilityLabel("\(step.kind == .quiz ? "Réponse" : "Choix") \(index + 1), \(choice.text)")
+                }
+            }
+        }
+    }
+
+    /// Sorties du nœud. Le moteur garantit que cette liste est vide lorsque
+    /// l'interaction est obligatoire : sa présence *est* l'autorisation de partir sans
+    /// jouer l'interaction, et elle n'a donc pas à être calculée ici.
+    @ViewBuilder
+    private func exitChoices(_ step: CurrentStep) -> some View {
+        if !step.exitChoices.isEmpty {
+            VStack(spacing: 10) {
+                EyebrowText(text: step.isOptional ? "VOUS POUVEZ AUSSI PASSER" : "SORTIES")
+                ForEach(step.exitChoices) { choice in
+                    Button {
+                        audio.signal(.choice)
+                        Task { await state.submit(choiceID: choice.id) }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Text(choice.text).font(.system(.body, design: .serif, weight: .medium)).multilineTextAlignment(.leading)
+                            Spacer()
+                            Image(systemName: "arrow.right").foregroundStyle(GenEngineTheme.amber)
+                        }
+                        .foregroundStyle(GenEngineTheme.ivory)
+                        .padding(16)
+                        .frame(maxWidth: 660, minHeight: HUDMetrics.minimumTarget)
+                        .glassPanel()
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(state.isBusy)
+                    .accessibilityLabel("Sortie, \(choice.text)")
                 }
             }
         }
