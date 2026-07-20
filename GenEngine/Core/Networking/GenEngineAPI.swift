@@ -124,6 +124,13 @@ enum APIError: LocalizedError {
     case http(Int, ProblemDetails?)
     case decoding(String)
     case transport(String)
+    /// Le plafond de sécurité de parcours de pages a été atteint avant la fin de la liste.
+    ///
+    /// Une liste incomplète se lit à l'écran exactement comme une liste complète : rien ne
+    /// distingue « il n'y a que ça » de « on a arrêté de demander ». Le client refuse donc de
+    /// livrer une collection tronquée en silence et remonte une erreur explicite, que
+    /// l'appelant présente comme n'importe quel autre refus.
+    case incompleteList(loaded: Int, total: Int)
 
     var errorDescription: String? {
         switch self {
@@ -133,6 +140,8 @@ enum APIError: LocalizedError {
             "Le service a répondu \(code)" + [problem?.title, problem?.detail].compactMap { $0 }.filter { !$0.isEmpty }.map { " — \($0)" }.joined()
         case let .decoding(message): "La réponse du service est incompatible — \(message)"
         case let .transport(message): "Connexion impossible — \(message)"
+        case let .incompleteList(loaded, total):
+            "Liste trop volumineuse — \(loaded) éléments chargés sur \(total). Affinez la recherche avant de réessayer."
         }
     }
 }
@@ -142,13 +151,17 @@ actor LiveGenEngineAPI: GenEngineAPI {
     private var token: String?
     private let session: URLSession
 
-    init(endpoints: ServiceEndpoints, token: String? = nil) {
+    /// `protocolClasses` n'existe que pour les tests : il permet d'intercepter les requêtes
+    /// avec un `URLProtocol` et d'observer les chemins réellement construits. En production le
+    /// paramètre est omis et la configuration reste celle d'origine.
+    init(endpoints: ServiceEndpoints, token: String? = nil, protocolClasses: [AnyClass]? = nil) {
         self.endpoints = endpoints
         self.token = token
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 15
         configuration.waitsForConnectivity = true
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        if let protocolClasses { configuration.protocolClasses = protocolClasses }
         session = URLSession(configuration: configuration)
     }
 
@@ -209,8 +222,64 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await perform(method: "POST", base: endpoints.playerExperience, path: "/me/experience/onboarding/reset?frontId=\(escaped(frontId))", body: nil, authenticated: true)
     }
 
+    /// Journal du joueur. L'écran dédoublonne et présente l'historique entier, sans défilement
+    /// paginé : une page unique en cachait la fin sans le dire. On parcourt donc toutes les
+    /// pages, en une seule passe.
+    ///
+    /// `totalsByType` est un agrégat serveur portant sur l'ensemble du journal et non sur la
+    /// page : celui de la première réponse est déjà le bon, on le conserve tel quel.
     func journal(frontId: String) async throws -> JournalView {
-        try await perform(method: "GET", base: endpoints.playerExperience, path: "/me/experience/journal?frontId=\(escaped(frontId))&pageSize=100", body: nil, authenticated: true)
+        let path = "/me/experience/journal?frontId=\(escaped(frontId))"
+        var entries: [PlayerJournalEntryView] = []
+        var totalsByType: [String: Int] = [:]
+        var page = 1
+        let maximumPages = 100
+        while page <= maximumPages {
+            let response: JournalPageEnvelope = try await perform(
+                method: "GET",
+                base: endpoints.playerExperience,
+                path: "\(path)&page=\(page)&pageSize=100",
+                body: nil,
+                authenticated: true)
+            if page == 1 { totalsByType = response.totalsByType }
+            entries.append(contentsOf: response.items)
+            guard response.items.isEmpty == false, let next = response.nextPage else { break }
+            guard next <= maximumPages else {
+                throw APIError.incompleteList(loaded: entries.count, total: response.total)
+            }
+            page = next
+        }
+        return JournalView(items: entries, total: entries.count, totalsByType: totalsByType)
+    }
+
+    /// Enveloppe paginée du journal. `JournalView` ne porte ni `page` ni `pageSize` : privé de
+    /// ces deux métadonnées, le client ne peut pas savoir qu'une suite existe. Ce type
+    /// intermédiaire les lit — avec la même tolérance que `PagedList` — pour piloter le
+    /// parcours des pages, sans toucher au modèle exposé aux vues.
+    private struct JournalPageEnvelope: Decodable, Sendable {
+        let items: [PlayerJournalEntryView]
+        let page: Int
+        let pageSize: Int
+        let total: Int
+        let totalsByType: [String: Int]
+
+        private enum CodingKeys: String, CodingKey { case items, page, pageSize, total, totalsByType }
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let decodedItems = try container.decodeIfPresent([PlayerJournalEntryView].self, forKey: .items) ?? []
+            let decodedPage = max(try container.decodeIfPresent(Int.self, forKey: .page) ?? 1, 1)
+            let decodedPageSize = max(try container.decodeIfPresent(Int.self, forKey: .pageSize) ?? max(decodedItems.count, 1), 1)
+            let declaredTotal = try container.decodeIfPresent(Int.self, forKey: .total) ?? decodedItems.count
+            let floor = decodedItems.isEmpty ? 0 : (decodedPage - 1) * decodedPageSize + decodedItems.count
+            items = decodedItems
+            page = decodedPage
+            pageSize = decodedPageSize
+            total = max(declaredTotal, floor)
+            totalsByType = try container.decodeIfPresent([String: Int].self, forKey: .totalsByType) ?? [:]
+        }
+
+        var nextPage: Int? { page * pageSize < total ? page + 1 : nil }
     }
 
     func contextualHelp(frontId: String, request: ContextualHelpRequest) async throws -> ContextualHelpView {
@@ -260,8 +329,15 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await sendVoid(method: "POST", base: endpoints.identity, path: "/admin/access/users/\(userId.uuidString.lowercased())/roles", body: request, authenticated: true)
     }
 
+    /// Comptes. `adminUsers` sert à la fois la liste d'administration et la résolution des noms
+    /// dans les appartenances : un plafond à 50 rendait invisibles les comptes au-delà, et
+    /// affichait « 50 » là où `adminUsersTotal` devait annoncer l'effectif réel. La recherche
+    /// reste appliquée par le serveur.
     func users(query: String) async throws -> PagedUsersView {
-        try await perform(method: "GET", base: endpoints.identity, path: "/admin/users?query=\(escaped(query))&pageSize=50", body: nil, authenticated: true)
+        let items: [AdminUserView] = try await allPages(
+            base: endpoints.identity,
+            path: "/admin/users?query=\(escaped(query))")
+        return PagedUsersView(items: items, page: 1, pageSize: max(items.count, 1), total: items.count)
     }
 
     func setUserActive(userId: UUID, isActive: Bool) async throws -> AdminUserView {
@@ -298,10 +374,18 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     /// Parcourt toutes les pages d'une liste paginée et concatène les éléments.
     ///
-    /// Réservé aux surfaces d'administration dont l'écran a réellement besoin de la
-    /// collection entière. Un plafond dur de pages évite qu'un serveur renvoyant un `total`
-    /// incohérent ne fasse boucler le client indéfiniment ; il est atteint à 10 000 éléments,
-    /// bien au-delà des volumes d'un front d'organisation.
+    /// Réservé aux surfaces dont l'écran a réellement besoin de la collection entière. Un
+    /// plafond dur de pages évite qu'un serveur renvoyant un `total` incohérent ne fasse
+    /// boucler le client indéfiniment ; il est atteint à 10 000 éléments, bien au-delà des
+    /// volumes d'un front d'organisation.
+    ///
+    /// **Le plafond n'est jamais silencieux.** S'il est atteint alors que le serveur annonce
+    /// encore des éléments, la méthode lève `APIError.incompleteList` au lieu de rendre une
+    /// collection tronquée : à l'écran, une liste amputée est indiscernable d'une liste
+    /// complète, et c'est exactement ce qui rend la troncature dangereuse.
+    ///
+    /// Le décodage passe par `PagedList`, tolérante : un serveur antérieur à GenEngine#55,
+    /// qui répond par un tableau nu, est lu comme une page unique complète.
     private func allPages<Item: Decodable & Sendable>(base: String, path: String, pageSize: Int = 100) async throws -> [Item] {
         let separator = path.contains("?") ? "&" : "?"
         var collected: [Item] = []
@@ -315,18 +399,32 @@ actor LiveGenEngineAPI: GenEngineAPI {
                 body: nil,
                 authenticated: true)
             collected.append(contentsOf: response.items)
-            guard response.items.isEmpty == false, let next = response.nextPage else { break }
+            guard response.items.isEmpty == false, let next = response.nextPage else { return collected }
+            guard next <= maximumPages else {
+                throw APIError.incompleteList(loaded: collected.count, total: response.total)
+            }
             page = next
         }
         return collected
     }
 
+    /// Appartenances. L'écran d'administration les croise avec les unités et les périodes et
+    /// n'offre aucun défilement paginé : il lui faut la collection entière. L'enveloppe rendue
+    /// décrit donc ce qui a réellement été chargé, et non la seule première page.
     func memberships(frontId: String) async throws -> PagedMembershipsView {
-        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/memberships?pageSize=100", body: nil, authenticated: true)
+        let items: [MembershipView] = try await allPages(
+            base: endpoints.organization,
+            path: "/admin/organization/\(escaped(frontId))/memberships")
+        return PagedMembershipsView(items: items, page: 1, pageSize: max(items.count, 1), total: items.count)
     }
 
+    /// Affectations de contenu. Même raison que les appartenances : l'écran résout des noms
+    /// d'unité et de contenu sur l'ensemble, une page unique en amputait la fin sans le dire.
     func assignments(frontId: String) async throws -> PagedAssignmentsView {
-        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/assignments?pageSize=100", body: nil, authenticated: true)
+        let items: [ContentAssignmentView] = try await allPages(
+            base: endpoints.organization,
+            path: "/admin/organization/\(escaped(frontId))/assignments")
+        return PagedAssignmentsView(items: items, page: 1, pageSize: max(items.count, 1), total: items.count)
     }
 
     func upsertUnit(frontId: String, id: UUID, request: UpsertUnitRequest) async throws -> OrganizationUnitView {
@@ -357,8 +455,14 @@ actor LiveGenEngineAPI: GenEngineAPI {
         try await performVoid(method: "DELETE", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/assignments/\(id.uuidString.lowercased())")
     }
 
+    /// Scénarios possédés (Studio). La liste est la surface de travail de l'auteur : elle n'a
+    /// ni défilement paginé ni indicateur de reste, si bien qu'au-delà de 50 scénarios les plus
+    /// anciens disparaissaient de l'écran sans trace. La recherche reste faite par le serveur.
     func scenarios(query: String) async throws -> PagedScenariosView {
-        try await perform(method: "GET", base: endpoints.authoring, path: "/scenarios?query=\(escaped(query))&pageSize=50", body: nil, authenticated: true)
+        let items: [ScenarioView] = try await allPages(
+            base: endpoints.authoring,
+            path: "/scenarios?query=\(escaped(query))")
+        return PagedScenariosView(items: items, total: items.count, page: 1, pageSize: max(items.count, 1))
     }
 
     func updateScenario(scenarioId: UUID, expectedRevision: Int, document: Data) async throws -> ScenarioView {
@@ -366,7 +470,7 @@ actor LiveGenEngineAPI: GenEngineAPI {
             throw APIError.invalidScenario("Le document narratif est invalide.")
         }
         let body = try JSONSerialization.data(withJSONObject: ["expectedRevision": expectedRevision, "document": object])
-        return try await perform(method: "PUT", base: endpoints.authoring, path: scenarioPath(scenarioId), body: body, authenticated: true)
+        return try await perform(method: "PUT", base: endpoints.authoring, path: scenarioDraftPath(scenarioId), body: body, authenticated: true)
     }
 
     func archiveScenario(scenarioId: UUID, expectedRevision: Int) async throws {
@@ -545,6 +649,11 @@ actor LiveGenEngineAPI: GenEngineAPI {
 
     private func sessionPath(_ id: UUID) -> String { "/sessions/\(id.uuidString.lowercased())" }
     private func scenarioPath(_ id: UUID) -> String { "/scenarios/\(id.uuidString.lowercased())" }
+    /// Enregistrement du brouillon. Le moteur n'expose **pas** `PUT /scenarios/{id}` : la
+    /// ressource modifiable est le brouillon, `PUT /scenarios/{id}/draft`, qui prend
+    /// `{ expectedRevision, document }` (`UpdateDraftRequest`, service Authoring). Viser la
+    /// ressource nue renvoyait 405 et perdait silencieusement chaque sauvegarde du Studio.
+    private func scenarioDraftPath(_ id: UUID) -> String { scenarioPath(id) + "/draft" }
     private func scenarioVersionPath(_ id: UUID) -> String { "/scenario-versions/\(id.uuidString.lowercased())" }
     private func escaped(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value }
 }
