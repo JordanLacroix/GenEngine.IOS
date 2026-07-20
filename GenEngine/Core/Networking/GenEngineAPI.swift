@@ -334,7 +334,12 @@ actor LiveGenEngineAPI: GenEngineAPI {
     }
 
     func users(query: String) async throws -> PagedUsersView {
-        try await perform(method: "GET", base: endpoints.identity, path: "/admin/users?query=\(escaped(query))&pageSize=50", body: nil, authenticated: true)
+        // L'écran d'administration présente la liste entière, sans défilement paginé : une
+        // page unique en cachait la fin sans le dire. On parcourt donc toutes les pages, et
+        // `total` reflète ce qui est réellement chargé plutôt qu'une taille de page.
+        let items: [AdminUserView] = try await allPages(
+            base: endpoints.identity, path: "/admin/users?query=\(escaped(query))")
+        return PagedUsersView(items: items, page: 1, pageSize: items.count, total: items.count)
     }
 
     func setUserActive(userId: UUID, isActive: Bool) async throws -> AdminUserView {
@@ -403,11 +408,17 @@ actor LiveGenEngineAPI: GenEngineAPI {
     }
 
     func memberships(frontId: String) async throws -> PagedMembershipsView {
-        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/memberships?pageSize=100", body: nil, authenticated: true)
+        // L'administration a besoin de l'arbre entier des rattachements ; une page unique en
+        // masquait la fin. On parcourt toutes les pages, `total` reflète le chargé.
+        let items: [MembershipView] = try await allPages(
+            base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/memberships")
+        return PagedMembershipsView(items: items, page: 1, pageSize: items.count, total: items.count)
     }
 
     func assignments(frontId: String) async throws -> PagedAssignmentsView {
-        try await perform(method: "GET", base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/assignments?pageSize=100", body: nil, authenticated: true)
+        let items: [ContentAssignmentView] = try await allPages(
+            base: endpoints.organization, path: "/admin/organization/\(escaped(frontId))/assignments")
+        return PagedAssignmentsView(items: items, page: 1, pageSize: items.count, total: items.count)
     }
 
     func upsertUnit(frontId: String, id: UUID, request: UpsertUnitRequest) async throws -> OrganizationUnitView {
@@ -439,7 +450,11 @@ actor LiveGenEngineAPI: GenEngineAPI {
     }
 
     func scenarios(query: String) async throws -> PagedScenariosView {
-        try await perform(method: "GET", base: endpoints.authoring, path: "/scenarios?query=\(escaped(query))&pageSize=50", body: nil, authenticated: true)
+        // Liste des brouillons possédés, présentée en entier : une page unique en cachait
+        // la fin sans le signaler. On parcourt toutes les pages.
+        let items: [ScenarioView] = try await allPages(
+            base: endpoints.authoring, path: "/scenarios?query=\(escaped(query))")
+        return PagedScenariosView(items: items, total: items.count, page: 1, pageSize: items.count)
     }
 
     func updateScenario(scenarioId: UUID, expectedRevision: Int, document: Data) async throws -> ScenarioView {
