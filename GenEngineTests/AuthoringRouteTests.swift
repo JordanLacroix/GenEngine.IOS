@@ -77,27 +77,125 @@ struct AuthoringRouteTests {
 
     /// 213 scénarios répartis en pages de 100 : les trois pages sont demandées et le total
     /// annoncé est l'effectif réel, pas la taille d'une page.
+    @Test func scenariosWalkEveryPage() async throws {
+        let recorder = RequestRecorder()
+        RouteStub.install { request in
+            recorder.record(request)
+            return (200, Fixtures.page(of: 213, at: request.url, key: "scenario"))
+        }
+        defer { RouteStub.reset() }
 
+        let page = try await makeAPI().scenarios(query: "")
+
+        #expect(page.items.count == 213)
+        #expect(page.total == 213)
+        #expect(recorder.calls.map(\.method).allSatisfy { $0 == "GET" })
+        #expect(recorder.calls.compactMap { $0.queryValue("page") } == ["1", "2", "3"])
+    }
+
+    /// Idem pour les utilisateurs, memberships et assignments : aucune liste ne s'arrête
+    /// silencieusement à la première page.
+    @Test func usersWalkEveryPage() async throws {
+        RouteStub.install { (200, Fixtures.page(of: 130, at: $0.url, key: "user")) }
+        defer { RouteStub.reset() }
+        let page = try await makeAPI().users(query: "")
+        #expect(page.items.count == 130)
+        #expect(page.total == 130)
+    }
+
+    @Test func membershipsWalkEveryPage() async throws {
+        RouteStub.install { (200, Fixtures.page(of: 250, at: $0.url, key: "membership")) }
+        defer { RouteStub.reset() }
+        let page = try await makeAPI().memberships(frontId: "default")
+        #expect(page.items.count == 250)
+        #expect(page.total == 250)
+    }
+
+    @Test func assignmentsWalkEveryPage() async throws {
+        RouteStub.install { (200, Fixtures.page(of: 140, at: $0.url, key: "assignment")) }
+        defer { RouteStub.reset() }
+        let page = try await makeAPI().assignments(frontId: "default")
+        #expect(page.items.count == 140)
+    }
 
     /// La recherche reste appliquée par le serveur, sur chaque page demandée.
+    @Test func userSearchIsForwardedOnEveryPage() async throws {
+        let recorder = RequestRecorder()
+        RouteStub.install { request in
+            recorder.record(request)
+            return (200, Fixtures.page(of: 130, at: request.url, key: "user"))
+        }
+        defer { RouteStub.reset() }
 
+        _ = try await makeAPI().users(query: "alice")
 
-
+        #expect(recorder.calls.count == 2)
+        #expect(recorder.calls.allSatisfy { $0.queryValue("query") == "alice" })
+    }
 
     /// Une liste tenant sur une seule page ne déclenche pas d'appel supplémentaire.
+    @Test func aSinglePageListStopsAfterOneRequest() async throws {
+        let recorder = RequestRecorder()
+        RouteStub.install { request in
+            recorder.record(request)
+            return (200, Fixtures.page(of: 12, at: request.url, key: "scenario"))
+        }
+        defer { RouteStub.reset() }
+
+        let page = try await makeAPI().scenarios(query: "")
+
+        #expect(page.items.count == 12)
+        #expect(recorder.calls.count == 1)
+    }
 
     // MARK: - Le plafond restant est annoncé, jamais silencieux
 
     /// Au-delà du plafond de 100 pages, le client refuse de rendre une collection tronquée.
     /// C'est tout l'objet du correctif : une liste incomplète ne doit pas se lire comme
     /// complète.
+    @Test func exceedingThePageCeilingIsAnnouncedRatherThanTruncated() async throws {
+        // 100 pages pleines de 100 éléments, plus une page de suite : le parcours atteint le
+        // plafond avant d'avoir tout lu et refuse de rendre une liste tronquée.
+        RouteStub.install { (200, Fixtures.page(of: 100 * 100 + 50, at: $0.url, key: "scenario")) }
+        defer { RouteStub.reset() }
+
+        await #expect(throws: APIError.self) {
+            _ = try await self.makeAPI().scenarios(query: "")
+        }
+    }
 
     /// Et le message dit ce qui manque, plutôt que d'être un échec opaque.
+    @Test func theCeilingErrorNamesWhatIsMissing() async throws {
+        RouteStub.install { (200, Fixtures.page(of: 100 * 100 + 50, at: $0.url, key: "scenario")) }
+        defer { RouteStub.reset() }
+
+        do {
+            _ = try await makeAPI().scenarios(query: "")
+            Issue.record("le parcours aurait dû s'interrompre au plafond")
+        } catch let APIError.incompleteList(loaded, total) {
+            #expect(loaded == 100 * 100)
+            #expect(total == 100 * 100 + 50)
+        }
+    }
 
     // MARK: - Tolérance de décodage héritée de `PagedList`
 
     /// Un serveur antérieur à l'enveloppe paginée répond par un tableau nu. Le parcours doit
     /// le lire comme une page unique complète, et non échouer.
+    @Test func aBareArrayIsReadAsOneCompletePage() async throws {
+        let recorder = RequestRecorder()
+        RouteStub.install { request in
+            recorder.record(request)
+            return (200, Fixtures.bareScenarioArray(count: 7))
+        }
+        defer { RouteStub.reset() }
+
+        let page = try await makeAPI().scenarios(query: "")
+
+        #expect(page.items.count == 7)
+        // Un tableau nu n'a pas de page suivante : une seule requête.
+        #expect(recorder.calls.count == 1)
+    }
 
     // MARK: - Outillage
 
