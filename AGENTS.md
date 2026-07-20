@@ -103,8 +103,9 @@ La CI ne fait toujours ni lint Swift, ni analyse statique du code applicatif, ni
 - Le projet Xcode est généré et volontairement ignoré.
 - Le mode démonstration doit rester navigable sans backend, tout en étant visuellement explicite.
 - L'application appelle les six services directement ; un point d'entrée public unique reste recommandé avant distribution.
-- **Aucun rendu n'a été observé en simulateur ni sur appareil** pour la coque HUD et la démonstration Diapason : seuls le build et les tests ont été exécutés, sur instruction du propriétaire du dépôt. Ne présente aucune capacité visuelle comme vérifiée.
-- Les valeurs de `HUDMetrics` (`GenEngine/Core/DesignSystem/HUD.swift`) sont des estimations non calibrées à l'écran.
+- La coque HUD et la carte du joueur **ont été observées** en simulateur, connectées à la pile locale : iPhone 17 Pro, et iPad Pro 13 pouces en portrait et en paysage. L'écran de paramètres, la bibliothèque, le Studio et l'administration ne l'ont toujours pas été, ni aucun rendu sur appareil physique ou en Dynamic Type agrandi. Ne présente comme vérifié que ce qui a été regardé.
+- Une vue qui impose sa taille intrinsèque en frère de `ZStack` — `Image` `scaledToFill`, halo décoratif à taille fixe — élargit toute la pile, qui recentre alors la coque entière hors de l'écran. Les géométries rapportées par SwiftUI restent justes pendant ce temps : mesure l'**ancêtre**, pas la vue qui paraît fautive. Les décors passent par `sceneBackdrop` ; `frame` + `clipped` ne suffit pas.
+- Les valeurs de `HUDMetrics` (`GenEngine/Core/DesignSystem/HUD.swift`) restent des estimations, sauf `railWidth: 140`, calibré à l'écran sur iPad, et `minimumTarget: 44`.
 - La seconde barre d'onglets de `PlayerExperienceView` a été retirée : les quatre panneaux (Journal, Compagnon, Magasin, Aide) sont devenus des actions du bandeau haut, la carte reste l'état de repos. Une seule barre d'onglets subsiste, celle de la coque.
 - `DeveloperView` et les vues mortes `keyStatus`, `header`, `sectionPicker` et `map` de `PlayerExperienceView` ont été supprimées.
 - Les réglages d'endpoints se modifient depuis **Paramètres du serveur** (`Features/Settings`), atteignable depuis le menu de l'accueil anonyme, depuis **Compte** et depuis **Administration → Environnement & diagnostic**.

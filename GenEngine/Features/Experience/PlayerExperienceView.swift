@@ -51,16 +51,49 @@ struct PlayerExperienceViewScreen: View {
         .fullScreenCover(isPresented: $showsKeyReward) { keyReward }
     }
 
+    /// Monde immersif.
+    ///
+    /// Le décor passe par `sceneBackdrop` et non par une `Image` posée en frère de `ZStack`.
+    /// Mesuré à l'écran sur iPad Pro 13" : `Image("WorldMap").resizable().scaledToFill()`
+    /// en frère de pile impose sa taille intrinsèque au conteneur. L'asset étant en 3:2,
+    /// dans une zone de 1236 × 906 il se mesurait 906 × 1,5 = **1359** de large — 123 de
+    /// trop. La `ZStack` adoptait cette largeur, puis toute la coque se recentrait dedans :
+    /// tout partait de 61,5 pt vers la gauche, hors de l'écran. D'où « Le Diapason » réduit
+    /// à « apason » et les libellés du rail amputés (« …univers », « …othèque »). Les
+    /// géométries rapportées par SwiftUI restaient justes, ce qui rendait le défaut
+    /// trompeur : c'est l'ancêtre qui était trop large, pas les vues fautives.
+    ///
+    /// `sceneBackdrop` pose le décor en arrière-plan clippé, où il ne participe plus au
+    /// calcul de mise en page — et court malgré tout bord à bord grâce à `ignoresSafeArea`.
+    /// Monde immersif.
+    ///
+    /// Le décor passe par `sceneBackdrop` et non par une `Image` posée en frère de `ZStack`.
+    /// Mesuré à l'écran sur iPad Pro 13" : `Image("WorldMap").resizable().scaledToFill()`
+    /// en frère de pile impose sa taille intrinsèque au conteneur — elle se mesurait 1359 de
+    /// large dans une zone de 1236. La `ZStack` adoptait cette largeur, puis toute la coque
+    /// se recentrait dedans et partait d'une soixantaine de points vers la gauche, hors de
+    /// l'écran : « Le Diapason » réduit à « apason » et libellés du rail amputés
+    /// (« …univers », « …othèque »). Les géométries rapportées par SwiftUI restaient justes,
+    /// ce qui rendait le défaut trompeur : c'est l'ancêtre qui était trop large, pas les
+    /// vues qui paraissaient fautives.
+    ///
+    /// `frame(maxWidth:maxHeight:)` suivi de `clipped()` ne suffit pas — vérifié à l'écran,
+    /// le débord persiste. Seul `sceneBackdrop` règle le cas : il pose le décor en
+    /// arrière-plan clippé, où il ne participe plus au calcul de mise en page, tout en
+    /// courant bord à bord grâce à `ignoresSafeArea`.
     private var immersiveWorld: some View {
         ZStack {
-            Image("WorldMap").resizable().scaledToFill().ignoresSafeArea()
-            LinearGradient(colors: [.black.opacity(0.36), .clear, .black.opacity(0.78)], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
             worldDoors
             if section == .map { storyDock }
             else { sectionOverlay }
             gameHUD
         }
-        .background(Color.black)
+        .sceneBackdrop(
+            image: "WorldMap",
+            overlay: LinearGradient(
+                colors: [.black.opacity(0.36), .clear, .black.opacity(0.78)],
+                startPoint: .top,
+                endPoint: .bottom))
     }
 
     /// Portes de la carte. Toutes les catégories visibles sont atteignables, sans plafond.
@@ -167,7 +200,12 @@ struct PlayerExperienceViewScreen: View {
     private var gameHUD: some View {
         VStack(spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 10) {
+                // `HStack` et non `LazyHStack` : une pile paresseuse ne publie pas de
+                // hauteur idéale fiable, et le `fixedSize` ci-dessous mesurait le bandeau
+                // trop court — les libellés « Journal », « Tierce », « Magasin » et « Aide »
+                // étaient rognés par le bord du panneau. Le bandeau compte quatre entrées :
+                // la paresse n'y gagnait rien.
+                HStack(spacing: 10) {
                     Label(state.playerExperience?.onboarding.status == "Completed" ? "Clé acquise" : "Clé à gagner", systemImage: "key.fill")
                         .font(.subheadline)
                     Text("\(state.playerExperience?.balance ?? 0) \(state.playerExperience?.currencyIcon ?? "✦")")
@@ -188,6 +226,12 @@ struct PlayerExperienceViewScreen: View {
                 .padding(6)
             }
             .scrollBounceBehavior(.basedOnSize)
+            // Même correctif que la barre basse de la coque : un `ScrollView` horizontal
+            // reste gourmand sur son axe transverse. Sans cette contrainte il prenait toute
+            // la hauteur sous la barre haute, et son matériau `glassPanel` voilait une
+            // colonne pleine hauteur de 620 pt — sur iPad, le tiers central de la carte
+            // était occulté, portes comprises, et la rangée flottait au milieu du panneau.
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: 620)
             .foregroundStyle(GenEngineTheme.ivory)
             .glassPanel()

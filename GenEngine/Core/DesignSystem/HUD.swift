@@ -6,7 +6,14 @@ import SwiftUI
 enum HUDMetrics {
     static let topBarHeight: CGFloat = 74
     static let bottomBarHeight: CGFloat = 96
-    static let railWidth: CGFloat = 108
+    /// Largeur du rail vertical iPad. Calibrée à l'écran sur iPad Pro 13" : le libellé le
+    /// plus long des destinations par défaut est « Administration », un mot insécable qui
+    /// ne se replie pas. Après retrait de la marge du rail (20), de son `padding` (2 × 8) et
+    /// du `padding` horizontal du bouton (2 × 10), il reste ici 84 pt de texte utile, ce qui
+    /// loge « Administration » et « Bibliothèque » en caption2 sans troncature.
+    /// Les libellés étant configurables par le serveur, `minimumScaleFactor` reste le
+    /// filet de sécurité pour un dictionnaire de copies plus bavard.
+    static let railWidth: CGFloat = 140
     /// Cible tactile minimale imposée par l'accessibilité.
     static let minimumTarget: CGFloat = 44
 }

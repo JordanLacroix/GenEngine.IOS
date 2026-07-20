@@ -28,13 +28,16 @@ struct GameShellView: View {
                 // dégage la zone occupée pour rester atteignable en fin de course.
                 //
                 // Ces marges passent par `safeAreaInset` et non par `safeAreaPadding` :
-                // `safeAreaPadding` agrandit réellement la vue de la marge demandée. La
-                // pile la mesurait alors plus large que l'écran et centrait tout le monde
-                // dedans — sur iPad, le HUD partait à moitié hors de l'écran par la gauche
-                // (rail réduit à quelques pixels, « Le Diapason » amputé de son article)
-                // pendant que le contenu débordait d'autant par la droite.
+                // `safeAreaPadding` agrandit réellement la vue de la marge demandée.
                 // `safeAreaInset` réserve la bande *à l'intérieur* des limites : la vue
                 // garde la taille de l'écran et le contenu défile bien sous le HUD.
+                //
+                // Attention : cette réservation ne protège de rien si la destination
+                // elle-même déborde. Un enfant qui impose sa taille intrinsèque — une
+                // `Image` `scaledToFill` posée en frère de pile, par exemple — élargit la
+                // `ZStack`, qui recentre alors *toute* la coque, HUD compris, hors de
+                // l'écran. Les destinations posent donc leur décor en arrière-plan, via
+                // `sceneBackdrop`, où il ne dicte plus la mise en page.
                 .safeAreaInset(edge: .top, spacing: 0) { hudClearance(height: HUDMetrics.topBarHeight) }
                 .safeAreaInset(edge: .leading, spacing: 0) { hudClearance(width: usesRail ? HUDMetrics.railWidth : 0) }
                 .safeAreaInset(edge: .bottom, spacing: 0) { hudClearance(height: usesRail ? 0 : HUDMetrics.bottomBarHeight) }
@@ -114,7 +117,11 @@ struct GameShellView: View {
 
     private var bottomBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 6) {
+            // `HStack` et non `LazyHStack` : une pile paresseuse ne publie pas de hauteur
+            // idéale fiable, et le `fixedSize` ci-dessous mesure alors la barre trop courte,
+            // rognant les libellés sous les icônes. Les destinations se comptent sur les
+            // doigts d'une main : la paresse n'y gagnait rien.
+            HStack(spacing: 6) {
                 ForEach(state.destinations, id: \.self) { destination in
                     destinationButton(destination, showsTitle: true)
                 }
