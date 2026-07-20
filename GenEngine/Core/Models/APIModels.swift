@@ -426,6 +426,17 @@ struct OnboardingStepDefinition: Codable, Identifiable, Sendable { let id: UUID;
 struct OnboardingDefinition: Codable, Sendable { var id: UUID; var version: Int; var enabled: Bool; var allowSkip: Bool; var requiredAfterUpgrade: Bool; var steps: [OnboardingStepDefinition] }
 struct AssistantPolicyDefinition: Codable, Sendable { var enabled: Bool; var requireFirstRunConfiguration: Bool; var proactive: Bool; var warnOnKnownPath: Bool; var defaultFrequency: Int; var offlineCapabilities: [String] }
 struct JournalPolicyDefinition: Codable, Sendable { var enabled: Bool; var allowExport: Bool; var retentionDays: Int; var showStoryTimeline: Bool }
+/// Document de configuration d'une instance.
+///
+/// Le client ne modélise qu'une partie des blocs publiés par le moteur — `media`,
+/// `finale` et `branding` notamment lui échappent aujourd'hui. Or `PUT /admin/configuration`
+/// remplace le document **entier** côté serveur (`ConfigurationService.UpsertAsync`), sans
+/// fusion : renvoyer un document amputé remet `media` à ses défauts et passe `finale` à
+/// `null`, effaçant le paramétrage d'un opérateur qui n'a touché qu'un autre écran.
+///
+/// Les blocs inconnus sont donc conservés tels quels dans `passthrough` et réémis à
+/// l'identique. Cette solution vaut aussi pour les blocs que le moteur ajoutera demain :
+/// le client n'a pas à connaître tout le contrat pour ne pas le détruire.
 struct ExperienceDocument: Codable, Sendable {
     var frontId: String
     var organizationType: String
@@ -447,6 +458,77 @@ struct ExperienceDocument: Codable, Sendable {
     var onboarding: OnboardingDefinition
     var assistantPolicy: AssistantPolicyDefinition
     var journal: JournalPolicyDefinition
+
+    /// Blocs publiés par le moteur que ce client ne modélise pas, conservés à l'identique.
+    private(set) var passthrough: [String: JSONValue] = [:]
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case frontId, organizationType, organization, game, language, authentication
+        case aiProviders, categories, familiars, economy, modules, journeys, assignments
+        case intro, playerShell, demo, help, onboarding, assistantPolicy, journal
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        frontId = try container.decode(String.self, forKey: .frontId)
+        organizationType = try container.decode(String.self, forKey: .organizationType)
+        organization = try container.decode(OrganizationDefinition.self, forKey: .organization)
+        game = try container.decode(GameDefinition.self, forKey: .game)
+        language = try container.decode(GameLanguageDefinition.self, forKey: .language)
+        authentication = try container.decode(AuthenticationDefinition.self, forKey: .authentication)
+        aiProviders = try container.decode([AIProviderDefinition].self, forKey: .aiProviders)
+        categories = try container.decode([CategoryDefinition].self, forKey: .categories)
+        familiars = try container.decode([FamiliarDefinition].self, forKey: .familiars)
+        economy = try container.decode(EconomyDefinition.self, forKey: .economy)
+        modules = try container.decode([ModuleDefinition].self, forKey: .modules)
+        journeys = try container.decodeIfPresent([JourneyDefinition].self, forKey: .journeys)
+        assignments = try container.decodeIfPresent([CatalogAssignmentDefinition].self, forKey: .assignments)
+        intro = try container.decode(IntroDefinition.self, forKey: .intro)
+        playerShell = try container.decode(PlayerShellDefinition.self, forKey: .playerShell)
+        demo = try container.decode(DemoExperienceDefinition.self, forKey: .demo)
+        help = try container.decode(HelpCenterDefinition.self, forKey: .help)
+        onboarding = try container.decode(OnboardingDefinition.self, forKey: .onboarding)
+        assistantPolicy = try container.decode(AssistantPolicyDefinition.self, forKey: .assistantPolicy)
+        journal = try container.decode(JournalPolicyDefinition.self, forKey: .journal)
+
+        let known = Set(CodingKeys.allCases.map(\.rawValue))
+        let dynamic = try decoder.container(keyedBy: DynamicCodingKey.self)
+        var unknown: [String: JSONValue] = [:]
+        for key in dynamic.allKeys where !known.contains(key.stringValue) {
+            unknown[key.stringValue] = try dynamic.decode(JSONValue.self, forKey: key)
+        }
+        passthrough = unknown
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(frontId, forKey: .frontId)
+        try container.encode(organizationType, forKey: .organizationType)
+        try container.encode(organization, forKey: .organization)
+        try container.encode(game, forKey: .game)
+        try container.encode(language, forKey: .language)
+        try container.encode(authentication, forKey: .authentication)
+        try container.encode(aiProviders, forKey: .aiProviders)
+        try container.encode(categories, forKey: .categories)
+        try container.encode(familiars, forKey: .familiars)
+        try container.encode(economy, forKey: .economy)
+        try container.encode(modules, forKey: .modules)
+        try container.encodeIfPresent(journeys, forKey: .journeys)
+        try container.encodeIfPresent(assignments, forKey: .assignments)
+        try container.encode(intro, forKey: .intro)
+        try container.encode(playerShell, forKey: .playerShell)
+        try container.encode(demo, forKey: .demo)
+        try container.encode(help, forKey: .help)
+        try container.encode(onboarding, forKey: .onboarding)
+        try container.encode(assistantPolicy, forKey: .assistantPolicy)
+        try container.encode(journal, forKey: .journal)
+
+        // Les blocs non modélisés repartent intacts, après les champs connus.
+        var dynamic = encoder.container(keyedBy: DynamicCodingKey.self)
+        for (key, value) in passthrough {
+            try dynamic.encode(value, forKey: DynamicCodingKey(key))
+        }
+    }
 }
 struct PublishedExperienceView: Decodable, Sendable {
     let version: Int

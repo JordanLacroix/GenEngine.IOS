@@ -1,0 +1,1110 @@
+{
+  "frontId": "default",
+  "organizationType": "Custom",
+  "organization": {
+    "name": "Organisation principale",
+    "description": "",
+    "units": []
+  },
+  "game": {
+    "name": "Le Diapason",
+    "description": "Dix situations professionnelles de 2026 où il faut décider sans pouvoir tout vérifier.",
+    "globalStory": "Les systèmes d'intelligence artificielle décident partout, vite, et de façon plausible. Étudiant ingénieur en alternance, vous êtes souvent la seule personne à détenir le fait qui manque. Chaque scénario vous demande ce que vous en faites.",
+    "locale": "fr-FR",
+    "timeZone": "Europe/Paris"
+  },
+  "language": {
+    "labels": {
+      "welcome.eyebrow": "Vos choix. Votre histoire.",
+      "welcome.title": "Entrez dans des mondes qui se souviennent de vous.",
+      "welcome.subtitle": "Une nouvelle génération de récits interactifs.",
+      "auth.username": "Identifiant",
+      "auth.password": "Mot de passe",
+      "auth.login": "Se connecter",
+      "auth.register": "Créer un compte",
+      "auth.microsoft": "Continuer avec Microsoft",
+      "auth.existingAccount": "J’ai déjà un compte",
+      "demo.explore": "Explorer la démo",
+      "demo.createAccount": "Continuer mon aventure",
+      "nav.home": "Accueil",
+      "nav.library": "Bibliothèque",
+      "nav.map": "Carte",
+      "nav.progress": "Progression",
+      "nav.companion": "Compagnon",
+      "nav.shop": "Magasin",
+      "nav.help": "Aide",
+      "nav.account": "Compte",
+      "nav.menu": "Menu",
+      "nav.experience": "Mon univers",
+      "nav.studio": "Studio",
+      "nav.administration": "Administration",
+      "home.discover": "À découvrir",
+      "library.resume": "Reprendre le fil",
+      "action.start": "Commencer",
+      "action.continue": "Continuer",
+      "action.close": "Fermer",
+      "entity.journey.singular": "Parcours",
+      "entity.journey.plural": "Parcours",
+      "entity.category.singular": "Catégorie",
+      "entity.category.plural": "Catégories",
+      "entity.scenario.singular": "Scénario",
+      "entity.scenario.plural": "Scénarios",
+      "entity.story.singular": "Histoire",
+      "entity.story.plural": "Histoires",
+      "entity.familiar.singular": "Familier",
+      "entity.familiar.plural": "Familiers",
+      "experience.title": "Mon univers",
+      "experience.familiar.title": "Mon familier",
+      "experience.familiar.configuration": "Configuration personnelle",
+      "experience.familiar.subtitle": "Une présence qui vous ressemble",
+      "experience.familiar.form": "Forme",
+      "experience.familiar.tone": "Ton",
+      "experience.familiar.helpLevel": "Niveau d’aide",
+      "experience.familiar.helpLow": "Discret",
+      "experience.familiar.helpHigh": "Très présent",
+      "experience.familiar.apply": "Appliquer cette personnalité",
+      "experience.familiar.saved": "Votre familier s’adaptera dès la prochaine scène.",
+      "experience.familiar.axis.aura": "Aura",
+      "experience.familiar.axis.silhouette": "Silhouette",
+      "experience.familiar.axis.speechRhythm": "Rythme d’élocution",
+      "experience.familiar.axis.languageRegister": "Registre de langage",
+      "experience.familiar.axis.interventionDensity": "Densité d’intervention",
+      "experience.familiar.preview": "Aperçu",
+      "finale.title": "Ce qui reste après vous",
+      "finale.reached": "Vous avez atteint la fin. Rien ne se ferme : les branches non ouvertes vous attendent.",
+      "finale.progress": "Progression vers la fin",
+      "finale.continue": "Continuer à jouer",
+      "experience.wallet.title": "Portefeuille",
+      "experience.wallet.empty": "Vos choix écriront ici les premières lignes de votre progression.",
+      "experience.shop.title": "Magasin",
+      "experience.shop.subtitle": "Des objets qui racontent qui vous êtes",
+      "experience.shop.owned": "Acquis",
+      "experience.shop.purchased": "Objet ajouté à votre collection.",
+      "experience.loading": "Connexion à votre univers…",
+      "studio.eyebrow": "Atelier narratif",
+      "studio.title": "Créer une nouvelle histoire",
+      "studio.generate": "Générer le scénario",
+      "studio.copilot.eyebrow": "Copilote narratif",
+      "studio.copilot.title": "Du monde global au premier brouillon",
+      "studio.copilot.subtitle": "Le moteur combine l’histoire globale, la catégorie et votre intention. Le résultat reste un brouillon, jamais publié automatiquement.",
+      "studio.prompt.label": "Votre intention",
+      "studio.category.label": "Catégorie",
+      "studio.duration.label": "Durée cible",
+      "studio.tone.label": "Ton",
+      "studio.provider.label": "Provider",
+      "studio.generateDraft": "Générer le brouillon",
+      "administration.eyebrow": "Centre de contrôle",
+      "administration.title": "Piloter l’expérience",
+      "administration.subtitle": "Le paramétrage du jeu et des accès reste séparé du Studio éditorial.",
+      "status.soon": "Bientôt"
+    }
+  },
+  "authentication": {
+    "mode": "LocalOnly",
+    "localEnabled": true,
+    "entraEnabled": false,
+    "entraTenantId": null,
+    "entraClientId": null
+  },
+  "aiProviders": [
+    {
+      "id": "3e6f6554-9b55-49ca-bd24-19e2f57e672a",
+      "name": "Hors ligne",
+      "type": "Offline",
+      "enabled": true,
+      "endpoint": "",
+      "deployment": "deterministic",
+      "authentication": "",
+      "secretReference": null,
+      "capabilities": [
+        "chat",
+        "scenario-generation"
+      ]
+    },
+    {
+      "id": "43b164f2-5a7d-48c0-b5c6-0dd7a3d44ea4",
+      "name": "Azure AI Foundry",
+      "type": "AzureAiFoundry",
+      "enabled": false,
+      "endpoint": "",
+      "deployment": "gpt-4.1-mini",
+      "authentication": "",
+      "secretReference": null,
+      "capabilities": [
+        "chat",
+        "scenario-generation",
+        "input-analysis"
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "id": "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e01",
+      "name": "Lucidité",
+      "description": "Voir ce qui est réellement là avant d'interpréter.",
+      "accent": "encre",
+      "order": 1,
+      "isVisible": true,
+      "imageUrl": null,
+      "tags": [],
+      "scenarioIds": [
+        "01b08a83-09bf-4572-a2b5-15d9e446b411",
+        "6f744bae-b907-4f3d-bb62-34f54d665957"
+      ]
+    },
+    {
+      "id": "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e02",
+      "name": "Discernement",
+      "description": "Trier ce qui compte quand tout est plausible.",
+      "accent": "azur",
+      "order": 2,
+      "isVisible": true,
+      "imageUrl": null,
+      "tags": [],
+      "scenarioIds": [
+        "16f4e765-2630-4e32-8790-9c8353797102",
+        "1da153ab-254f-494f-9aab-99dddd05a621"
+      ]
+    },
+    {
+      "id": "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e03",
+      "name": "Arbitrage",
+      "description": "Décider sous contrainte et assumer ce qu'on perd.",
+      "accent": "or",
+      "order": 3,
+      "isVisible": true,
+      "imageUrl": null,
+      "tags": [],
+      "scenarioIds": [
+        "76c40b9c-054c-415f-baf2-debf7d999635",
+        "3bf13119-6ba1-4ad4-bd72-5a79540ab3b6"
+      ]
+    },
+    {
+      "id": "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e04",
+      "name": "Courage",
+      "description": "Parler, refuser ou signaler quand c'est coûteux.",
+      "accent": "cuivre",
+      "order": 4,
+      "isVisible": true,
+      "imageUrl": null,
+      "tags": [],
+      "scenarioIds": [
+        "bd753bbd-302f-4577-bc1f-c6948b0244b5",
+        "63e54a59-3fdc-4947-8639-df1f92db51f1"
+      ]
+    },
+    {
+      "id": "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e05",
+      "name": "Transmission",
+      "description": "Rendre son raisonnement utilisable par d'autres.",
+      "accent": "sauge",
+      "order": 5,
+      "isVisible": true,
+      "imageUrl": null,
+      "tags": [],
+      "scenarioIds": [
+        "d2d25780-5ef2-41f6-8c0d-706814597995"
+      ]
+    },
+    {
+      "id": "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e06",
+      "name": "Autonomie",
+      "description": "Garder une compétence qu'on pourrait déléguer.",
+      "accent": "aube",
+      "order": 6,
+      "isVisible": true,
+      "imageUrl": null,
+      "tags": [],
+      "scenarioIds": [
+        "fe48bc33-11ff-49a8-9ef0-61c7349df036"
+      ]
+    }
+  ],
+  "familiars": [
+    {
+      "id": "04b758d1-862d-4f01-b2c9-d7f5ccf33a0f",
+      "name": "Tierce",
+      "description": "Une voix qui ne répond jamais à votre place : elle demande sur quoi vous vous appuyez.",
+      "form": "tuning-fork",
+      "writingStyle": "Socratic",
+      "tone": "Warm",
+      "accent": "amber",
+      "helpLevel": 2,
+      "capabilities": [
+        "hint",
+        "recap",
+        "rephrase"
+      ],
+      "availableForms": [
+        "tuning-fork",
+        "spark",
+        "echo",
+        "owl",
+        "fox"
+      ],
+      "availableTones": [
+        "Warm",
+        "Playful",
+        "Direct",
+        "Mysterious",
+        "Neutral"
+      ],
+      "portraitUrl": null,
+      "avatarUrl": null,
+      "backgroundUrl": null,
+      "license": null,
+      "attribution": null,
+      "axes": [
+        {
+          "axis": "form",
+          "label": "Forme",
+          "description": "La silhouette générale de la présence qui vous accompagne.",
+          "defaultValue": "tuning-fork",
+          "options": [
+            {
+              "value": "tuning-fork",
+              "label": "Diapason",
+              "description": "Un objet sobre qui vibre quand quelque chose sonne faux.",
+              "accentToken": "encre",
+              "assetReference": null,
+              "order": 1
+            },
+            {
+              "value": "spark",
+              "label": "Étincelle",
+              "description": "Un point de lumière discret, presque absent tant qu'il ne parle pas.",
+              "accentToken": "amber",
+              "assetReference": null,
+              "order": 2
+            },
+            {
+              "value": "echo",
+              "label": "Écho",
+              "description": "Une onde sans corps : rien à regarder, seulement à écouter.",
+              "accentToken": "azur",
+              "assetReference": null,
+              "order": 3
+            },
+            {
+              "value": "owl",
+              "label": "Chouette",
+              "description": "Une silhouette posée qui observe avant de commenter.",
+              "accentToken": "sauge",
+              "assetReference": null,
+              "order": 4
+            },
+            {
+              "value": "fox",
+              "label": "Renard",
+              "description": "Une présence mobile qui attire l'œil vers ce que vous n'avez pas lu.",
+              "accentToken": "cuivre",
+              "assetReference": null,
+              "order": 5
+            }
+          ]
+        },
+        {
+          "axis": "tone",
+          "label": "Ton",
+          "description": "L'humeur générale de ses interventions.",
+          "defaultValue": "Warm",
+          "options": [
+            {
+              "value": "Warm",
+              "label": "Chaleureux",
+              "description": "Il vous ménage et souligne ce que vous avez bien vu.",
+              "accentToken": "amber",
+              "assetReference": null,
+              "order": 1
+            },
+            {
+              "value": "Playful",
+              "label": "Joueur",
+              "description": "Il taquine, y compris vos raccourcis.",
+              "accentToken": "or",
+              "assetReference": null,
+              "order": 2
+            },
+            {
+              "value": "Direct",
+              "label": "Direct",
+              "description": "Il va au fait, sans préambule ni ménagement.",
+              "accentToken": "cuivre",
+              "assetReference": null,
+              "order": 3
+            },
+            {
+              "value": "Mysterious",
+              "label": "Énigmatique",
+              "description": "Il suggère plus qu'il n'explique.",
+              "accentToken": "encre",
+              "assetReference": null,
+              "order": 4
+            },
+            {
+              "value": "Neutral",
+              "label": "Neutre",
+              "description": "Il expose sans colorer.",
+              "accentToken": "azur",
+              "assetReference": null,
+              "order": 5
+            }
+          ]
+        },
+        {
+          "axis": "writingStyle",
+          "label": "Style d'écriture",
+          "description": "La façon dont il formule ce qu'il vous dit.",
+          "defaultValue": "Socratic",
+          "options": [
+            {
+              "value": "Socratic",
+              "label": "Socratique",
+              "description": "Il ne répond pas : il demande sur quoi vous vous appuyez.",
+              "accentToken": "encre",
+              "assetReference": null,
+              "order": 1
+            },
+            {
+              "value": "Concise",
+              "label": "Concis",
+              "description": "Une phrase, jamais deux.",
+              "accentToken": "azur",
+              "assetReference": null,
+              "order": 2
+            },
+            {
+              "value": "Narrative",
+              "label": "Narratif",
+              "description": "Il replace ce que vous vivez dans l'histoire en cours.",
+              "accentToken": "sauge",
+              "assetReference": null,
+              "order": 3
+            },
+            {
+              "value": "Analytical",
+              "label": "Analytique",
+              "description": "Il décompose la situation en éléments vérifiables.",
+              "accentToken": "or",
+              "assetReference": null,
+              "order": 4
+            },
+            {
+              "value": "Laconic",
+              "label": "Laconique",
+              "description": "Il se contente d'un mot quand un mot suffit.",
+              "accentToken": "cuivre",
+              "assetReference": null,
+              "order": 5
+            }
+          ]
+        },
+        {
+          "axis": "accent",
+          "label": "Couleur",
+          "description": "La teinte dominante de son apparence et de ses bulles.",
+          "defaultValue": "amber",
+          "options": [
+            {
+              "value": "amber",
+              "label": "Ambre",
+              "description": "Une lumière chaude, lisible sur fond sombre.",
+              "accentToken": "amber",
+              "assetReference": null,
+              "order": 1
+            },
+            {
+              "value": "encre",
+              "label": "Encre",
+              "description": "Un bleu profond, presque noir.",
+              "accentToken": "encre",
+              "assetReference": null,
+              "order": 2
+            },
+            {
+              "value": "azur",
+              "label": "Azur",
+              "description": "Un bleu clair, franc et froid.",
+              "accentToken": "azur",
+              "assetReference": null,
+              "order": 3
+            },
+            {
+              "value": "or",
+              "label": "Or",
+              "description": "Un jaune dense réservé aux moments d'arbitrage.",
+              "accentToken": "or",
+              "assetReference": null,
+              "order": 4
+            },
+            {
+              "value": "cuivre",
+              "label": "Cuivre",
+              "description": "Un orange métallique qui accroche le regard.",
+              "accentToken": "cuivre",
+              "assetReference": null,
+              "order": 5
+            },
+            {
+              "value": "sauge",
+              "label": "Sauge",
+              "description": "Un vert éteint, reposant sur de longues sessions.",
+              "accentToken": "sauge",
+              "assetReference": null,
+              "order": 6
+            },
+            {
+              "value": "aube",
+              "label": "Aube",
+              "description": "Un rose pâle, le plus discret du jeu.",
+              "accentToken": "aube",
+              "assetReference": null,
+              "order": 7
+            }
+          ]
+        },
+        {
+          "axis": "aura",
+          "label": "Aura",
+          "description": "Le halo qui l'entoure lorsqu'il intervient.",
+          "defaultValue": "none",
+          "options": [
+            {
+              "value": "none",
+              "label": "Aucune",
+              "description": "Aucun halo : la forme seule.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 1
+            },
+            {
+              "value": "halo",
+              "label": "Halo",
+              "description": "Un cercle net autour de la forme.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 2
+            },
+            {
+              "value": "glow",
+              "label": "Lueur",
+              "description": "Un dégradé diffus qui pulse lentement.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 3
+            },
+            {
+              "value": "ripple",
+              "label": "Onde",
+              "description": "Une onde qui part de la forme à chaque intervention.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 4
+            }
+          ]
+        },
+        {
+          "axis": "silhouette",
+          "label": "Silhouette",
+          "description": "Sa densité visuelle à l'écran.",
+          "defaultValue": "compact",
+          "options": [
+            {
+              "value": "compact",
+              "label": "Compacte",
+              "description": "Petite, en marge du texte.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 1
+            },
+            {
+              "value": "standard",
+              "label": "Standard",
+              "description": "La taille par défaut, à côté de la scène.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 2
+            },
+            {
+              "value": "expansive",
+              "label": "Ample",
+              "description": "Occupe visiblement l'écran quand il parle.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 3
+            },
+            {
+              "value": "minimal",
+              "label": "Minimale",
+              "description": "Réduite à un point ; seul le texte reste.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 4
+            }
+          ]
+        },
+        {
+          "axis": "speechRhythm",
+          "label": "Rythme d'élocution",
+          "description": "La vitesse à laquelle son texte se déroule.",
+          "defaultValue": "instant",
+          "options": [
+            {
+              "value": "instant",
+              "label": "Immédiat",
+              "description": "Le texte apparaît d'un bloc.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 1
+            },
+            {
+              "value": "measured",
+              "label": "Mesuré",
+              "description": "Le texte se déroule à la vitesse d'une lecture calme.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 2
+            },
+            {
+              "value": "slow",
+              "label": "Lent",
+              "description": "Le texte se déroule mot à mot.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 3
+            }
+          ]
+        },
+        {
+          "axis": "languageRegister",
+          "label": "Registre de langage",
+          "description": "Le niveau de langue qu'il emploie avec vous.",
+          "defaultValue": "standard",
+          "options": [
+            {
+              "value": "standard",
+              "label": "Courant",
+              "description": "Un français neutre et professionnel.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 1
+            },
+            {
+              "value": "familiar",
+              "label": "Familier",
+              "description": "Il vous tutoie et raccourcit ses phrases.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 2
+            },
+            {
+              "value": "formal",
+              "label": "Soutenu",
+              "description": "Il vous vouvoie et pèse chaque terme.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 3
+            },
+            {
+              "value": "technical",
+              "label": "Technique",
+              "description": "Il emploie le vocabulaire du métier sans le traduire.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 4
+            }
+          ]
+        },
+        {
+          "axis": "interventionDensity",
+          "label": "Densité d'intervention",
+          "description": "La place qu'il prend sans que vous le sollicitiez.",
+          "defaultValue": "silent",
+          "options": [
+            {
+              "value": "silent",
+              "label": "Silencieux",
+              "description": "Il n'intervient jamais sans être appelé.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 1
+            },
+            {
+              "value": "sparse",
+              "label": "Rare",
+              "description": "Il intervient aux moments décisifs seulement.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 2
+            },
+            {
+              "value": "regular",
+              "label": "Régulier",
+              "description": "Il commente chaque scène une fois.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 3
+            },
+            {
+              "value": "constant",
+              "label": "Constant",
+              "description": "Il réagit à presque chacun de vos gestes.",
+              "accentToken": null,
+              "assetReference": null,
+              "order": 4
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "economy": {
+    "currencyCode": "ACCORD",
+    "currencyName": "Accords",
+    "currencyIcon": "♪",
+    "initialBalance": 0,
+    "rewardRules": [
+      {
+        "trigger": "ScenarioCompleted",
+        "referenceId": "*",
+        "amount": 25,
+        "description": "Terminer un scénario"
+      },
+      {
+        "trigger": "RewardGranted",
+        "referenceId": "frequence-du-doute",
+        "amount": 15,
+        "description": "Avoir suspendu une conclusion trop fluide"
+      },
+      {
+        "trigger": "RewardGranted",
+        "referenceId": "frequence-des-biais",
+        "amount": 15,
+        "description": "Avoir identifié ce qu'un système mesure réellement"
+      }
+    ],
+    "offers": [
+      {
+        "id": "370b6f82-a264-45cc-a0d0-2d71e58be15e",
+        "name": "Sourdine de cuivre",
+        "description": "Une apparence rare pour le familier.",
+        "price": 80,
+        "rewardType": "FamiliarCosmetic",
+        "rewardReference": "copper-mute",
+        "enabled": true
+      }
+    ]
+  },
+  "modules": [
+    {
+      "id": "play",
+      "name": "Jouer",
+      "description": "Accéder aux histoires publiées.",
+      "enabled": true,
+      "requiredPermissions": [
+        "session.play"
+      ]
+    },
+    {
+      "id": "studio",
+      "name": "Studio",
+      "description": "Créer, générer et publier des scénarios.",
+      "enabled": true,
+      "requiredPermissions": [
+        "scenario.author"
+      ]
+    },
+    {
+      "id": "administration",
+      "name": "Administration",
+      "description": "Configurer le jeu, les accès et les providers.",
+      "enabled": true,
+      "requiredPermissions": [
+        "config.read"
+      ]
+    },
+    {
+      "id": "shop",
+      "name": "Magasin",
+      "description": "Dépenser les monnaies narratives.",
+      "enabled": true,
+      "requiredPermissions": [
+        "shop.read"
+      ]
+    }
+  ],
+  "journeys": [
+    {
+      "id": "7d4c2a10-1b3e-4f52-8a6d-9c0e2f4a6b01",
+      "name": "Le premier accord",
+      "description": "Établir les faits avant de les interpréter, et distinguer ce qu'un système mesure de ce qu'il prétend constater.",
+      "accent": "encre",
+      "imageUrl": null,
+      "order": 1,
+      "isVisible": true,
+      "categoryIds": [
+        "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e01",
+        "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e02"
+      ],
+      "prerequisiteJourneyIds": [],
+      "tags": [
+        "provenance",
+        "preuve"
+      ]
+    },
+    {
+      "id": "7d4c2a10-1b3e-4f52-8a6d-9c0e2f4a6b02",
+      "name": "La chaîne de décision",
+      "description": "Décider sous contrainte, assumer ce qu'on perd, et parler au bon moment dans la bonne forme.",
+      "accent": "or",
+      "imageUrl": null,
+      "order": 2,
+      "isVisible": true,
+      "categoryIds": [
+        "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e03",
+        "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e04"
+      ],
+      "prerequisiteJourneyIds": [
+        "7d4c2a10-1b3e-4f52-8a6d-9c0e2f4a6b01"
+      ],
+      "tags": [
+        "arbitrage",
+        "alerte"
+      ]
+    },
+    {
+      "id": "7d4c2a10-1b3e-4f52-8a6d-9c0e2f4a6b03",
+      "name": "Ce qui reste après toi",
+      "description": "Écrire ce qui doit être vrai, et garder les compétences qu'on pourrait déléguer.",
+      "accent": "sauge",
+      "imageUrl": null,
+      "order": 3,
+      "isVisible": true,
+      "categoryIds": [
+        "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e05",
+        "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e06"
+      ],
+      "prerequisiteJourneyIds": [
+        "7d4c2a10-1b3e-4f52-8a6d-9c0e2f4a6b02"
+      ],
+      "tags": [
+        "spécification",
+        "autonomie"
+      ]
+    }
+  ],
+  "assignments": [],
+  "intro": {
+    "enabled": true,
+    "displayPolicy": "OncePerVersion",
+    "allowSkip": true,
+    "minimumDisplaySeconds": 0,
+    "scenes": [
+      {
+        "id": "59ee8932-281f-4fbc-a02b-90221d0a0ad4",
+        "eyebrow": "Le Diapason",
+        "title": "Une réponse fluide n'est pas une réponse vérifiée.",
+        "body": "2026. Vous êtes étudiant ingénieur en alternance. Personne autour de vous n'a le temps de douter, et vous êtes souvent la seule personne à détenir le fait qui manque. Ce que vous en faites vous appartient.",
+        "imageUrl": null,
+        "order": 1
+      }
+    ]
+  },
+  "playerShell": {
+    "navigation": [
+      {
+        "destination": "map",
+        "labelKey": "nav.map",
+        "icon": "map",
+        "order": 1,
+        "enabled": true,
+        "requiredModule": "play"
+      },
+      {
+        "destination": "progress",
+        "labelKey": "nav.progress",
+        "icon": "chart",
+        "order": 2,
+        "enabled": true,
+        "requiredModule": "play"
+      },
+      {
+        "destination": "companion",
+        "labelKey": "nav.companion",
+        "icon": "sparkles",
+        "order": 3,
+        "enabled": true,
+        "requiredModule": "assistant"
+      },
+      {
+        "destination": "shop",
+        "labelKey": "nav.shop",
+        "icon": "bag",
+        "order": 4,
+        "enabled": true,
+        "requiredModule": "shop"
+      },
+      {
+        "destination": "help",
+        "labelKey": "nav.help",
+        "icon": "help",
+        "order": 5,
+        "enabled": true,
+        "requiredModule": null
+      },
+      {
+        "destination": "account",
+        "labelKey": "nav.account",
+        "icon": "account",
+        "order": 6,
+        "enabled": true,
+        "requiredModule": null
+      }
+    ]
+  },
+  "demo": {
+    "enabled": true,
+    "scenarioSlug": "la-note-de-service",
+    "targetMinutes": 18,
+    "familiarId": "04b758d1-862d-4f01-b2c9-d7f5ccf33a0f",
+    "callToActionLabelKey": "demo.createAccount"
+  },
+  "help": {
+    "enabled": true,
+    "articles": [
+      {
+        "id": "b01faeca-c3a6-4e44-9374-bf1f5f23a948",
+        "slug": "premiers-pas",
+        "title": "Premiers pas",
+        "summary": "Comprendre la carte, les scénarios et votre progression.",
+        "body": "Votre carte rassemble les parcours et catégories accessibles. Ouvrez une catégorie pour découvrir ses scénarios.",
+        "contexts": [
+          "map",
+          "onboarding"
+        ],
+        "tags": [
+          "débuter",
+          "carte"
+        ],
+        "order": 1,
+        "published": true
+      },
+      {
+        "id": "b6adb4dc-a161-45db-989d-5a34786b54fe",
+        "slug": "rejouer",
+        "title": "Explorer d’autres chemins",
+        "summary": "Rejouez sans perdre vos découvertes.",
+        "body": "Chaque nouvelle branche enrichit votre arbre et votre journal. Votre compagnon peut vous prévenir avant un chemin déjà parcouru.",
+        "contexts": [
+          "player",
+          "completion",
+          "progress"
+        ],
+        "tags": [
+          "rejeu",
+          "arbre"
+        ],
+        "order": 2,
+        "published": true
+      }
+    ],
+    "glossary": [
+      {
+        "term": "Parcours",
+        "definition": "Un ensemble ordonné de catégories qui compose une aventure globale."
+      },
+      {
+        "term": "Maîtrise",
+        "definition": "La part des fins, branches et jalons d’exploration que vous avez découverts."
+      }
+    ]
+  },
+  "onboarding": {
+    "id": "9cccf7f7-fba6-45ff-a3be-42d8993bb8cc",
+    "version": 1,
+    "enabled": true,
+    "allowSkip": true,
+    "requiredAfterUpgrade": false,
+    "steps": [
+      {
+        "id": "7b28af3a-e075-420f-9a60-c42cae6fdfea",
+        "title": "Votre compagnon",
+        "body": "Je resterai à vos côtés et vous aiderai sans choisir à votre place.",
+        "target": "companion",
+        "action": "open",
+        "order": 1,
+        "required": true
+      },
+      {
+        "id": "eea6be3b-1810-45ea-8428-9fc4adb42aa2",
+        "title": "Votre carte",
+        "body": "Explorez les catégories pour retrouver les scénarios accessibles.",
+        "target": "map",
+        "action": "open",
+        "order": 2,
+        "required": true
+      },
+      {
+        "id": "17664c57-f8b0-4106-897b-a55e4d918429",
+        "title": "Votre progression",
+        "body": "Chaque fin et chaque branche découverte enrichissent votre journal.",
+        "target": "progress",
+        "action": "open",
+        "order": 3,
+        "required": true
+      }
+    ]
+  },
+  "assistantPolicy": {
+    "enabled": true,
+    "requireFirstRunConfiguration": true,
+    "proactive": true,
+    "warnOnKnownPath": true,
+    "defaultFrequency": 2,
+    "offlineCapabilities": [
+      "hint",
+      "recap",
+      "rephrase",
+      "known-path-warning"
+    ]
+  },
+  "journal": {
+    "enabled": true,
+    "allowExport": true,
+    "retentionDays": 0,
+    "showStoryTimeline": true
+  },
+  "media": {
+    "enabled": true,
+    "defaultMuted": true,
+    "locations": [
+      {
+        "location": "home",
+        "ambienceUrl": null,
+        "musicUrl": null,
+        "backgroundUrl": null,
+        "backgroundDescription": null,
+        "bpm": null,
+        "loop": true
+      },
+      {
+        "location": "map",
+        "ambienceUrl": null,
+        "musicUrl": null,
+        "backgroundUrl": null,
+        "backgroundDescription": null,
+        "bpm": null,
+        "loop": true
+      },
+      {
+        "location": "player",
+        "ambienceUrl": null,
+        "musicUrl": null,
+        "backgroundUrl": null,
+        "backgroundDescription": null,
+        "bpm": null,
+        "loop": true
+      },
+      {
+        "location": "journal",
+        "ambienceUrl": null,
+        "musicUrl": null,
+        "backgroundUrl": null,
+        "backgroundDescription": null,
+        "bpm": null,
+        "loop": true
+      },
+      {
+        "location": "familiar",
+        "ambienceUrl": null,
+        "musicUrl": null,
+        "backgroundUrl": null,
+        "backgroundDescription": null,
+        "bpm": null,
+        "loop": true
+      },
+      {
+        "location": "shop",
+        "ambienceUrl": null,
+        "musicUrl": null,
+        "backgroundUrl": null,
+        "backgroundDescription": null,
+        "bpm": null,
+        "loop": true
+      }
+    ],
+    "gameOver": {
+      "musicUrl": null,
+      "visualUrl": null,
+      "visualDescription": null,
+      "labelKey": "gameOver.title"
+    }
+  },
+  "branding": {
+    "applicationName": "Le Diapason",
+    "shortName": "Diapason",
+    "tagline": "Une réponse fluide n'est pas une réponse vérifiée.",
+    "brandIconUrl": null,
+    "clientIconUrl": null,
+    "logoUrl": null,
+    "faviconUrl": null,
+    "theme": {
+      "colors": {
+        "ink": "#17344a",
+        "muted": "#c8b98d",
+        "accent": "#d7a746",
+        "danger": "#a33b2a",
+        "success": "#7a9a55",
+        "surface": "#fffaf0",
+        "warning": "#c98a2e",
+        "accentAlt": "#2f7fa0"
+      },
+      "colorScheme": "Light",
+      "cornerRadius": 12,
+      "fontFamily": "Georgia, \"Times New Roman\", serif"
+    },
+    "accentPalette": {
+      "or": "#d7a746",
+      "aube": "#e8b98c",
+      "azur": "#2f7fa0",
+      "amber": "#c98a2e",
+      "encre": "#17344a",
+      "sauge": "#7a9a55",
+      "cuivre": "#b0733a"
+    }
+  },
+  "finale": {
+    "id": "5f2c8b41-7d10-4a63-9e58-3c17a4b6d201",
+    "enabled": true,
+    "title": "Ce qui reste après vous",
+    "summary": "Vous avez traversé les six postures. Ce que vous en gardez vous appartient.",
+    "body": "Vous n'avez pas gagné, et vous n'avez rien perdu non plus. Vous avez décidé dix fois sans pouvoir tout vérifier, et chaque décision a laissé une trace lisible par quelqu'un d'autre. Le Diapason continue : les scénarios déjà joués gardent des branches que vous n'avez pas ouvertes.",
+    "mode": "All",
+    "conditions": [
+      {
+        "id": "5f2c8b41-7d10-4a63-9e58-3c17a4b6d211",
+        "type": "CategoryCompleted",
+        "description": "Avoir terminé la posture « Autonomie ».",
+        "threshold": null,
+        "categoryId": "2b0f1f8c-6f2f-4a1e-9c4a-0f3a1d5b7e06",
+        "journeyId": null,
+        "endingIds": null,
+        "scenarioIds": null
+      },
+      {
+        "id": "5f2c8b41-7d10-4a63-9e58-3c17a4b6d212",
+        "type": "ScenariosCompleted",
+        "description": "Avoir terminé au moins huit scénarios, quels qu'ils soient.",
+        "threshold": 8,
+        "categoryId": null,
+        "journeyId": null,
+        "endingIds": null,
+        "scenarioIds": null
+      }
+    ],
+    "visualUrl": null,
+    "musicUrl": null,
+    "labelKey": "finale.title"
+  }
+}
