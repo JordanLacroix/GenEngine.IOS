@@ -19,22 +19,33 @@ struct BrandingLeakTests {
     }
 
     /// Le dernier repli du nom affiché, quand le moteur n'a pas encore répondu. Il lit le
-    /// nom livré dans le paquet, et ce nom ne doit pas être celui du moteur.
-    @Test func theCompiledFallbackIsNotTheEngineName() {
+    /// nom livré dans le paquet — jamais un littéral de configuration.
+    ///
+    /// Le paquet porte délibérément le nom du **moteur** : le binaire est GenEngine, et
+    /// « Le Diapason » est une configuration servie à l'exécution. Une instance cliente
+    /// redéfinit `CFBundleDisplayName` en recompilant avec sa propre marque ; c'est le
+    /// seul moment où ce nom peut changer, puisqu'il est figé à la compilation.
+    ///
+    /// Ce que le test verrouille est donc la **provenance**, pas la valeur : le repli lit
+    /// le paquet, il n'invente pas et ne code en dur aucun nom de configuration.
+    @Test func theCompiledFallbackReadsTheBundleAndNotAConfigurationLiteral() {
         #expect(AppState.bundleDisplayName.isEmpty == false)
-        #expect(AppState.bundleDisplayName != "GenEngine")
+        let bundleName = (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+            ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)
+        #expect(AppState.bundleDisplayName == bundleName)
+        #expect(AppState.bundleDisplayName != "Le Diapason")
     }
 
     /// Sans amorce cliente — moteur injoignable au tout premier lancement — le nom affiché
-    /// retombe sur le paquet, jamais sur « GenEngine ».
-    @Test func theDisplayedNameNeverFallsBackToTheEngineName() {
+    /// retombe sur celui du paquet, et sur rien d'autre.
+    @Test func theDisplayedNameFallsBackToTheBundleName() {
         let state = AppState(vault: StubVault(token: nil))
-        #expect(state.gameName != "GenEngine")
         #expect(state.gameName == AppState.bundleDisplayName)
     }
 
     // Que le nom **servi** prime sur ce repli est déjà verrouillé par
     // `ClientBootstrapTests.decodesTheServedBootstrap` et par l'ordre de résolution de
-    // `AppState.gameName` ; ce fichier ne couvre que le repli lui-même, qui est le seul
-    // endroit où « GenEngine » pouvait encore fuir sans qu'aucun test ne le voie.
+    // `AppState.gameName`. C'est cette priorité qui empêche réellement la fuite : dès que
+    // le moteur répond, l'utilisateur lit le nom de sa configuration partout dans
+    // l'interface, et le nom du paquet ne subsiste que sous l'icône de l'appareil.
 }

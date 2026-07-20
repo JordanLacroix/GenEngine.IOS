@@ -157,13 +157,14 @@ final class AppState {
     }
 
     /// Dernier repli du nom affiché, quand le moteur est injoignable au tout premier
-    /// lancement. Il lit le nom livré dans le paquet plutôt que « GenEngine » : le client
-    /// est industrialisé par instance, et un joueur du Diapason ne doit jamais lire le nom
-    /// du moteur là où il attend le nom de sa configuration.
+    /// lancement. Il lit le nom livré dans le paquet, que chaque instance cliente
+    /// redéfinit en recompilant avec sa propre marque. Le repli ultime reste « GenEngine » :
+    /// le binaire est le moteur, et « Le Diapason » est une configuration servie à
+    /// l'exécution par GET /client-bootstrap — l'inscrire ici en dur confondrait les deux.
     static let bundleDisplayName: String =
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)?.nonEmpty
             ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)?.nonEmpty
-            ?? "Le Diapason"
+            ?? "GenEngine"
 
     /// Accroche de la configuration, si le moteur en publie une.
     var tagline: String? {
