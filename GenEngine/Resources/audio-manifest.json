@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "attribution": "Signatures : Kenney (kenney.nl), Interface Sounds. Ambiances « welcome », « home », « library », « studio », « administration », « world » : cynicmusic (The Cynic Project, cynicmusic.com). Ambiance « session » : TinyWorlds. Ambiance « account » et signature « gameOver » : Wolfgang_.",
+  "license": "CC0 1.0 Universal (domaine public) pour la totalité du pack.",
+  "ambiences": {
+    "welcome": { "resource": "welcome", "fileExtension": "m4a", "gain": 0.85 },
+    "home": { "resource": "home", "fileExtension": "m4a", "gain": 0.9 },
+    "library": { "resource": "library", "fileExtension": "m4a", "gain": 0.9 },
+    "world": { "resource": "world", "fileExtension": "m4a", "gain": 0.9 },
+    "studio": { "resource": "studio", "fileExtension": "m4a", "gain": 0.75 },
+    "administration": { "resource": "administration", "fileExtension": "m4a", "gain": 0.7 },
+    "account": { "resource": "account", "fileExtension": "m4a", "gain": 0.85 },
+    "session": { "resource": "session", "fileExtension": "m4a", "gain": 0.8 }
+  },
+  "cues": {
+    "choice": { "resource": "choice", "fileExtension": "caf" },
+    "error": { "resource": "error", "fileExtension": "caf", "gain": 0.9 },
+    "reward": { "resource": "reward", "fileExtension": "caf" },
+    "gameOver": { "resource": "gameover", "fileExtension": "m4a", "loops": false }
+  }
+}
