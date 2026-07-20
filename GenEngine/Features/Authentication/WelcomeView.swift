@@ -166,7 +166,7 @@ struct WelcomeView: View {
     private var fallbackIntroScenes: [IntroSceneDefinition] {
         [
             .init(id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!, eyebrow: "AVANT LE PREMIER CHOIX", title: "Chaque monde commence par une porte.", body: "Rien n’est écrit à votre place. Vos décisions dessinent la route et les souvenirs.", imageUrl: "IntroGateway", order: 1),
-            .init(id: UUID(uuidString: "10000000-0000-0000-0000-000000000002")!, eyebrow: "UNE PRÉSENCE À VOS CÔTÉS", title: "Créez le familier qui apprendra votre manière d’avancer.", body: "Il conseille, éclaire un détail et reformule une énigme ; il ne choisit jamais pour vous.", imageUrl: "FamiliarAster", order: 2),
+            .init(id: UUID(uuidString: "10000000-0000-0000-0000-000000000002")!, eyebrow: "UNE PRÉSENCE À VOS CÔTÉS", title: "Créez le familier qui apprendra votre manière d’avancer.", body: "Il conseille, éclaire un détail et reformule une énigme ; il ne choisit jamais pour vous.", imageUrl: "FamiliarTierce", order: 2),
             .init(id: UUID(uuidString: "10000000-0000-0000-0000-000000000003")!, eyebrow: "LE PROLOGUE", title: "Votre première histoire vous remettra une clé.", body: "Terminez le tutoriel, relisez votre chemin, puis ouvrez la porte de votre choix.", imageUrl: "TutorialKey", order: 3)
         ]
     }

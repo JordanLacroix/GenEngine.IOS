@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Portrait abstrait de Tierce : un diapason d'ambre dont les deux branches émettent deux ondes séparées par un intervalle.">
+  <title>Tierce</title>
+  <desc>
+    Portrait du familier « Tierce ». Sa forme par défaut est `tuning-fork` et son ton
+    `Warm` : la composition les encode plutôt qu'elle ne les illustre. Deux branches,
+    deux ondes décalées d'un intervalle — une tierce — et rien d'autre. Aucun visage,
+    aucun animal, aucune créature : Tierce n'est pas un personnage mais une voix qui
+    demande sur quoi vous vous appuyez. Le graphisme reste lisible à quarante-cinq
+    pixels, taille à laquelle il est affiché dans le bandeau du compagnon.
+  </desc>
+
+  <defs>
+    <radialGradient id="tierce-ground" cx="0.5" cy="0.42" r="0.66">
+      <stop offset="0%" stop-color="#123047"/>
+      <stop offset="58%" stop-color="#0b1c2b"/>
+      <stop offset="100%" stop-color="#050d14"/>
+    </radialGradient>
+
+    <radialGradient id="tierce-warmth" cx="0.5" cy="0.38" r="0.5">
+      <stop offset="0%" stop-color="#f0c877" stop-opacity="0.30"/>
+      <stop offset="55%" stop-color="#d7a746" stop-opacity="0.09"/>
+      <stop offset="100%" stop-color="#d7a746" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- `userSpaceOnUse` obligatoire : le pied et la traverse sont des segments
+         de boîte englobante plate, où un dégradé en unités relatives est
+         indéfini — les traits disparaîtraient au rendu. -->
+    <linearGradient id="tierce-metal" gradientUnits="userSpaceOnUse" x1="256" y1="118" x2="256" y2="418">
+      <stop offset="0%" stop-color="#ffdc9b"/>
+      <stop offset="62%" stop-color="#d7a746"/>
+      <stop offset="100%" stop-color="#a86c34"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#tierce-ground)"/>
+  <rect width="512" height="512" fill="url(#tierce-warmth)"/>
+
+  <!-- Ondes concentriques : le ton `Warm`, en cercles larges et lents. -->
+  <g fill="none" stroke="#d7a746" stroke-opacity="0.16">
+    <circle cx="256" cy="238" r="112" stroke-width="1.4"/>
+    <circle cx="256" cy="238" r="158" stroke-width="1.2"/>
+    <circle cx="256" cy="238" r="212" stroke-width="1"/>
+  </g>
+
+  <!-- L'intervalle. Deux ondes de même forme, séparées verticalement : c'est la
+       tierce, et c'est tout le nom du personnage. -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M28 300 C 86 300 104 254 148 254 C 192 254 210 346 254 346"
+      stroke="#7a9a55" stroke-opacity="0.46" stroke-width="3.2"/>
+    <path d="M258 300 C 302 300 320 208 364 208 C 408 208 426 300 484 300"
+      stroke="#f0c877" stroke-opacity="0.62" stroke-width="3.6"/>
+  </g>
+
+  <!-- Le diapason. Trait épais, silhouette fermée : c'est ce qui doit survivre
+       à la réduction en vignette de quarante-cinq pixels. -->
+  <g stroke="url(#tierce-metal)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M200 126 V 262 a 56 56 0 0 0 112 0 V 126" stroke-width="26"/>
+    <path d="M256 318 V 404" stroke-width="26"/>
+    <path d="M226 404 h 60" stroke-width="26"/>
+  </g>
+  <g fill="#ffe7b4">
+    <circle cx="200" cy="122" r="14"/>
+    <circle cx="312" cy="122" r="14"/>
+  </g>
+</svg>
